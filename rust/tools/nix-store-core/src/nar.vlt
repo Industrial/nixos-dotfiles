@@ -1,0 +1,241 @@
+-- The NAR serialisation of a store path, as a pull cursor.
+--
+-- The format is libutil's `dumpPath`: every string is a little-endian u64
+-- length, the bytes, then zero padding to a multiple of eight. A node is
+-- `( type regular [executable ""] contents <bytes> )`, `( type symlink target
+-- <bytes> )` or `( type directory (entry ( name <n> node <node> ))* )`, with
+-- directory entries in byte order of their names. The whole archive is
+-- `nix-archive-1` followed by the root node.
+--
+-- The cursor holds a stack of what is left to emit and hands out chunks of at
+-- most about CHUNK bytes per pull, so a multi-gigabyte path costs one chunk of
+-- memory and nothing is produced before the consumer asks for it. `stream` is
+-- the id_effect face (an HTTP body pulls it); `dump` drives the same cursor
+-- into any `Write`, and `nar_hash` into a SHA-256, which is what the
+-- conformance and golden tests compare with Nix.
+
+import bytes::Bytes
+import id_effect::{Effect, HNil, Stream, fail, succeed, suspend}
+import std::collections::VecDeque
+import std::ffi::OsString
+import std::io::Read
+import std::io::Write
+import std::path::{Path, PathBuf}
+import std::os::unix::ffi::OsStrExt
+import std::os::unix::fs::PermissionsExt
+import sha2::Digest
+import crate::hash::Sha256
+
+export const MAGIC : &str = "nix-archive-1"
+
+-- Bytes per pull, and per read of a regular file.
+export const CHUNK : usize = 262144
+
+const READ_MAX : u64 = 262144
+
+const ZEROS : [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0]
+
+-- The owner-execute bit, the only mode bit a NAR records (S_IXUSR, 0o100).
+const OWNER_EXEC : u32 = 64
+
+-- Zero bytes after a string of `len` bytes. Always below eight, so the
+-- conversion cannot fail.
+export padding : u64 -> usize
+padding len =
+  usize::try_from ((8 - len % 8) % 8) |> .unwrap_or 0
+
+-- One string: length, bytes, padding.
+export push_bytes : &mut Vec<u8> -> &[u8] -> ()
+push_bytes out s =
+  n = u64::try_from (s.len ()) |> .unwrap_or u64::MAX
+  out.extend_from_slice (&n.to_le_bytes ())
+  out.extend_from_slice s
+  out.extend_from_slice (&ZEROS[0 .. padding n])
+  ()
+
+-- Several fixed tokens in a row.
+tokens : &mut Vec<u8> -> &[&str] -> ()
+tokens out ts =
+  for t in ts
+    push_bytes out (t.as_bytes ())
+  ()
+
+encoded : &[&str] -> Vec<u8>
+encoded ts =
+  mut out = Vec::new () : Vec<u8>
+  tokens (&mut out) ts
+  out
+
+-- What is left to emit, innermost last.
+export data Step
+  = Emit Vec<u8>
+  | Visit PathBuf
+  | Contents std::fs::File u64
+  | Entries PathBuf (VecDeque<OsString>)
+
+export data NarCursor { stack Vec<Step>, out Vec<u8> }
+
+-- The archive of `path`, nothing read yet.
+export cursor : &Path -> NarCursor
+cursor path =
+  mut out = Vec::with_capacity CHUNK : Vec<u8>
+  tokens (&mut out) (&[MAGIC])
+  stack = Vec::from ([Visit (path.to_path_buf ())])
+  NarCursor { stack, out }
+
+-- The next chunk, or None once the archive is complete.
+export next_chunk : &mut NarCursor -> std::io::Result<Option<Bytes>>
+next_chunk c =
+  while c.out.len () < CHUNK && !c.stack.is_empty ()
+    if c.stack.pop () is Some step
+      (advance c step)?
+  if c.out.is_empty ()
+    Ok None
+  else
+    Ok (Some (Bytes::from (std::mem::take (&mut c.out))))
+
+advance : &mut NarCursor -> Step -> std::io::Result<()>
+advance c step =
+  case step of
+    Emit bytes -> emit c bytes
+    Visit path -> visit c path
+    Contents file left -> contents c file left
+    Entries dir names -> entries c dir names
+
+emit : &mut NarCursor -> Vec<u8> -> std::io::Result<()>
+emit c bytes =
+  c.out.extend_from_slice (&bytes)
+  Ok ()
+
+-- Entries sorted by the bytes of their names, which is the order Nix uses.
+sorted_names : &Path -> std::io::Result<VecDeque<OsString>>
+sorted_names dir =
+  mut names = Vec::new () : Vec<OsString>
+  for entry in (std::fs::read_dir dir)?
+    e = entry?
+    names.push (e.file_name ())
+  names.sort_by (\a b -> a.as_bytes ().cmp (b.as_bytes ()))
+  Ok (VecDeque::from names)
+
+-- One node, whatever its type. Symlinks are not followed.
+visit : &mut NarCursor -> PathBuf -> std::io::Result<()>
+visit c path =
+  meta = (std::fs::symlink_metadata (&path))?
+  kind = meta.file_type ()
+  if kind.is_symlink ()
+    target = (std::fs::read_link (&path))?
+    tokens (&mut c.out) (&["(", "type", "symlink", "target"])
+    push_bytes (&mut c.out) (target.as_os_str ().as_bytes ())
+    tokens (&mut c.out) (&[")"])
+    Ok ()
+  else if kind.is_dir ()
+    names = (sorted_names (&path))?
+    tokens (&mut c.out) (&["(", "type", "directory"])
+    c.stack.push (Emit (encoded (&[")"])))
+    c.stack.push (Entries path names)
+    Ok ()
+  else if kind.is_file ()
+    file = (std::fs::File::open (&path))?
+    size = meta.len ()
+    tokens (&mut c.out) (&["(", "type", "regular"])
+    if meta.permissions ().mode () & OWNER_EXEC != 0
+      tokens (&mut c.out) (&["executable", ""])
+    tokens (&mut c.out) (&["contents"])
+    c.out.extend_from_slice (&size.to_le_bytes ())
+    mut close = ZEROS[0 .. padding size].to_vec ()
+    close.extend_from_slice (&encoded (&[")"]))
+    c.stack.push (Emit close)
+    c.stack.push (Contents file size)
+    Ok ()
+  else
+    Err (std::io::Error::other (format! \-> "#{path.display ()} is not a file, directory or symlink"))
+
+-- Up to READ_MAX bytes of a regular file, straight into the chunk. A file
+-- that ends early fails the archive instead of corrupting it.
+contents : &mut NarCursor -> std::fs::File -> u64 -> std::io::Result<()>
+contents c file left =
+  if left == 0
+    return Ok ()
+  mut f = file
+  want = usize::try_from (left.min READ_MAX) |> .unwrap_or CHUNK
+  start = c.out.len ()
+  c.out.resize (start + want) 0
+  n = (f.read (&mut c.out[start .. start + want]))?
+  c.out.truncate (start + n)
+  if n == 0
+    return Err (std::io::Error::new std::io::ErrorKind::UnexpectedEof "a store file shrank while it was archived")
+  rest = left - (u64::try_from n |> .unwrap_or left)
+  if rest > 0
+    c.stack.push (Contents f rest)
+  Ok ()
+
+-- The next directory entry: its name, then its node, then the rest.
+entries : &mut NarCursor -> PathBuf -> VecDeque<OsString> -> std::io::Result<()>
+entries c dir names =
+  mut rest = names
+  if rest.pop_front () is Some name
+    tokens (&mut c.out) (&["entry", "(", "name"])
+    push_bytes (&mut c.out) (name.as_bytes ())
+    tokens (&mut c.out) (&["node"])
+    child = dir.join (&name)
+    c.stack.push (Entries dir rest)
+    c.stack.push (Emit (encoded (&[")"])))
+    c.stack.push (Visit child)
+  Ok ()
+
+-- One pull, as an effect: the stream's step.
+pull : NarCursor -> Effect<Option<(Bytes, NarCursor)>, std::io::Error, HNil>
+pull state =
+  mut c = state
+  case next_chunk (&mut c) of
+    Ok (Some chunk) -> succeed (Some ((chunk, c)))
+    Ok None -> succeed None
+    Err e -> fail e
+
+-- The archive of `path` as an id_effect stream, pulled chunk by chunk.
+export stream : PathBuf -> Stream<Bytes, std::io::Error, HNil>
+stream path =
+  Stream::unfold_effect (cursor (&path)) (\c -> suspend (move \-> pull c))
+
+-- The archive of `path` into `w`.
+export dump : Write w => &mut w -> &Path -> std::io::Result<()>
+dump w path =
+  mut c = cursor path
+  while (next_chunk (&mut c))? is Some chunk
+    (w.write_all (&chunk))?
+  w.flush ()
+
+-- A NAR's SHA-256 and length: what Nix registers as narHash and narSize, and
+-- what `nix hash path` prints.
+export data NarDigest { export hash Sha256, export size u64 }
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+-- The NAR hash of `path`, archived chunk by chunk and never held whole.
+export nar_hash : &Path -> std::io::Result<NarDigest>
+nar_hash path =
+  mut c = cursor path
+  mut hasher = sha2::Sha256::new ()
+  mut size = 0 : u64
+  while (next_chunk (&mut c))? is Some chunk
+    hasher.update (&chunk)
+    size += u64::try_from (chunk.len ()) |> .unwrap_or u64::MAX
+  bytes = hasher.finalize ().into () : [u8; 32]
+  Ok (NarDigest { hash = Sha256 { bytes }, size })
+
+-- The NAR hash of `path` as bare nix32, what `nix-hash --type sha256 --base32`
+-- prints. `hash::typed_nix32` of `nar_hash`'s digest is the `sha256:` form.
+export nar_hash_nix32 : &Path -> std::io::Result<String>
+nar_hash_nix32 path =
+  d = (nar_hash path)?
+  Ok (crate::hash::to_nix32 (&d.hash))
+
+test "padding rounds up to eight"
+  assert_eq! \-> padding 0 \-> 0
+  assert_eq! \-> padding 1 \-> 7
+  assert_eq! \-> padding 8 \-> 0
+  assert_eq! \-> padding 13 \-> 3
+
+test "a string is length, bytes, padding"
+  mut out = Vec::new () : Vec<u8>
+  push_bytes (&mut out) (b"abc")
+  assert_eq! \-> out \-> .to_vec ([3, 0, 0, 0, 0, 0, 0, 0, 97, 98, 99, 0, 0, 0, 0, 0])

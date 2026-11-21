@@ -1,0 +1,2067 @@
+{
+  "derivations": [
+    {
+      "path": "/nix/store/013mqc5ymx4cih72blz21l6ync49i3jg-expr-strcmp.patch.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/h24jwyqgava9fwnq8rxfk56n2gi25wgs-expr-strcmp.patch\",\"sha256\",\"49a5719c0cc5a072e34fff79972f18873c5ce949db3b71f7c73c86aa1d0dc3a5\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"expr-strcmp.patch\"),(\"out\",\"/nix/store/h24jwyqgava9fwnq8rxfk56n2gi25wgs-expr-strcmp.patch\"),(\"outputHash\",\"19f31lfsm1iwqzvp2fyv97lmqg4730prfygz9zip58651jf739a9\"),(\"outputHashAlgo\",\"sha256\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://github.com/fosslinux/live-bootstrap/raw/a8752029f60217a5c41c548b16f5cdd2a1a0e0db/sysa/coreutils-5.0/patches/expr-strcmp.patch\"),(\"urls\",\"https://github.com/fosslinux/live-bootstrap/raw/a8752029f60217a5c41c548b16f5cdd2a1a0e0db/sysa/coreutils-5.0/patches/expr-strcmp.patch\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "expr-strcmp.patch",
+        "out": "/nix/store/h24jwyqgava9fwnq8rxfk56n2gi25wgs-expr-strcmp.patch",
+        "outputHash": "19f31lfsm1iwqzvp2fyv97lmqg4730prfygz9zip58651jf739a9",
+        "outputHashAlgo": "sha256",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://github.com/fosslinux/live-bootstrap/raw/a8752029f60217a5c41c548b16f5cdd2a1a0e0db/sysa/coreutils-5.0/patches/expr-strcmp.patch",
+        "urls": "https://github.com/fosslinux/live-bootstrap/raw/a8752029f60217a5c41c548b16f5cdd2a1a0e0db/sysa/coreutils-5.0/patches/expr-strcmp.patch"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/h24jwyqgava9fwnq8rxfk56n2gi25wgs-expr-strcmp.patch",
+          "hashAlgo": "sha256",
+          "hash": "49a5719c0cc5a072e34fff79972f18873c5ce949db3b71f7c73c86aa1d0dc3a5"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/0i3qixpwn0qsbpmz6p415lk2qq6s639l-CVE-2026-55200.patch.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/6rv2i7dl0bbxl3069p61896xi0948643-CVE-2026-55200.patch\",\"sha256\",\"c0202096bf01b015888678774a215ec8acd9988a7cac2e4c55f160a04ce9fe11\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"CVE-2026-55200.patch\"),(\"out\",\"/nix/store/6rv2i7dl0bbxl3069p61896xi0948643-CVE-2026-55200.patch\"),(\"outputHash\",\"sha256-wCAglr8BsBWIhnh3SiFeyKzZmIp8rC5MVfFgoEzp/hE=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://salsa.debian.org/debian/libssh2/-/raw/1d4906e6ebe85a9da2931ba33677ead96a61f07f/debian/patches/CVE-2026-55200.patch\"),(\"urls\",\"https://salsa.debian.org/debian/libssh2/-/raw/1d4906e6ebe85a9da2931ba33677ead96a61f07f/debian/patches/CVE-2026-55200.patch\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "CVE-2026-55200.patch",
+        "out": "/nix/store/6rv2i7dl0bbxl3069p61896xi0948643-CVE-2026-55200.patch",
+        "outputHash": "sha256-wCAglr8BsBWIhnh3SiFeyKzZmIp8rC5MVfFgoEzp/hE=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://salsa.debian.org/debian/libssh2/-/raw/1d4906e6ebe85a9da2931ba33677ead96a61f07f/debian/patches/CVE-2026-55200.patch",
+        "urls": "https://salsa.debian.org/debian/libssh2/-/raw/1d4906e6ebe85a9da2931ba33677ead96a61f07f/debian/patches/CVE-2026-55200.patch"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/6rv2i7dl0bbxl3069p61896xi0948643-CVE-2026-55200.patch",
+          "hashAlgo": "sha256",
+          "hash": "c0202096bf01b015888678774a215ec8acd9988a7cac2e4c55f160a04ce9fe11"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/0rjn4fs706rp2zf5xfyycf1pfqnkjmgg-linux-6.5.6.tar.xz.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/w8cdfv0ip9q2jvyi1csc3kf4k6azqqmn-linux-6.5.6.tar.xz\",\"sha256\",\"78e36d4214547051c24df2140f4ce09428d6c515ad9a71b38b28e8094a95d2f6\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"linux-6.5.6.tar.xz\"),(\"out\",\"/nix/store/w8cdfv0ip9q2jvyi1csc3kf4k6azqqmn-linux-6.5.6.tar.xz\"),(\"outputHash\",\"sha256-eONtQhRUcFHCTfIUD0zglCjWxRWtmnGziyjoCUqV0vY=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.5.6.tar.xz\"),(\"urls\",\"https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.5.6.tar.xz\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "linux-6.5.6.tar.xz",
+        "out": "/nix/store/w8cdfv0ip9q2jvyi1csc3kf4k6azqqmn-linux-6.5.6.tar.xz",
+        "outputHash": "sha256-eONtQhRUcFHCTfIUD0zglCjWxRWtmnGziyjoCUqV0vY=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.5.6.tar.xz",
+        "urls": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.5.6.tar.xz"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/w8cdfv0ip9q2jvyi1csc3kf4k6azqqmn-linux-6.5.6.tar.xz",
+          "hashAlgo": "sha256",
+          "hash": "78e36d4214547051c24df2140f4ce09428d6c515ad9a71b38b28e8094a95d2f6"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/1j374gfxc0lslhnzzfaqpgf2i797ny9g-CVE-2026-66032.patch.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/idhhjlhpjagam2r7x1y9kznwgz6wb87a-CVE-2026-66032.patch\",\"sha256\",\"1fa55785573bb821718ff9375e8bb283ef06629b27ffd21e71766b3e4cec824b\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"CVE-2026-66032.patch\"),(\"out\",\"/nix/store/idhhjlhpjagam2r7x1y9kznwgz6wb87a-CVE-2026-66032.patch\"),(\"outputHash\",\"sha256-H6VXhVc7uCFxj/k3Xouyg+8GYpsn/9IecXZrPkzsgks=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://salsa.debian.org/debian/libssh2/-/raw/fe2e3c0848f8501bf729d61790360761a20c75f2/debian/patches/CVE-2026-66032.patch\"),(\"urls\",\"https://salsa.debian.org/debian/libssh2/-/raw/fe2e3c0848f8501bf729d61790360761a20c75f2/debian/patches/CVE-2026-66032.patch\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "CVE-2026-66032.patch",
+        "out": "/nix/store/idhhjlhpjagam2r7x1y9kznwgz6wb87a-CVE-2026-66032.patch",
+        "outputHash": "sha256-H6VXhVc7uCFxj/k3Xouyg+8GYpsn/9IecXZrPkzsgks=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://salsa.debian.org/debian/libssh2/-/raw/fe2e3c0848f8501bf729d61790360761a20c75f2/debian/patches/CVE-2026-66032.patch",
+        "urls": "https://salsa.debian.org/debian/libssh2/-/raw/fe2e3c0848f8501bf729d61790360761a20c75f2/debian/patches/CVE-2026-66032.patch"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/idhhjlhpjagam2r7x1y9kznwgz6wb87a-CVE-2026-66032.patch",
+          "hashAlgo": "sha256",
+          "hash": "1fa55785573bb821718ff9375e8bb283ef06629b27ffd21e71766b3e4cec824b"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/29lnh7ylh7r4qrjh252ihd8jzg78dvhg-gnugrep-get-version-2.4.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/qmqdd4y6nfd5qamjmq4gbs8cs0lrpx4q-gnugrep-get-version-2.4\",\"\",\"\")],[(\"/nix/store/m6mv4n37zil8bnif1zc2s57rklyb8gcf-bootstrap-coreutils-5.0.drv\",[\"out\"]),(\"/nix/store/xg1pjplq42vgwbqdlgnh95349wn9jfz9-bash-2.05b.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/z3p57j3xnk55md4gjjq3rszzdvaxxa5b-gnugrep-2.4.drv\",[\"out\"])],[\"/nix/store/9hvp9axa7zm732xi5jvg8pckvfk6ixcj-bash-builder.sh\"],\"x86_64-linux\",\"/nix/store/bz59myxzwz0jphlm2ifzdpqhgq9k4i4y-bash-2.05b/bin/bash\",[\"-e\",\"/nix/store/9hvp9axa7zm732xi5jvg8pckvfk6ixcj-bash-builder.sh\"],[(\"PATH\",\"/nix/store/bz59myxzwz0jphlm2ifzdpqhgq9k4i4y-bash-2.05b/bin:/nix/store/mkbfl7lln7lx09bca4jdf50g7b31rj7k-bootstrap-coreutils-5.0/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"SHELL\",\"/nix/store/bz59myxzwz0jphlm2ifzdpqhgq9k4i4y-bash-2.05b/bin/bash\"),(\"buildCommand\",\"/nix/store/78vz3sykax8iij6kly5lj4334qk6c43d-gnugrep-2.4/bin/grep --version\\nmkdir ${out}\\n\"),(\"builder\",\"/nix/store/bz59myxzwz0jphlm2ifzdpqhgq9k4i4y-bash-2.05b/bin/bash\"),(\"name\",\"gnugrep-get-version-2.4\"),(\"out\",\"/nix/store/qmqdd4y6nfd5qamjmq4gbs8cs0lrpx4q-gnugrep-get-version-2.4\"),(\"passAsFile\",\"buildCommand\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/bz59myxzwz0jphlm2ifzdpqhgq9k4i4y-bash-2.05b/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/9hvp9axa7zm732xi5jvg8pckvfk6ixcj-bash-builder.sh"
+      ],
+      "env": {
+        "PATH": "/nix/store/bz59myxzwz0jphlm2ifzdpqhgq9k4i4y-bash-2.05b/bin:/nix/store/mkbfl7lln7lx09bca4jdf50g7b31rj7k-bootstrap-coreutils-5.0/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "SHELL": "/nix/store/bz59myxzwz0jphlm2ifzdpqhgq9k4i4y-bash-2.05b/bin/bash",
+        "buildCommand": "/nix/store/78vz3sykax8iij6kly5lj4334qk6c43d-gnugrep-2.4/bin/grep --version\nmkdir ${out}\n",
+        "builder": "/nix/store/bz59myxzwz0jphlm2ifzdpqhgq9k4i4y-bash-2.05b/bin/bash",
+        "name": "gnugrep-get-version-2.4",
+        "out": "/nix/store/qmqdd4y6nfd5qamjmq4gbs8cs0lrpx4q-gnugrep-get-version-2.4",
+        "passAsFile": "buildCommand",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [
+        "/nix/store/9hvp9axa7zm732xi5jvg8pckvfk6ixcj-bash-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/m6mv4n37zil8bnif1zc2s57rklyb8gcf-bootstrap-coreutils-5.0.drv": [
+          "out"
+        ],
+        "/nix/store/xg1pjplq42vgwbqdlgnh95349wn9jfz9-bash-2.05b.drv": ["out"],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/z3p57j3xnk55md4gjjq3rszzdvaxxa5b-gnugrep-2.4.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/qmqdd4y6nfd5qamjmq4gbs8cs0lrpx4q-gnugrep-get-version-2.4",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/2vknf2sz2fdbpqkpsph03x5qyp7pprzy-dev-tty.patch.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/i66hsbhbbpn7vha2zaxhhsrx9dnsilgv-dev-tty.patch\",\"sha256\",\"499632e597a3de7ef0359e04de0d68bc076795a792bceeb154f11f5736d5258c\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"dev-tty.patch\"),(\"out\",\"/nix/store/i66hsbhbbpn7vha2zaxhhsrx9dnsilgv-dev-tty.patch\"),(\"outputHash\",\"1315slv5f7ziajqyxg4jlyanf1xwd06xw14y6pq7xpm3jzjk55j9\"),(\"outputHashAlgo\",\"sha256\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://github.com/fosslinux/live-bootstrap/raw/c0494d9af84b9e8c3e76e34c6e898978013a3b39/steps/bash-2.05b/patches/dev-tty.patch\"),(\"urls\",\"https://github.com/fosslinux/live-bootstrap/raw/c0494d9af84b9e8c3e76e34c6e898978013a3b39/steps/bash-2.05b/patches/dev-tty.patch\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "dev-tty.patch",
+        "out": "/nix/store/i66hsbhbbpn7vha2zaxhhsrx9dnsilgv-dev-tty.patch",
+        "outputHash": "1315slv5f7ziajqyxg4jlyanf1xwd06xw14y6pq7xpm3jzjk55j9",
+        "outputHashAlgo": "sha256",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://github.com/fosslinux/live-bootstrap/raw/c0494d9af84b9e8c3e76e34c6e898978013a3b39/steps/bash-2.05b/patches/dev-tty.patch",
+        "urls": "https://github.com/fosslinux/live-bootstrap/raw/c0494d9af84b9e8c3e76e34c6e898978013a3b39/steps/bash-2.05b/patches/dev-tty.patch"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/i66hsbhbbpn7vha2zaxhhsrx9dnsilgv-dev-tty.patch",
+          "hashAlgo": "sha256",
+          "hash": "499632e597a3de7ef0359e04de0d68bc076795a792bceeb154f11f5736d5258c"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/3d3pihrlggvslps72rdpsm0xmrf8lnhm-libc.a.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/da2divww37rxlh804r69ipjin4n1z103-libc.a\",\"\",\"\")],[(\"/nix/store/dipc6gf1wqlcxm2qximla4vjxf1hcbax-libc.a-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/xs1042mql02z8b9i8m52d08x7b7690nm-libc.a-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"libc.a\"),(\"out\",\"/nix/store/da2divww37rxlh804r69ipjin4n1z103-libc.a\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/xs1042mql02z8b9i8m52d08x7b7690nm-libc.a-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "libc.a",
+        "out": "/nix/store/da2divww37rxlh804r69ipjin4n1z103-libc.a",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/dipc6gf1wqlcxm2qximla4vjxf1hcbax-libc.a-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/da2divww37rxlh804r69ipjin4n1z103-libc.a",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/3xs5n9hmbbmc5qis9zzs764ilbjk0v72-libidn2-2.3.8.tar.gz.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/9dcs318zy7jbxz8kfdjnxd1c6s1xd2vy-libidn2-2.3.8.tar.gz\",\"sha256\",\"f557911bf6171621e1f72ff35f5b1825bb35b52ed45325dcdee931e5d3c0787a\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"libidn2-2.3.8.tar.gz\"),(\"out\",\"/nix/store/9dcs318zy7jbxz8kfdjnxd1c6s1xd2vy-libidn2-2.3.8.tar.gz\"),(\"outputHash\",\"sha256-9VeRG/YXFiHh9y/zX1sYJbs1tS7UUyXc3ukx5dPAeHo=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://ftp.gnu.org/gnu/libidn/libidn2-2.3.8.tar.gz\"),(\"urls\",\"https://ftp.gnu.org/gnu/libidn/libidn2-2.3.8.tar.gz\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "libidn2-2.3.8.tar.gz",
+        "out": "/nix/store/9dcs318zy7jbxz8kfdjnxd1c6s1xd2vy-libidn2-2.3.8.tar.gz",
+        "outputHash": "sha256-9VeRG/YXFiHh9y/zX1sYJbs1tS7UUyXc3ukx5dPAeHo=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://ftp.gnu.org/gnu/libidn/libidn2-2.3.8.tar.gz",
+        "urls": "https://ftp.gnu.org/gnu/libidn/libidn2-2.3.8.tar.gz"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/9dcs318zy7jbxz8kfdjnxd1c6s1xd2vy-libidn2-2.3.8.tar.gz",
+          "hashAlgo": "sha256",
+          "hash": "f557911bf6171621e1f72ff35f5b1825bb35b52ed45325dcdee931e5d3c0787a"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/4id1z907zlr2vf8x4hjqvgv2hb12cyji-tccdefs-unstable-2025-12-03.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/626vha9xkrg2f3ydw80253072zv6lba0-tccdefs-unstable-2025-12-03\",\"\",\"\")],[(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/xqnj45vmc4akiawlj6z83yvlbgg0d4bg-tccdefs-unstable-2025-12-03-builder.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/gmypb6zybfmhgrazdgcjxbi1vfk23dy9-tccdefs-unstable-2025-12-03-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"tccdefs-unstable-2025-12-03\"),(\"out\",\"/nix/store/626vha9xkrg2f3ydw80253072zv6lba0-tccdefs-unstable-2025-12-03\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/gmypb6zybfmhgrazdgcjxbi1vfk23dy9-tccdefs-unstable-2025-12-03-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "tccdefs-unstable-2025-12-03",
+        "out": "/nix/store/626vha9xkrg2f3ydw80253072zv6lba0-tccdefs-unstable-2025-12-03",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/xqnj45vmc4akiawlj6z83yvlbgg0d4bg-tccdefs-unstable-2025-12-03-builder.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/626vha9xkrg2f3ydw80253072zv6lba0-tccdefs-unstable-2025-12-03",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/560k1yihr2pxc44d2c30akymj44dmm9z-autoconf-2.69.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/zakc5dna36ya7xx037hcplbzfh46w4mk-autoconf-2.69\",\"\",\"\")],[(\"/nix/store/7camx6as44z7ks8g4azj65c7rf594zby-bootstrap-stage-xgcc-stdenv-linux.drv\",[\"out\"]),(\"/nix/store/agil61gqywjpflv83qw69cfsjazvznfc-gnum4-1.4.21.drv\",[\"out\"]),(\"/nix/store/hcrp1v3m55a73xvxg9lgj7c62w88zjx6-autoconf-2.69.tar.xz.drv\",[\"out\"]),(\"/nix/store/q54r7sc0yp8v3a6bgz7wj7p4xm7br9hg-perl-5.42.3.drv\",[\"out\"]),(\"/nix/store/wgxrbv6jpdnf0nb5xx3wffvmv8q0nwdr-bash-static-5.3.drv\",[\"out\"])],[\"/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh\",\"/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh\"],\"x86_64-linux\",\"/nix/store/yn40n1h7nry843rmhiz1rzxxbgais07x-bash-static-5.3/bin/bash\",[\"-e\",\"/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh\",\"/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh\"],[(\"__json\",\"{\\\"buildInputs\\\":[\\\"/nix/store/ja464x29jc1xxb1jkpmr4xypi95gxk1q-gnum4-1.4.21\\\"],\\\"builder\\\":\\\"/nix/store/yn40n1h7nry843rmhiz1rzxxbgais07x-bash-static-5.3/bin/bash\\\",\\\"cmakeFlags\\\":[],\\\"configureFlags\\\":[],\\\"depsBuildBuild\\\":[],\\\"depsBuildBuildPropagated\\\":[],\\\"depsBuildTarget\\\":[],\\\"depsBuildTargetPropagated\\\":[],\\\"depsHostHost\\\":[],\\\"depsHostHostPropagated\\\":[],\\\"depsTargetTarget\\\":[],\\\"depsTargetTargetPropagated\\\":[],\\\"doCheck\\\":false,\\\"doInstallCheck\\\":false,\\\"dontPatchShebangs\\\":true,\\\"enableParallelBuilding\\\":true,\\\"enableParallelChecking\\\":true,\\\"enableParallelInstalling\\\":true,\\\"env\\\":{},\\\"mesonFlags\\\":[],\\\"name\\\":\\\"autoconf-2.69\\\",\\\"nativeBuildInputs\\\":[\\\"/nix/store/ja464x29jc1xxb1jkpmr4xypi95gxk1q-gnum4-1.4.21\\\",\\\"/nix/store/7skrnc8m0v4wvkm7b508llyan0dijmrq-perl-5.42.3\\\"],\\\"outputChecks\\\":{\\\"out\\\":{}},\\\"outputs\\\":[\\\"out\\\"],\\\"patches\\\":[],\\\"pname\\\":\\\"autoconf\\\",\\\"preCheck\\\":\\\"export TESTSUITEFLAGS=\\\\\\\"-j$NIX_BUILD_CORES\\\\\\\"\\\\n\\\",\\\"propagatedBuildInputs\\\":[],\\\"propagatedNativeBuildInputs\\\":[],\\\"src\\\":\\\"/nix/store/sm3m6c71sxa8rwzk85zllm9xjqrdvdb4-autoconf-2.69.tar.xz\\\",\\\"stdenv\\\":\\\"/nix/store/m6jijz26w630pkc05mcyhmc5v1n66vv8-bootstrap-stage-xgcc-stdenv-linux\\\",\\\"strictDeps\\\":true,\\\"system\\\":\\\"x86_64-linux\\\",\\\"version\\\":\\\"2.69\\\"}\"),(\"out\",\"/nix/store/zakc5dna36ya7xx037hcplbzfh46w4mk-autoconf-2.69\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/yn40n1h7nry843rmhiz1rzxxbgais07x-bash-static-5.3/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
+        "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
+      ],
+      "env": {
+        "out": "/nix/store/zakc5dna36ya7xx037hcplbzfh46w4mk-autoconf-2.69"
+      },
+      "inputSrcs": [
+        "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
+        "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/7camx6as44z7ks8g4azj65c7rf594zby-bootstrap-stage-xgcc-stdenv-linux.drv": [
+          "out"
+        ],
+        "/nix/store/agil61gqywjpflv83qw69cfsjazvznfc-gnum4-1.4.21.drv": ["out"],
+        "/nix/store/hcrp1v3m55a73xvxg9lgj7c62w88zjx6-autoconf-2.69.tar.xz.drv": [
+          "out"
+        ],
+        "/nix/store/q54r7sc0yp8v3a6bgz7wj7p4xm7br9hg-perl-5.42.3.drv": ["out"],
+        "/nix/store/wgxrbv6jpdnf0nb5xx3wffvmv8q0nwdr-bash-static-5.3.drv": [
+          "out"
+        ]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/zakc5dna36ya7xx037hcplbzfh46w4mk-autoconf-2.69",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/5pl8gbjb9fghnndfk2rwx6lan2f2abn2-findutils-static-get-version-4.11.0.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/9mgrn3d9pan3adadlppi916682rl218b-findutils-static-get-version-4.11.0\",\"\",\"\")],[(\"/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv\",[\"out\"]),(\"/nix/store/bny5cp5xx3yc70hwlmxgcxjb7gg7c5wn-findutils-static-4.11.0.drv\",[\"out\"]),(\"/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv\",[\"out\"])],[\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],\"x86_64-linux\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\",[\"-e\",\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],[(\"PATH\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin\"),(\"SHELL\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"buildCommand\",\"/nix/store/p1yrijl4n2slxwf5s5ajl329lgzfxyk5-findutils-static-4.11.0/bin/find --version\\n/nix/store/p1yrijl4n2slxwf5s5ajl329lgzfxyk5-findutils-static-4.11.0/bin/xargs --version\\nmkdir $out\\n\"),(\"builder\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"name\",\"findutils-static-get-version-4.11.0\"),(\"out\",\"/nix/store/9mgrn3d9pan3adadlppi916682rl218b-findutils-static-get-version-4.11.0\"),(\"passAsFile\",\"buildCommand\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "env": {
+        "PATH": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin",
+        "SHELL": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "buildCommand": "/nix/store/p1yrijl4n2slxwf5s5ajl329lgzfxyk5-findutils-static-4.11.0/bin/find --version\n/nix/store/p1yrijl4n2slxwf5s5ajl329lgzfxyk5-findutils-static-4.11.0/bin/xargs --version\nmkdir $out\n",
+        "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "name": "findutils-static-get-version-4.11.0",
+        "out": "/nix/store/9mgrn3d9pan3adadlppi916682rl218b-findutils-static-get-version-4.11.0",
+        "passAsFile": "buildCommand",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
+        "/nix/store/bny5cp5xx3yc70hwlmxgcxjb7gg7c5wn-findutils-static-4.11.0.drv": [
+          "out"
+        ],
+        "/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv": [
+          "out"
+        ]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/9mgrn3d9pan3adadlppi916682rl218b-findutils-static-get-version-4.11.0",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/6a6diq15i1w6piy38bf29s6y8sjfsxa5-bash-5.3.tar.gz.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/kwm524zjlnnq4yfhhmb5r14f2wxf8a2j-bash-5.3.tar.gz\",\"sha256\",\"0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"bash-5.3.tar.gz\"),(\"out\",\"/nix/store/kwm524zjlnnq4yfhhmb5r14f2wxf8a2j-bash-5.3.tar.gz\"),(\"outputHash\",\"sha256-DVzYaWX4aaJs9k9Lcb57lvkKO6iz104n6OnZ1VUPMbo=\"),(\"outputHashAlgo\",\"sha256\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz\"),(\"urls\",\"https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "bash-5.3.tar.gz",
+        "out": "/nix/store/kwm524zjlnnq4yfhhmb5r14f2wxf8a2j-bash-5.3.tar.gz",
+        "outputHash": "sha256-DVzYaWX4aaJs9k9Lcb57lvkKO6iz104n6OnZ1VUPMbo=",
+        "outputHashAlgo": "sha256",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz",
+        "urls": "https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/kwm524zjlnnq4yfhhmb5r14f2wxf8a2j-bash-5.3.tar.gz",
+          "hashAlgo": "sha256",
+          "hash": "0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/6xh4gnmais0bg7xaj5hl07wwmbpbz2zs-gcc-16.2.0.tar.xz.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/chw5kxp89wq3wkc37f6fr8wiw4yc7paj-gcc-16.2.0.tar.xz\",\"sha256\",\"e6738e29597f733270731aa90600f37ffdc045079dfc27ec7e8192cc81085c3e\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"gcc-16.2.0.tar.xz\"),(\"out\",\"/nix/store/chw5kxp89wq3wkc37f6fr8wiw4yc7paj-gcc-16.2.0.tar.xz\"),(\"outputHash\",\"sha256-5nOOKVl/czJwcxqpBgDzf/3ARQed/CfsfoGSzIEIXD4=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://ftpmirror.gnu.org/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz\"),(\"urls\",\"https://ftpmirror.gnu.org/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "gcc-16.2.0.tar.xz",
+        "out": "/nix/store/chw5kxp89wq3wkc37f6fr8wiw4yc7paj-gcc-16.2.0.tar.xz",
+        "outputHash": "sha256-5nOOKVl/czJwcxqpBgDzf/3ARQed/CfsfoGSzIEIXD4=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://ftpmirror.gnu.org/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz",
+        "urls": "https://ftpmirror.gnu.org/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/chw5kxp89wq3wkc37f6fr8wiw4yc7paj-gcc-16.2.0.tar.xz",
+          "hashAlgo": "sha256",
+          "hash": "e6738e29597f733270731aa90600f37ffdc045079dfc27ec7e8192cc81085c3e"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/7pyriglp5ghf4sl4nr7c654gjpz84rv8-tinycc-mes-chain-unstable-2025-12-03.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/3rm630mjyvwl7g9d46di2gc020sfc61a-tinycc-mes-chain-unstable-2025-12-03\",\"\",\"\")],[(\"/nix/store/lw3yyhi0kja3w4bzn090fqdf6bcmd1i0-tinycc-mes-chain-unstable-2025-12-03-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/gx4saz8kkqv27yaiis715p5zh2hyfx5k-tinycc-mes-chain-unstable-2025-12-03-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"tinycc-mes-chain-unstable-2025-12-03\"),(\"out\",\"/nix/store/3rm630mjyvwl7g9d46di2gc020sfc61a-tinycc-mes-chain-unstable-2025-12-03\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/gx4saz8kkqv27yaiis715p5zh2hyfx5k-tinycc-mes-chain-unstable-2025-12-03-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "tinycc-mes-chain-unstable-2025-12-03",
+        "out": "/nix/store/3rm630mjyvwl7g9d46di2gc020sfc61a-tinycc-mes-chain-unstable-2025-12-03",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/lw3yyhi0kja3w4bzn090fqdf6bcmd1i0-tinycc-mes-chain-unstable-2025-12-03-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/3rm630mjyvwl7g9d46di2gc020sfc61a-tinycc-mes-chain-unstable-2025-12-03",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/8lms8hvr6g6ryzlr8530as114ysgwlaw-binutils-static-get-version-2.46.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/si54skic26v4i53kb150k7xiz4k9wr3p-binutils-static-get-version-2.46\",\"\",\"\")],[(\"/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv\",[\"out\"]),(\"/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv\",[\"out\"]),(\"/nix/store/yiqx7jf89idhwdpd89hdamp2s5k3kkj1-binutils-static-2.46.drv\",[\"out\"])],[\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],\"x86_64-linux\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\",[\"-e\",\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],[(\"PATH\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin\"),(\"SHELL\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"buildCommand\",\"/nix/store/b4gz44dav7hkxfvlwxw1hpji3pnh9rjm-binutils-static-2.46/bin/ld --version\\n/nix/store/b4gz44dav7hkxfvlwxw1hpji3pnh9rjm-binutils-static-2.46/x86_64-unknown-linux-gnu/bin/ld --version\\nmkdir $out\\n\"),(\"builder\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"name\",\"binutils-static-get-version-2.46\"),(\"out\",\"/nix/store/si54skic26v4i53kb150k7xiz4k9wr3p-binutils-static-get-version-2.46\"),(\"passAsFile\",\"buildCommand\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "env": {
+        "PATH": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin",
+        "SHELL": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "buildCommand": "/nix/store/b4gz44dav7hkxfvlwxw1hpji3pnh9rjm-binutils-static-2.46/bin/ld --version\n/nix/store/b4gz44dav7hkxfvlwxw1hpji3pnh9rjm-binutils-static-2.46/x86_64-unknown-linux-gnu/bin/ld --version\nmkdir $out\n",
+        "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "name": "binutils-static-get-version-2.46",
+        "out": "/nix/store/si54skic26v4i53kb150k7xiz4k9wr3p-binutils-static-get-version-2.46",
+        "passAsFile": "buildCommand",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
+        "/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv": [
+          "out"
+        ],
+        "/nix/store/yiqx7jf89idhwdpd89hdamp2s5k3kkj1-binutils-static-2.46.drv": [
+          "out"
+        ]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/si54skic26v4i53kb150k7xiz4k9wr3p-binutils-static-get-version-2.46",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/9b5xvzhkkyvf9k6mxskgawzsq2129iga-mes-crt1-0.27.1-builder.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/25w8kwblv1cnlkhl91mbzdr2b9yzbdnd-mes-crt1-0.27.1-builder\",\"\",\"\")],[(\"/nix/store/h6pi2cyw7j5liy0fbzq8i1ippcqwdjd3-mes-src-0.27.1.drv\",[\"bin\",\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],[(\"PATH\",\"/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"destination\",\"\"),(\"destinationDir\",\".\"),(\"name\",\"mes-crt1-0.27.1-builder\"),(\"out\",\"/nix/store/25w8kwblv1cnlkhl91mbzdr2b9yzbdnd-mes-crt1-0.27.1-builder\"),(\"passAsFile\",\"text\"),(\"system\",\"x86_64-linux\"),(\"text\",\"mkdir ${out}\\ncd ${out}\\n/nix/store/n9mj1f0ipsva4vyd2llpdgv3wyrcmsm1-mes-src-0.27.1-bin/bin/mes-m2 -e main /nix/store/n9mj1f0ipsva4vyd2llpdgv3wyrcmsm1-mes-src-0.27.1-bin/bin/mescc.scm -D HAVE_CONFIG_H=1 -I /nix/store/vhbf57apsjqv01fnvhavm6iyk91m91si-mes-src-0.27.1/mes-0.27.1/include -I /nix/store/vhbf57apsjqv01fnvhavm6iyk91m91si-mes-src-0.27.1/mes-0.27.1/include/linux/x86_64 -c /nix/store/vhbf57apsjqv01fnvhavm6iyk91m91si-mes-src-0.27.1/mes-0.27.1/lib/linux/x86_64-mes-mescc/crt1.c\\n\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "env": {
+        "PATH": "/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "destination": "",
+        "destinationDir": ".",
+        "name": "mes-crt1-0.27.1-builder",
+        "out": "/nix/store/25w8kwblv1cnlkhl91mbzdr2b9yzbdnd-mes-crt1-0.27.1-builder",
+        "passAsFile": "text",
+        "system": "x86_64-linux",
+        "text": "mkdir ${out}\ncd ${out}\n/nix/store/n9mj1f0ipsva4vyd2llpdgv3wyrcmsm1-mes-src-0.27.1-bin/bin/mes-m2 -e main /nix/store/n9mj1f0ipsva4vyd2llpdgv3wyrcmsm1-mes-src-0.27.1-bin/bin/mescc.scm -D HAVE_CONFIG_H=1 -I /nix/store/vhbf57apsjqv01fnvhavm6iyk91m91si-mes-src-0.27.1/mes-0.27.1/include -I /nix/store/vhbf57apsjqv01fnvhavm6iyk91m91si-mes-src-0.27.1/mes-0.27.1/include/linux/x86_64 -c /nix/store/vhbf57apsjqv01fnvhavm6iyk91m91si-mes-src-0.27.1/mes-0.27.1/lib/linux/x86_64-mes-mescc/crt1.c\n"
+      },
+      "inputSrcs": [
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "inputDrvs": {
+        "/nix/store/h6pi2cyw7j5liy0fbzq8i1ippcqwdjd3-mes-src-0.27.1.drv": [
+          "bin",
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/25w8kwblv1cnlkhl91mbzdr2b9yzbdnd-mes-crt1-0.27.1-builder",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/a87939dy8br1925la9l46bvcgaha55q3-bzip2-1.0.8.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/k0qh0209qm93l494r6cgqp24ilcil98j-bzip2-1.0.8\",\"\",\"\")],[(\"/nix/store/19vlv640sa5fr6cpnr14s166v9vd2p9m-bzip2-1.0.8.tar.gz.drv\",[\"out\"]),(\"/nix/store/34rg2xham6ia2dy5pa94bfyw2mr04ic7-gnutar-musl-1.12.drv\",[\"out\"]),(\"/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv\",[\"out\"]),(\"/nix/store/8ffma7vfd2ql29kjqk78rqrzkn4zn65g-gzip-1.2.4.drv\",[\"out\"]),(\"/nix/store/8z22c4qlnic6ix9n36ak5g9bfidddh8c-gnumake-musl-4.4.1.drv\",[\"out\"]),(\"/nix/store/cklaikzbcdr5fyziis69q0j5412dibpz-tinycc-musl-unstable-2025-12-03-libs.drv\",[\"out\"]),(\"/nix/store/kdqb6r6i19s3jd1wah6hnydk6m5glqk2-tinycc-musl-unstable-2025-12-03-compiler.drv\",[\"out\"]),(\"/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv\",[\"out\"])],[\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],\"x86_64-linux\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\",[\"-e\",\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],[(\"PATH\",\"/nix/store/55gf9wr64zc3891fc1p5wrx6ay1clsll-tinycc-musl-unstable-2025-12-03-compiler/bin:/nix/store/m9jpnhqjnn560p56yjp2icm4hnwf419p-gnumake-musl-4.4.1/bin:/nix/store/vda20cz8kvyj95hylms9w6rmfp2wd5b2-gnutar-musl-1.12/bin:/nix/store/absdzczys6277hq720cijsch71njram3-gzip-1.2.4/bin:/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin\"),(\"SHELL\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"buildCommand\",\"# Unpack\\ntar xzf /nix/store/slpdqm3wlhwbkzyijjz3xpifa219ac0x-bzip2-1.0.8.tar.gz\\ncd bzip2-1.0.8\\n\\n# Build\\nmake \\\\\\n  -j $NIX_BUILD_CORES \\\\\\n  CC=\\\"tcc -B /nix/store/drp096szn40npaiymasq3khf0rvw7iwi-tinycc-musl-unstable-2025-12-03-libs/lib\\\" \\\\\\n  AR=\\\"tcc -ar\\\" \\\\\\n  bzip2 bzip2recover\\n\\n# Install\\nmake install -j $NIX_BUILD_CORES PREFIX=$out\\n\"),(\"builder\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"name\",\"bzip2-1.0.8\"),(\"out\",\"/nix/store/k0qh0209qm93l494r6cgqp24ilcil98j-bzip2-1.0.8\"),(\"passAsFile\",\"buildCommand\"),(\"pname\",\"bzip2\"),(\"system\",\"x86_64-linux\"),(\"version\",\"1.0.8\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "env": {
+        "PATH": "/nix/store/55gf9wr64zc3891fc1p5wrx6ay1clsll-tinycc-musl-unstable-2025-12-03-compiler/bin:/nix/store/m9jpnhqjnn560p56yjp2icm4hnwf419p-gnumake-musl-4.4.1/bin:/nix/store/vda20cz8kvyj95hylms9w6rmfp2wd5b2-gnutar-musl-1.12/bin:/nix/store/absdzczys6277hq720cijsch71njram3-gzip-1.2.4/bin:/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin",
+        "SHELL": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "buildCommand": "# Unpack\ntar xzf /nix/store/slpdqm3wlhwbkzyijjz3xpifa219ac0x-bzip2-1.0.8.tar.gz\ncd bzip2-1.0.8\n\n# Build\nmake \\\n  -j $NIX_BUILD_CORES \\\n  CC=\"tcc -B /nix/store/drp096szn40npaiymasq3khf0rvw7iwi-tinycc-musl-unstable-2025-12-03-libs/lib\" \\\n  AR=\"tcc -ar\" \\\n  bzip2 bzip2recover\n\n# Install\nmake install -j $NIX_BUILD_CORES PREFIX=$out\n",
+        "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "name": "bzip2-1.0.8",
+        "out": "/nix/store/k0qh0209qm93l494r6cgqp24ilcil98j-bzip2-1.0.8",
+        "passAsFile": "buildCommand",
+        "pname": "bzip2",
+        "system": "x86_64-linux",
+        "version": "1.0.8"
+      },
+      "inputSrcs": [
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/19vlv640sa5fr6cpnr14s166v9vd2p9m-bzip2-1.0.8.tar.gz.drv": [
+          "out"
+        ],
+        "/nix/store/34rg2xham6ia2dy5pa94bfyw2mr04ic7-gnutar-musl-1.12.drv": [
+          "out"
+        ],
+        "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
+        "/nix/store/8ffma7vfd2ql29kjqk78rqrzkn4zn65g-gzip-1.2.4.drv": ["out"],
+        "/nix/store/8z22c4qlnic6ix9n36ak5g9bfidddh8c-gnumake-musl-4.4.1.drv": [
+          "out"
+        ],
+        "/nix/store/cklaikzbcdr5fyziis69q0j5412dibpz-tinycc-musl-unstable-2025-12-03-libs.drv": [
+          "out"
+        ],
+        "/nix/store/kdqb6r6i19s3jd1wah6hnydk6m5glqk2-tinycc-musl-unstable-2025-12-03-compiler.drv": [
+          "out"
+        ],
+        "/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv": [
+          "out"
+        ]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/k0qh0209qm93l494r6cgqp24ilcil98j-bzip2-1.0.8",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/akag406i2x9yrv04yz1ydq9hnh63pkks-zlib-1.3.2.tar.gz.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/13vkic2v8zac4m6p38asdhasb3xylv07-zlib-1.3.2.tar.gz\",\"sha256\",\"bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"zlib-1.3.2.tar.gz\"),(\"out\",\"/nix/store/13vkic2v8zac4m6p38asdhasb3xylv07-zlib-1.3.2.tar.gz\"),(\"outputHash\",\"sha256-uzKaCizQJ00FUZ1hxmfAYuBpkNcuEl7i36jeZPARnRY=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz\"),(\"urls\",\"https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "zlib-1.3.2.tar.gz",
+        "out": "/nix/store/13vkic2v8zac4m6p38asdhasb3xylv07-zlib-1.3.2.tar.gz",
+        "outputHash": "sha256-uzKaCizQJ00FUZ1hxmfAYuBpkNcuEl7i36jeZPARnRY=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz",
+        "urls": "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/13vkic2v8zac4m6p38asdhasb3xylv07-zlib-1.3.2.tar.gz",
+          "hashAlgo": "sha256",
+          "hash": "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/bamwxswxacs3cjdcydv0z7bj22d7g2kc-config.guess-948ae97.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/vq0j27nvpks679djbiykl8ikdyj6z5a9-config.guess-948ae97\",\"sha256\",\"641cae3c0c74c49354d3ede009f3febd80febe1501a77c1d9fac8d42cc45b6cb\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"config.guess-948ae97\"),(\"out\",\"/nix/store/vq0j27nvpks679djbiykl8ikdyj6z5a9-config.guess-948ae97\"),(\"outputHash\",\"sha256-ZByuPAx0xJNU0+3gCfP+vYD+vhUBp3wdn6yNQsxFtss=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://git.savannah.gnu.org/cgit/config.git/plain/config.guess?id=948ae97ca5703224bd3eada06b7a69f40dd15a02\"),(\"urls\",\"https://git.savannah.gnu.org/cgit/config.git/plain/config.guess?id=948ae97ca5703224bd3eada06b7a69f40dd15a02\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "config.guess-948ae97",
+        "out": "/nix/store/vq0j27nvpks679djbiykl8ikdyj6z5a9-config.guess-948ae97",
+        "outputHash": "sha256-ZByuPAx0xJNU0+3gCfP+vYD+vhUBp3wdn6yNQsxFtss=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://git.savannah.gnu.org/cgit/config.git/plain/config.guess?id=948ae97ca5703224bd3eada06b7a69f40dd15a02",
+        "urls": "https://git.savannah.gnu.org/cgit/config.git/plain/config.guess?id=948ae97ca5703224bd3eada06b7a69f40dd15a02"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/vq0j27nvpks679djbiykl8ikdyj6z5a9-config.guess-948ae97",
+          "hashAlgo": "sha256",
+          "hash": "641cae3c0c74c49354d3ede009f3febd80febe1501a77c1d9fac8d42cc45b6cb"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/bmqil3ly450l2q6xhv35a5a8ck93lqbk-bison-3.8.2.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/fxlrbbvsdvj14ds7a9y71wjy06lynby6-bison-3.8.2\",\"\",\"\")],[(\"/nix/store/08grahh6i022hkpbaz3yix4wvrcrpyks-stdenv-linux.drv\",[\"out\"]),(\"/nix/store/3y0bjp6kk93iw74vzp4s976zdmcqaznc-bison-3.8.2.tar.gz.drv\",[\"out\"]),(\"/nix/store/j5z3x411sqcjpwq4bgw4vxm19sm93lx8-perl-5.42.3.drv\",[\"out\"]),(\"/nix/store/kbpcpb1ps9sxn55ng7yifk6zmncrjifx-bash-5.3p20.drv\",[\"out\"]),(\"/nix/store/lrrh696kslplccy9n3ss5wf99q494dqf-gnum4-1.4.21.drv\",[\"out\"])],[\"/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh\",\"/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh\"],\"x86_64-linux\",\"/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20/bin/bash\",[\"-e\",\"/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh\",\"/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh\"],[(\"__json\",\"{\\\"buildInputs\\\":[],\\\"builder\\\":\\\"/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20/bin/bash\\\",\\\"cmakeFlags\\\":[],\\\"configureFlags\\\":[\\\"--build=x86_64-unknown-linux-gnu\\\",\\\"--host=x86_64-unknown-linux-gnu\\\"],\\\"configurePlatforms\\\":[\\\"build\\\",\\\"host\\\"],\\\"depsBuildBuild\\\":[],\\\"depsBuildBuildPropagated\\\":[],\\\"depsBuildTarget\\\":[],\\\"depsBuildTargetPropagated\\\":[],\\\"depsHostHost\\\":[],\\\"depsHostHostPropagated\\\":[],\\\"depsTargetTarget\\\":[],\\\"depsTargetTargetPropagated\\\":[],\\\"doCheck\\\":false,\\\"doInstallCheck\\\":true,\\\"enableParallelBuilding\\\":true,\\\"enableParallelChecking\\\":true,\\\"enableParallelInstalling\\\":true,\\\"env\\\":{},\\\"mesonFlags\\\":[],\\\"name\\\":\\\"bison-3.8.2\\\",\\\"nativeBuildInputs\\\":[\\\"/nix/store/dpfl1jgh80jki2a53i6i1gx19lccvk9f-gnum4-1.4.21\\\",\\\"/nix/store/niqsa6mxqsyax9lzbm261a2ml6m71vb6-perl-5.42.3\\\"],\\\"outputChecks\\\":{\\\"out\\\":{}},\\\"outputs\\\":[\\\"out\\\"],\\\"patches\\\":[],\\\"pname\\\":\\\"bison\\\",\\\"postFixup\\\":\\\"patchShebangs --build $out/bin/yacc\\\\n\\\",\\\"propagatedBuildInputs\\\":[\\\"/nix/store/dpfl1jgh80jki2a53i6i1gx19lccvk9f-gnum4-1.4.21\\\"],\\\"propagatedNativeBuildInputs\\\":[],\\\"src\\\":\\\"/nix/store/9vm1ihdg1ysmrjdbb80g834iizzxb4yk-bison-3.8.2.tar.gz\\\",\\\"stdenv\\\":\\\"/nix/store/z2wyfgcxn7brfklv373fz0l9k8b5pwsg-stdenv-linux\\\",\\\"strictDeps\\\":true,\\\"system\\\":\\\"x86_64-linux\\\",\\\"version\\\":\\\"3.8.2\\\"}\"),(\"out\",\"/nix/store/fxlrbbvsdvj14ds7a9y71wjy06lynby6-bison-3.8.2\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
+        "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
+      ],
+      "env": {
+        "out": "/nix/store/fxlrbbvsdvj14ds7a9y71wjy06lynby6-bison-3.8.2"
+      },
+      "inputSrcs": [
+        "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
+        "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/08grahh6i022hkpbaz3yix4wvrcrpyks-stdenv-linux.drv": ["out"],
+        "/nix/store/3y0bjp6kk93iw74vzp4s976zdmcqaznc-bison-3.8.2.tar.gz.drv": [
+          "out"
+        ],
+        "/nix/store/j5z3x411sqcjpwq4bgw4vxm19sm93lx8-perl-5.42.3.drv": ["out"],
+        "/nix/store/kbpcpb1ps9sxn55ng7yifk6zmncrjifx-bash-5.3p20.drv": ["out"],
+        "/nix/store/lrrh696kslplccy9n3ss5wf99q494dqf-gnum4-1.4.21.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/fxlrbbvsdvj14ds7a9y71wjy06lynby6-bison-3.8.2",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/c9f499q7q1nz8wjkbkgd0hkhlpqpxmnd-tinycc-boot3-libs-unstable-2024-07-07-builder.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/fr9ks4fd15kfa4019yaq3n0867jk248v-tinycc-boot3-libs-unstable-2024-07-07-builder\",\"\",\"\")],[(\"/nix/store/nxw2yr1lk45ypcnira1m153ar8dwdzj2-libgetopt.a.drv\",[\"out\"]),(\"/nix/store/ssj4nwq1miqn3i5rhihvgd3mck7fwm40-libtcc1.a.drv\",[\"out\"]),(\"/nix/store/xi58f9jv14p2pdq63g1d789m7jb3dxlr-crt.drv\",[\"out\"]),(\"/nix/store/ygvpm2yg35mziv51ciadbpxa4kbdvwl7-libc.a.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],[(\"PATH\",\"/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"destination\",\"\"),(\"destinationDir\",\".\"),(\"name\",\"tinycc-boot3-libs-unstable-2024-07-07-builder\"),(\"out\",\"/nix/store/fr9ks4fd15kfa4019yaq3n0867jk248v-tinycc-boot3-libs-unstable-2024-07-07-builder\"),(\"passAsFile\",\"text\"),(\"system\",\"x86_64-linux\"),(\"text\",\"mkdir -p ${out}/lib\\ncp /nix/store/in4lxyl2gfjhp0dfi9hbx7l275j4zqqh-crt/lib/crt1.o ${out}/lib\\ncp /nix/store/in4lxyl2gfjhp0dfi9hbx7l275j4zqqh-crt/lib/crtn.o ${out}/lib\\ncp /nix/store/in4lxyl2gfjhp0dfi9hbx7l275j4zqqh-crt/lib/crti.o ${out}/lib\\ncp /nix/store/rh4xf4rvlnvghk15c57r925dc6d28f29-libtcc1.a ${out}/lib/libtcc1.a\\ncp /nix/store/fcsl30kqw88yzhd01c3x868w7k2197gg-libc.a ${out}/lib/libc.a\\ncp /nix/store/0kwsy1cmcsgki1y9zdkx4d4wdgshgbfk-libgetopt.a ${out}/lib/libgetopt.a\\n\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "env": {
+        "PATH": "/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "destination": "",
+        "destinationDir": ".",
+        "name": "tinycc-boot3-libs-unstable-2024-07-07-builder",
+        "out": "/nix/store/fr9ks4fd15kfa4019yaq3n0867jk248v-tinycc-boot3-libs-unstable-2024-07-07-builder",
+        "passAsFile": "text",
+        "system": "x86_64-linux",
+        "text": "mkdir -p ${out}/lib\ncp /nix/store/in4lxyl2gfjhp0dfi9hbx7l275j4zqqh-crt/lib/crt1.o ${out}/lib\ncp /nix/store/in4lxyl2gfjhp0dfi9hbx7l275j4zqqh-crt/lib/crtn.o ${out}/lib\ncp /nix/store/in4lxyl2gfjhp0dfi9hbx7l275j4zqqh-crt/lib/crti.o ${out}/lib\ncp /nix/store/rh4xf4rvlnvghk15c57r925dc6d28f29-libtcc1.a ${out}/lib/libtcc1.a\ncp /nix/store/fcsl30kqw88yzhd01c3x868w7k2197gg-libc.a ${out}/lib/libc.a\ncp /nix/store/0kwsy1cmcsgki1y9zdkx4d4wdgshgbfk-libgetopt.a ${out}/lib/libgetopt.a\n"
+      },
+      "inputSrcs": [
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "inputDrvs": {
+        "/nix/store/nxw2yr1lk45ypcnira1m153ar8dwdzj2-libgetopt.a.drv": ["out"],
+        "/nix/store/ssj4nwq1miqn3i5rhihvgd3mck7fwm40-libtcc1.a.drv": ["out"],
+        "/nix/store/xi58f9jv14p2pdq63g1d789m7jb3dxlr-crt.drv": ["out"],
+        "/nix/store/ygvpm2yg35mziv51ciadbpxa4kbdvwl7-libc.a.drv": ["out"],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/fr9ks4fd15kfa4019yaq3n0867jk248v-tinycc-boot3-libs-unstable-2024-07-07-builder",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/cxpi1vdfflr3zh9xhgsqz44vqjk0jfk8-mpfr-2.4.2.tar.gz.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/ld9r1azyxbiqcp0frrndjv9ih48icif3-mpfr-2.4.2.tar.gz\",\"sha256\",\"246d7e184048b1fc48d3696dd302c9774e24e921204221540745e5464022b637\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"mpfr-2.4.2.tar.gz\"),(\"out\",\"/nix/store/ld9r1azyxbiqcp0frrndjv9ih48icif3-mpfr-2.4.2.tar.gz\"),(\"outputHash\",\"0dxn4904dra50xa22hi047lj8kkpr41d6vb9sd4grca880c7wv94\"),(\"outputHashAlgo\",\"sha256\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://ftpmirror.gnu.org/mpfr/mpfr-2.4.2.tar.gz\"),(\"urls\",\"https://ftpmirror.gnu.org/mpfr/mpfr-2.4.2.tar.gz\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "mpfr-2.4.2.tar.gz",
+        "out": "/nix/store/ld9r1azyxbiqcp0frrndjv9ih48icif3-mpfr-2.4.2.tar.gz",
+        "outputHash": "0dxn4904dra50xa22hi047lj8kkpr41d6vb9sd4grca880c7wv94",
+        "outputHashAlgo": "sha256",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://ftpmirror.gnu.org/mpfr/mpfr-2.4.2.tar.gz",
+        "urls": "https://ftpmirror.gnu.org/mpfr/mpfr-2.4.2.tar.gz"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/ld9r1azyxbiqcp0frrndjv9ih48icif3-mpfr-2.4.2.tar.gz",
+          "hashAlgo": "sha256",
+          "hash": "246d7e184048b1fc48d3696dd302c9774e24e921204221540745e5464022b637"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/dc0711ldvbq2x2pqzny1a1vapjwqcr49-libgetopt.a.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/y4bgya5hg5dvg9izfsrvj4x5niyvf0vv-libgetopt.a\",\"\",\"\")],[(\"/nix/store/nsrksq0rxb8m5wgn541c0j6n03cjzd7y-libgetopt.a-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/xhd85g7y88x8misf7ipwvgrw9rzrmikx-libgetopt.a-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"libgetopt.a\"),(\"out\",\"/nix/store/y4bgya5hg5dvg9izfsrvj4x5niyvf0vv-libgetopt.a\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/xhd85g7y88x8misf7ipwvgrw9rzrmikx-libgetopt.a-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "libgetopt.a",
+        "out": "/nix/store/y4bgya5hg5dvg9izfsrvj4x5niyvf0vv-libgetopt.a",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/nsrksq0rxb8m5wgn541c0j6n03cjzd7y-libgetopt.a-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/y4bgya5hg5dvg9izfsrvj4x5niyvf0vv-libgetopt.a",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/dschwsfi21lwar5ldv5wdqnm1waf197a-M2-0-0.M1-1.9.1.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/2d6n5iwhk8d4aq38v350y937b5khx3f0-M2-0-0.M1-1.9.1\",\"\",\"\")],[(\"/nix/store/2jwh5pdbg0mff2bhxvc2vam8bm05wa08-catm-1.9.1.drv\",[\"out\"]),(\"/nix/store/2kbbzfsz1hzd21yj0h989s3z40cgrp58-stage0-posix-1.9.1-source.drv\",[\"out\"]),(\"/nix/store/fg5yn059hlcxgb0116bq8s47rbg4gzs2-M2-0.M1-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1\",[\"/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2libc/amd64/amd64_defs.M1\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2libc/amd64/libc-core.M1\",\"/nix/store/az1imkg706y2z3qzyr5pkhm6pk22016y-M2-0.M1-1.9.1\"],[(\"builder\",\"/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1\"),(\"name\",\"M2-0-0.M1-1.9.1\"),(\"out\",\"/nix/store/2d6n5iwhk8d4aq38v350y937b5khx3f0-M2-0-0.M1-1.9.1\"),(\"pname\",\"M2-0-0.M1\"),(\"system\",\"x86_64-linux\"),(\"version\",\"1.9.1\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1",
+      "args": [
+        "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2libc/amd64/amd64_defs.M1",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2libc/amd64/libc-core.M1",
+        "/nix/store/az1imkg706y2z3qzyr5pkhm6pk22016y-M2-0.M1-1.9.1"
+      ],
+      "env": {
+        "builder": "/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1",
+        "name": "M2-0-0.M1-1.9.1",
+        "out": "/nix/store/2d6n5iwhk8d4aq38v350y937b5khx3f0-M2-0-0.M1-1.9.1",
+        "pname": "M2-0-0.M1",
+        "system": "x86_64-linux",
+        "version": "1.9.1"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/2jwh5pdbg0mff2bhxvc2vam8bm05wa08-catm-1.9.1.drv": ["out"],
+        "/nix/store/2kbbzfsz1hzd21yj0h989s3z40cgrp58-stage0-posix-1.9.1-source.drv": [
+          "out"
+        ],
+        "/nix/store/fg5yn059hlcxgb0116bq8s47rbg4gzs2-M2-0.M1-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/2d6n5iwhk8d4aq38v350y937b5khx3f0-M2-0-0.M1-1.9.1",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/fg5yn059hlcxgb0116bq8s47rbg4gzs2-M2-0.M1-1.9.1.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/az1imkg706y2z3qzyr5pkhm6pk22016y-M2-0.M1-1.9.1\",\"\",\"\")],[(\"/nix/store/rq77y1w9cbyx76dqcnw4wa24w1wq3ybw-M2-0.c-1.9.1.drv\",[\"out\"]),(\"/nix/store/s47mlxqkjc26fvmx2yrps4hkpigimxi1-cc_arch-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/pp0bp180x7k871rvplc78sz92l42s4y2-cc_arch-1.9.1\",[\"/nix/store/0mcg84c9y2wvxqlg56hky8n8prgm6v7y-M2-0.c-1.9.1\",\"/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9\"],[(\"builder\",\"/nix/store/pp0bp180x7k871rvplc78sz92l42s4y2-cc_arch-1.9.1\"),(\"name\",\"M2-0.M1-1.9.1\"),(\"out\",\"/nix/store/az1imkg706y2z3qzyr5pkhm6pk22016y-M2-0.M1-1.9.1\"),(\"pname\",\"M2-0.M1\"),(\"system\",\"x86_64-linux\"),(\"version\",\"1.9.1\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/pp0bp180x7k871rvplc78sz92l42s4y2-cc_arch-1.9.1",
+      "args": [
+        "/nix/store/0mcg84c9y2wvxqlg56hky8n8prgm6v7y-M2-0.c-1.9.1",
+        "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9"
+      ],
+      "env": {
+        "builder": "/nix/store/pp0bp180x7k871rvplc78sz92l42s4y2-cc_arch-1.9.1",
+        "name": "M2-0.M1-1.9.1",
+        "out": "/nix/store/az1imkg706y2z3qzyr5pkhm6pk22016y-M2-0.M1-1.9.1",
+        "pname": "M2-0.M1",
+        "system": "x86_64-linux",
+        "version": "1.9.1"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/rq77y1w9cbyx76dqcnw4wa24w1wq3ybw-M2-0.c-1.9.1.drv": ["out"],
+        "/nix/store/s47mlxqkjc26fvmx2yrps4hkpigimxi1-cc_arch-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/az1imkg706y2z3qzyr5pkhm6pk22016y-M2-0.M1-1.9.1",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/fxii7wgh8167mckd8bbjal5mxq9l9p05-M2-0.hex2-1.9.1.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/xyxmvpw1jm4hlkr1lrvdd8gwgk1avfr9-M2-0.hex2-1.9.1\",\"\",\"\")],[(\"/nix/store/dschwsfi21lwar5ldv5wdqnm1waf197a-M2-0-0.M1-1.9.1.drv\",[\"out\"]),(\"/nix/store/z4xincpdf0q9ikjbma0s5sf5jrl3s187-M0-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/r45ldgp94pqnp2da8h77sdsqhpg13mya-M0-1.9.1\",[\"/nix/store/2d6n5iwhk8d4aq38v350y937b5khx3f0-M2-0-0.M1-1.9.1\",\"/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9\"],[(\"builder\",\"/nix/store/r45ldgp94pqnp2da8h77sdsqhpg13mya-M0-1.9.1\"),(\"name\",\"M2-0.hex2-1.9.1\"),(\"out\",\"/nix/store/xyxmvpw1jm4hlkr1lrvdd8gwgk1avfr9-M2-0.hex2-1.9.1\"),(\"pname\",\"M2-0.hex2\"),(\"system\",\"x86_64-linux\"),(\"version\",\"1.9.1\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/r45ldgp94pqnp2da8h77sdsqhpg13mya-M0-1.9.1",
+      "args": [
+        "/nix/store/2d6n5iwhk8d4aq38v350y937b5khx3f0-M2-0-0.M1-1.9.1",
+        "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9"
+      ],
+      "env": {
+        "builder": "/nix/store/r45ldgp94pqnp2da8h77sdsqhpg13mya-M0-1.9.1",
+        "name": "M2-0.hex2-1.9.1",
+        "out": "/nix/store/xyxmvpw1jm4hlkr1lrvdd8gwgk1avfr9-M2-0.hex2-1.9.1",
+        "pname": "M2-0.hex2",
+        "system": "x86_64-linux",
+        "version": "1.9.1"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/dschwsfi21lwar5ldv5wdqnm1waf197a-M2-0-0.M1-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/z4xincpdf0q9ikjbma0s5sf5jrl3s187-M0-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/xyxmvpw1jm4hlkr1lrvdd8gwgk1avfr9-M2-0.hex2-1.9.1",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/gr7p5aghmkv93kv5vmq42nn0b3372k3c-m4-1.4.21.tar.xz.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/2r25sdk503dsvfxq9ssfkdzn18wybsxn-m4-1.4.21.tar.xz\",\"sha256\",\"f25c6ab51548a73a75558742fb031e0625d6485fe5f9155949d6486a2408ab66\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"m4-1.4.21.tar.xz\"),(\"out\",\"/nix/store/2r25sdk503dsvfxq9ssfkdzn18wybsxn-m4-1.4.21.tar.xz\"),(\"outputHash\",\"sha256-8lxqtRVIpzp1VYdC+wMeBiXWSF/l+RVZSdZIaiQIq2Y=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://ftpmirror.gnu.org/m4/m4-1.4.21.tar.xz\"),(\"urls\",\"https://ftpmirror.gnu.org/m4/m4-1.4.21.tar.xz\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "m4-1.4.21.tar.xz",
+        "out": "/nix/store/2r25sdk503dsvfxq9ssfkdzn18wybsxn-m4-1.4.21.tar.xz",
+        "outputHash": "sha256-8lxqtRVIpzp1VYdC+wMeBiXWSF/l+RVZSdZIaiQIq2Y=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://ftpmirror.gnu.org/m4/m4-1.4.21.tar.xz",
+        "urls": "https://ftpmirror.gnu.org/m4/m4-1.4.21.tar.xz"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/2r25sdk503dsvfxq9ssfkdzn18wybsxn-m4-1.4.21.tar.xz",
+          "hashAlgo": "sha256",
+          "hash": "f25c6ab51548a73a75558742fb031e0625d6485fe5f9155949d6486a2408ab66"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/h284fqqiy6psckskgzjbbsidi2054msg-mes-get-version-0.27.1.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/gdfqds90y7frdym19pbx0bqanjvg68r5-mes-get-version-0.27.1\",\"\",\"\")],[(\"/nix/store/l0rq88l43hfrdaywci9zzjglkw56gwc0-mes-get-version-0.27.1-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/75rs3fnjz863wpais8crwmpk1b7kzcdw-mes-get-version-0.27.1-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"mes-get-version-0.27.1\"),(\"out\",\"/nix/store/gdfqds90y7frdym19pbx0bqanjvg68r5-mes-get-version-0.27.1\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/75rs3fnjz863wpais8crwmpk1b7kzcdw-mes-get-version-0.27.1-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "mes-get-version-0.27.1",
+        "out": "/nix/store/gdfqds90y7frdym19pbx0bqanjvg68r5-mes-get-version-0.27.1",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/l0rq88l43hfrdaywci9zzjglkw56gwc0-mes-get-version-0.27.1-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/gdfqds90y7frdym19pbx0bqanjvg68r5-mes-get-version-0.27.1",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/hhlbiv75flpi91p8gf11g6m7sa7qna2w-libgetopt.a.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/arzgm9976k0b6f5i1ffg2brdqg1rhq2c-libgetopt.a\",\"\",\"\")],[(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/wignb9bpy2y83qwixsgiabml57wbknjv-libgetopt.a-builder.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/xrik0v0wmja1783b6bhq0p891zdls56c-libgetopt.a-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"libgetopt.a\"),(\"out\",\"/nix/store/arzgm9976k0b6f5i1ffg2brdqg1rhq2c-libgetopt.a\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/xrik0v0wmja1783b6bhq0p891zdls56c-libgetopt.a-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "libgetopt.a",
+        "out": "/nix/store/arzgm9976k0b6f5i1ffg2brdqg1rhq2c-libgetopt.a",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/wignb9bpy2y83qwixsgiabml57wbknjv-libgetopt.a-builder.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/arzgm9976k0b6f5i1ffg2brdqg1rhq2c-libgetopt.a",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/i4a7vp8h1mg0gf9dkr7lqda402qi2blz-mes-libc+tcc-0.27.1.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/3fc7rx021l4k3bz7vkyps6n4j5a3nvdn-mes-libc+tcc-0.27.1\",\"\",\"\")],[(\"/nix/store/n8xfn5p7ap99jqirj54202i7g7mwscbb-mes-libc+tcc-0.27.1-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/mr289i3y08s6a4kjxrpsz3i9d1ph412q-mes-libc+tcc-0.27.1-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"mes-libc+tcc-0.27.1\"),(\"out\",\"/nix/store/3fc7rx021l4k3bz7vkyps6n4j5a3nvdn-mes-libc+tcc-0.27.1\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/mr289i3y08s6a4kjxrpsz3i9d1ph412q-mes-libc+tcc-0.27.1-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "mes-libc+tcc-0.27.1",
+        "out": "/nix/store/3fc7rx021l4k3bz7vkyps6n4j5a3nvdn-mes-libc+tcc-0.27.1",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/n8xfn5p7ap99jqirj54202i7g7mwscbb-mes-libc+tcc-0.27.1-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/3fc7rx021l4k3bz7vkyps6n4j5a3nvdn-mes-libc+tcc-0.27.1",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/iv1jc57sl4b5imgylsfnhzdmk37f3dg9-libgetopt.a.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/wgfv3l0vk9jg9d8hc36dsrv0nvsgg4fn-libgetopt.a\",\"\",\"\")],[(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/qvfqccw9xfc9jd2n2ska6v5bk8f52bl8-libgetopt.a-builder.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/lpfsr5pdxyf99clg8iwiflhczcjwl0kc-libgetopt.a-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"libgetopt.a\"),(\"out\",\"/nix/store/wgfv3l0vk9jg9d8hc36dsrv0nvsgg4fn-libgetopt.a\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/lpfsr5pdxyf99clg8iwiflhczcjwl0kc-libgetopt.a-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "libgetopt.a",
+        "out": "/nix/store/wgfv3l0vk9jg9d8hc36dsrv0nvsgg4fn-libgetopt.a",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/qvfqccw9xfc9jd2n2ska6v5bk8f52bl8-libgetopt.a-builder.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/wgfv3l0vk9jg9d8hc36dsrv0nvsgg4fn-libgetopt.a",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/j97m5zw1a3in1vk9iswb95rsic1c4bmw-update-autotools-gnu-config-scripts-hook.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/sk59smk7b5pkq4h7ww277mlz7wlvf3rd-update-autotools-gnu-config-scripts-hook\",\"\",\"\")],[(\"/nix/store/9s1n83dmdihh3zzqpqlp88kfw91nzwd7-bootstrap-stage2-stdenv-linux-no-cc.drv\",[\"out\"]),(\"/nix/store/jvmpwfn1hsi13r6q3silkfl0iwyq26nb-gnu-config-2024-01-01.drv\",[\"out\"]),(\"/nix/store/wgxrbv6jpdnf0nb5xx3wffvmv8q0nwdr-bash-static-5.3.drv\",[\"out\"])],[\"/nix/store/96rvfw5vlv1hwwm9sdxhdkkpjyym6p2x-update-autotools-gnu-config-scripts.sh\",\"/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh\",\"/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh\"],\"x86_64-linux\",\"/nix/store/yn40n1h7nry843rmhiz1rzxxbgais07x-bash-static-5.3/bin/bash\",[\"-e\",\"/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh\",\"/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh\"],[(\"__json\",\"{\\\"buildCommand\\\":\\\"mkdir -p $out/nix-support\\\\ncp /nix/store/96rvfw5vlv1hwwm9sdxhdkkpjyym6p2x-update-autotools-gnu-config-scripts.sh $out/nix-support/setup-hook\\\\nrecordPropagatedDependencies\\\\nsubstitute /nix/store/96rvfw5vlv1hwwm9sdxhdkkpjyym6p2x-update-autotools-gnu-config-scripts.sh $out/nix-support/setup-hook --subst-var gnu_config\\\\n\\\",\\\"buildInputs\\\":[],\\\"builder\\\":\\\"/nix/store/yn40n1h7nry843rmhiz1rzxxbgais07x-bash-static-5.3/bin/bash\\\",\\\"cmakeFlags\\\":[],\\\"configureFlags\\\":[],\\\"depsBuildBuild\\\":[],\\\"depsBuildBuildPropagated\\\":[],\\\"depsBuildTarget\\\":[],\\\"depsBuildTargetPropagated\\\":[],\\\"depsHostHost\\\":[],\\\"depsHostHostPropagated\\\":[],\\\"depsTargetTarget\\\":[],\\\"depsTargetTargetPropagated\\\":[],\\\"doCheck\\\":false,\\\"doInstallCheck\\\":false,\\\"enableParallelBuilding\\\":true,\\\"enableParallelChecking\\\":true,\\\"enableParallelInstalling\\\":true,\\\"env\\\":{},\\\"gnu_config\\\":\\\"/nix/store/vjh3adfljl7187n0hbm0h1pvrg3nq17l-gnu-config-2024-01-01\\\",\\\"mesonFlags\\\":[],\\\"name\\\":\\\"update-autotools-gnu-config-scripts-hook\\\",\\\"nativeBuildInputs\\\":[],\\\"outputChecks\\\":{\\\"out\\\":{}},\\\"outputs\\\":[\\\"out\\\"],\\\"passAsFile\\\":[\\\"buildCommand\\\"],\\\"patches\\\":[],\\\"pname\\\":\\\"update-autotools-gnu-config-scripts-hook\\\",\\\"propagatedBuildInputs\\\":[],\\\"propagatedNativeBuildInputs\\\":[],\\\"stdenv\\\":\\\"/nix/store/dnvd4fmksvklapdq97jlajv0w0faby4g-bootstrap-stage2-stdenv-linux-no-cc\\\",\\\"strictDeps\\\":true,\\\"system\\\":\\\"x86_64-linux\\\",\\\"version\\\":\\\"26.05pre-git\\\"}\"),(\"out\",\"/nix/store/sk59smk7b5pkq4h7ww277mlz7wlvf3rd-update-autotools-gnu-config-scripts-hook\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/yn40n1h7nry843rmhiz1rzxxbgais07x-bash-static-5.3/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
+        "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
+      ],
+      "env": {
+        "out": "/nix/store/sk59smk7b5pkq4h7ww277mlz7wlvf3rd-update-autotools-gnu-config-scripts-hook"
+      },
+      "inputSrcs": [
+        "/nix/store/96rvfw5vlv1hwwm9sdxhdkkpjyym6p2x-update-autotools-gnu-config-scripts.sh",
+        "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
+        "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/9s1n83dmdihh3zzqpqlp88kfw91nzwd7-bootstrap-stage2-stdenv-linux-no-cc.drv": [
+          "out"
+        ],
+        "/nix/store/jvmpwfn1hsi13r6q3silkfl0iwyq26nb-gnu-config-2024-01-01.drv": [
+          "out"
+        ],
+        "/nix/store/wgxrbv6jpdnf0nb5xx3wffvmv8q0nwdr-bash-static-5.3.drv": [
+          "out"
+        ]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/sk59smk7b5pkq4h7ww277mlz7wlvf3rd-update-autotools-gnu-config-scripts-hook",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/kk0db19b3xzr899ihww0q4d85fl13icn-bzip2-static-compress-1.0.8.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/mqk1cplfphmvl5lbn36sak60wp29hpkz-bzip2-static-compress-1.0.8\",\"\",\"\")],[(\"/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv\",[\"out\"]),(\"/nix/store/d21687bzcrh0bvz34kra3il3g75xvgix-bzip2-static-1.0.8.drv\",[\"out\"]),(\"/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv\",[\"out\"])],[\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],\"x86_64-linux\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\",[\"-e\",\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],[(\"PATH\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin\"),(\"SHELL\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"buildCommand\",\"printf 'bootstrap\\\\n' > input\\n/nix/store/r92n9vsi53kkkf4szxvb49123z6r87vs-bzip2-static-1.0.8/bin/bzip2 -k input\\n/nix/store/r92n9vsi53kkkf4szxvb49123z6r87vs-bzip2-static-1.0.8/bin/bunzip2 -c input.bz2 > bunzip2-output\\nread -r bunzip2Output < bunzip2-output\\ntest \\\"$bunzip2Output\\\" = bootstrap\\n/nix/store/r92n9vsi53kkkf4szxvb49123z6r87vs-bzip2-static-1.0.8/bin/bzcat input.bz2 > bzcat-output\\nread -r bzcatOutput < bzcat-output\\ntest \\\"$bzcatOutput\\\" = bootstrap\\nmkdir $out\\n\"),(\"builder\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"name\",\"bzip2-static-compress-1.0.8\"),(\"out\",\"/nix/store/mqk1cplfphmvl5lbn36sak60wp29hpkz-bzip2-static-compress-1.0.8\"),(\"passAsFile\",\"buildCommand\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "env": {
+        "PATH": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin",
+        "SHELL": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "buildCommand": "printf 'bootstrap\\n' > input\n/nix/store/r92n9vsi53kkkf4szxvb49123z6r87vs-bzip2-static-1.0.8/bin/bzip2 -k input\n/nix/store/r92n9vsi53kkkf4szxvb49123z6r87vs-bzip2-static-1.0.8/bin/bunzip2 -c input.bz2 > bunzip2-output\nread -r bunzip2Output < bunzip2-output\ntest \"$bunzip2Output\" = bootstrap\n/nix/store/r92n9vsi53kkkf4szxvb49123z6r87vs-bzip2-static-1.0.8/bin/bzcat input.bz2 > bzcat-output\nread -r bzcatOutput < bzcat-output\ntest \"$bzcatOutput\" = bootstrap\nmkdir $out\n",
+        "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "name": "bzip2-static-compress-1.0.8",
+        "out": "/nix/store/mqk1cplfphmvl5lbn36sak60wp29hpkz-bzip2-static-compress-1.0.8",
+        "passAsFile": "buildCommand",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
+        "/nix/store/d21687bzcrh0bvz34kra3il3g75xvgix-bzip2-static-1.0.8.drv": [
+          "out"
+        ],
+        "/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv": [
+          "out"
+        ]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/mqk1cplfphmvl5lbn36sak60wp29hpkz-bzip2-static-compress-1.0.8",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/l4q7jsk9n0ys3qb31zafgzwakpwq0360-libssh2-1.11.1.tar.gz.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/j04yfblg6sk5abb4n067xv0x0dfraf73-libssh2-1.11.1.tar.gz\",\"sha256\",\"d9ec76cbe34db98eec3539fe2c899d26b0c837cb3eb466a56b0f109cabf658f7\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"libssh2-1.11.1.tar.gz\"),(\"out\",\"/nix/store/j04yfblg6sk5abb4n067xv0x0dfraf73-libssh2-1.11.1.tar.gz\"),(\"outputHash\",\"sha256-2ex2y+NNuY7sNTn+LImdJrDIN8s+tGalaw8QnKv2WPc=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://www.libssh2.org/download/libssh2-1.11.1.tar.gz\"),(\"urls\",\"https://www.libssh2.org/download/libssh2-1.11.1.tar.gz\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "libssh2-1.11.1.tar.gz",
+        "out": "/nix/store/j04yfblg6sk5abb4n067xv0x0dfraf73-libssh2-1.11.1.tar.gz",
+        "outputHash": "sha256-2ex2y+NNuY7sNTn+LImdJrDIN8s+tGalaw8QnKv2WPc=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://www.libssh2.org/download/libssh2-1.11.1.tar.gz",
+        "urls": "https://www.libssh2.org/download/libssh2-1.11.1.tar.gz"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/j04yfblg6sk5abb4n067xv0x0dfraf73-libssh2-1.11.1.tar.gz",
+          "hashAlgo": "sha256",
+          "hash": "d9ec76cbe34db98eec3539fe2c899d26b0c837cb3eb466a56b0f109cabf658f7"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/lnv2kjxni9cc5rmf7la9dkn5fvcbi55n-pkgs-config-setup-hook.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/152vlzbj880fyf80hpi5hadr4v5fpd5i-pkgs-config-setup-hook\",\"\",\"\")],[(\"/nix/store/9k2radvbny2prs6r0l215zy4r5wd2cyp-stdenv-linux-no-cc.drv\",[\"out\"]),(\"/nix/store/kbpcpb1ps9sxn55ng7yifk6zmncrjifx-bash-5.3p20.drv\",[\"out\"])],[\"/nix/store/c4akajrb4jg50k72jw7zfbyv8z139ri0-setup-hook.sh\",\"/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh\",\"/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh\"],\"x86_64-linux\",\"/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20/bin/bash\",[\"-e\",\"/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh\",\"/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh\"],[(\"__json\",\"{\\\"baseBinName\\\":\\\"pkg-config\\\",\\\"buildCommand\\\":\\\"mkdir -p $out/nix-support\\\\ncp /nix/store/c4akajrb4jg50k72jw7zfbyv8z139ri0-setup-hook.sh $out/nix-support/setup-hook\\\\nrecordPropagatedDependencies\\\\nsubstitute /nix/store/c4akajrb4jg50k72jw7zfbyv8z139ri0-setup-hook.sh $out/nix-support/setup-hook --subst-var baseBinName --subst-var targetPrefix\\\\n\\\",\\\"buildInputs\\\":[],\\\"builder\\\":\\\"/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20/bin/bash\\\",\\\"cmakeFlags\\\":[],\\\"configureFlags\\\":[],\\\"depsBuildBuild\\\":[],\\\"depsBuildBuildPropagated\\\":[],\\\"depsBuildTarget\\\":[],\\\"depsBuildTargetPropagated\\\":[],\\\"depsHostHost\\\":[],\\\"depsHostHostPropagated\\\":[],\\\"depsTargetTarget\\\":[],\\\"depsTargetTargetPropagated\\\":[],\\\"doCheck\\\":false,\\\"doInstallCheck\\\":false,\\\"enableParallelBuilding\\\":true,\\\"enableParallelChecking\\\":true,\\\"enableParallelInstalling\\\":true,\\\"env\\\":{},\\\"mesonFlags\\\":[],\\\"name\\\":\\\"pkgs-config-setup-hook\\\",\\\"nativeBuildInputs\\\":[],\\\"outputChecks\\\":{\\\"out\\\":{}},\\\"outputs\\\":[\\\"out\\\"],\\\"passAsFile\\\":[\\\"buildCommand\\\"],\\\"patches\\\":[],\\\"pname\\\":\\\"pkgs-config-setup-hook\\\",\\\"propagatedBuildInputs\\\":[],\\\"propagatedNativeBuildInputs\\\":[],\\\"stdenv\\\":\\\"/nix/store/vd29sjk0bfwm2fygq5a9an70qd8hfnlb-stdenv-linux-no-cc\\\",\\\"strictDeps\\\":true,\\\"system\\\":\\\"x86_64-linux\\\",\\\"targetPrefix\\\":\\\"\\\",\\\"version\\\":\\\"26.05pre-git\\\"}\"),(\"out\",\"/nix/store/152vlzbj880fyf80hpi5hadr4v5fpd5i-pkgs-config-setup-hook\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
+        "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
+      ],
+      "env": {
+        "out": "/nix/store/152vlzbj880fyf80hpi5hadr4v5fpd5i-pkgs-config-setup-hook"
+      },
+      "inputSrcs": [
+        "/nix/store/c4akajrb4jg50k72jw7zfbyv8z139ri0-setup-hook.sh",
+        "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
+        "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/9k2radvbny2prs6r0l215zy4r5wd2cyp-stdenv-linux-no-cc.drv": [
+          "out"
+        ],
+        "/nix/store/kbpcpb1ps9sxn55ng7yifk6zmncrjifx-bash-5.3p20.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/152vlzbj880fyf80hpi5hadr4v5fpd5i-pkgs-config-setup-hook",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/m2khnp0iw665w7zjkyvil62v5wjlbl8i-patch-2.5.9.tar.gz.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/q9qicy85fzbs1fzn98hl231bah798m48-patch-2.5.9.tar.gz\",\"sha256\",\"ecb5c6469d732bcf01d6ec1afe9e64f1668caba5bfdb103c28d7f537ba3cdb8a\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"patch-2.5.9.tar.gz\"),(\"out\",\"/nix/store/q9qicy85fzbs1fzn98hl231bah798m48-patch-2.5.9.tar.gz\"),(\"outputHash\",\"12nv7jx3gxfp50y11nxzlnmqqrpicjggw6pcsq0wyavkkm3cddgc\"),(\"outputHashAlgo\",\"sha256\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://ftpmirror.gnu.org/patch/patch-2.5.9.tar.gz\"),(\"urls\",\"https://ftpmirror.gnu.org/patch/patch-2.5.9.tar.gz\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "patch-2.5.9.tar.gz",
+        "out": "/nix/store/q9qicy85fzbs1fzn98hl231bah798m48-patch-2.5.9.tar.gz",
+        "outputHash": "12nv7jx3gxfp50y11nxzlnmqqrpicjggw6pcsq0wyavkkm3cddgc",
+        "outputHashAlgo": "sha256",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://ftpmirror.gnu.org/patch/patch-2.5.9.tar.gz",
+        "urls": "https://ftpmirror.gnu.org/patch/patch-2.5.9.tar.gz"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/q9qicy85fzbs1fzn98hl231bah798m48-patch-2.5.9.tar.gz",
+          "hashAlgo": "sha256",
+          "hash": "ecb5c6469d732bcf01d6ec1afe9e64f1668caba5bfdb103c28d7f537ba3cdb8a"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/mf9br2m8vddsnqxjla1xsj0d160l6bw6-mes-libc-mini-0.27.1.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/d7n0wb8lnxywdzl9cpnc9gagzrcsak40-mes-libc-mini-0.27.1\",\"\",\"\")],[(\"/nix/store/7sn98bdbh4x5b58q0ghni71ginkqxcms-mes-libc-mini-0.27.1-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/d0l31n71g71m7zvw2l41fdfq4dpv8rlm-mes-libc-mini-0.27.1-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"mes-libc-mini-0.27.1\"),(\"out\",\"/nix/store/d7n0wb8lnxywdzl9cpnc9gagzrcsak40-mes-libc-mini-0.27.1\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/d0l31n71g71m7zvw2l41fdfq4dpv8rlm-mes-libc-mini-0.27.1-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "mes-libc-mini-0.27.1",
+        "out": "/nix/store/d7n0wb8lnxywdzl9cpnc9gagzrcsak40-mes-libc-mini-0.27.1",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/7sn98bdbh4x5b58q0ghni71ginkqxcms-mes-libc-mini-0.27.1-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/d7n0wb8lnxywdzl9cpnc9gagzrcsak40-mes-libc-mini-0.27.1",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/mnf045bsmn91nmylz4nn2ci5p2y89nwx-minimal-bootstrap-bootstrap-chain-test.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/rld2frvx7zyaiisrhghx3jh8yz7wb0nq-minimal-bootstrap-bootstrap-chain-test\",\"\",\"\")],[(\"/nix/store/d3v7xlwway2wsb2ipyfxnh2y3xfydjqm-minimal-bootstrap-bootstrap-chain-test-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/9cbx9mgz3h456vb1b6mkibg0yjvddzn5-minimal-bootstrap-bootstrap-chain-test-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"minimal-bootstrap-bootstrap-chain-test\"),(\"out\",\"/nix/store/rld2frvx7zyaiisrhghx3jh8yz7wb0nq-minimal-bootstrap-bootstrap-chain-test\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/9cbx9mgz3h456vb1b6mkibg0yjvddzn5-minimal-bootstrap-bootstrap-chain-test-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "minimal-bootstrap-bootstrap-chain-test",
+        "out": "/nix/store/rld2frvx7zyaiisrhghx3jh8yz7wb0nq-minimal-bootstrap-bootstrap-chain-test",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/d3v7xlwway2wsb2ipyfxnh2y3xfydjqm-minimal-bootstrap-bootstrap-chain-test-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/rld2frvx7zyaiisrhghx3jh8yz7wb0nq-minimal-bootstrap-bootstrap-chain-test",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/n4lyn7z6ka63jc3lgy067fsjmadgagws-gnupatch-2.5.9-builder.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/0iw7hh602vvvbw5891f1aj5widawcdrk-gnupatch-2.5.9-builder\",\"\",\"\")],[(\"/nix/store/m2khnp0iw665w7zjkyvil62v5wjlbl8i-patch-2.5.9.tar.gz.drv\",[\"out\"]),(\"/nix/store/rhk6vr1hcpvmknj9f4jksczgvdv0fnd2-tinycc-mes-libs-unstable-2025-12-03.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],[(\"PATH\",\"/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"destination\",\"\"),(\"destinationDir\",\".\"),(\"name\",\"gnupatch-2.5.9-builder\"),(\"out\",\"/nix/store/0iw7hh602vvvbw5891f1aj5widawcdrk-gnupatch-2.5.9-builder\"),(\"passAsFile\",\"text\"),(\"system\",\"x86_64-linux\"),(\"text\",\"# Unpack\\nungz --file /nix/store/q9qicy85fzbs1fzn98hl231bah798m48-patch-2.5.9.tar.gz --output patch.tar\\nuntar --file patch.tar\\nrm patch.tar\\ncd patch-2.5.9\\n\\n# Configure\\ncatm config.h\\n\\n# Build\\nalias CC=\\\"tcc -B /nix/store/kdkjx3ipcy17hh0xkhcycqxl2imirna4-tinycc-mes-libs-unstable-2025-12-03/lib -I. -DHAVE_DECL_GETENV -DHAVE_DECL_MALLOC -DHAVE_DIRENT_H -DHAVE_LIMITS_H -DHAVE_GETEUID -DHAVE_MKTEMP -DPACKAGE_BUGREPORT= -Ded_PROGRAM=\\\\\\\"/nullop\\\\\\\" -Dmbstate_t=int -DRETSIGTYPE=int -DHAVE_MKDIR -DHAVE_RMDIR -DHAVE_FCNTL_H -DPACKAGE_NAME=\\\\\\\"patch\\\\\\\" -DPACKAGE_VERSION=\\\\\\\"2.5.9\\\\\\\" -DHAVE_MALLOC -DHAVE_REALLOC -DSTDC_HEADERS -DHAVE_STRING_H -DHAVE_STDLIB_H -DHAVE_VPRINTF\\\"\\nCC -c addext.c\\nCC -c argmatch.c\\nCC -c backupfile.c\\nCC -c basename.c\\nCC -c dirname.c\\nCC -c getopt.c\\nCC -c getopt1.c\\nCC -c inp.c\\nCC -c maketime.c\\nCC -c partime.c\\nCC -c patch.c\\nCC -c pch.c\\nCC -c quote.c\\nCC -c quotearg.c\\nCC -c quotesys.c\\nCC -c util.c\\nCC -c version.c\\nCC -c xmalloc.c\\nCC -c error.c\\n\\n# Link\\nCC -o patch addext.o argmatch.o backupfile.o basename.o dirname.o getopt.o getopt1.o inp.o maketime.o partime.o patch.o pch.o quote.o quotearg.o quotesys.o util.o version.o xmalloc.o error.o\\n\\n# Check\\n./patch --version\\n\\n# Install\\nmkdir -p ${out}/bin\\ncp ./patch ${out}/bin\\nchmod 555 ${out}/bin/patch\\n\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "env": {
+        "PATH": "/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "destination": "",
+        "destinationDir": ".",
+        "name": "gnupatch-2.5.9-builder",
+        "out": "/nix/store/0iw7hh602vvvbw5891f1aj5widawcdrk-gnupatch-2.5.9-builder",
+        "passAsFile": "text",
+        "system": "x86_64-linux",
+        "text": "# Unpack\nungz --file /nix/store/q9qicy85fzbs1fzn98hl231bah798m48-patch-2.5.9.tar.gz --output patch.tar\nuntar --file patch.tar\nrm patch.tar\ncd patch-2.5.9\n\n# Configure\ncatm config.h\n\n# Build\nalias CC=\"tcc -B /nix/store/kdkjx3ipcy17hh0xkhcycqxl2imirna4-tinycc-mes-libs-unstable-2025-12-03/lib -I. -DHAVE_DECL_GETENV -DHAVE_DECL_MALLOC -DHAVE_DIRENT_H -DHAVE_LIMITS_H -DHAVE_GETEUID -DHAVE_MKTEMP -DPACKAGE_BUGREPORT= -Ded_PROGRAM=\\\"/nullop\\\" -Dmbstate_t=int -DRETSIGTYPE=int -DHAVE_MKDIR -DHAVE_RMDIR -DHAVE_FCNTL_H -DPACKAGE_NAME=\\\"patch\\\" -DPACKAGE_VERSION=\\\"2.5.9\\\" -DHAVE_MALLOC -DHAVE_REALLOC -DSTDC_HEADERS -DHAVE_STRING_H -DHAVE_STDLIB_H -DHAVE_VPRINTF\"\nCC -c addext.c\nCC -c argmatch.c\nCC -c backupfile.c\nCC -c basename.c\nCC -c dirname.c\nCC -c getopt.c\nCC -c getopt1.c\nCC -c inp.c\nCC -c maketime.c\nCC -c partime.c\nCC -c patch.c\nCC -c pch.c\nCC -c quote.c\nCC -c quotearg.c\nCC -c quotesys.c\nCC -c util.c\nCC -c version.c\nCC -c xmalloc.c\nCC -c error.c\n\n# Link\nCC -o patch addext.o argmatch.o backupfile.o basename.o dirname.o getopt.o getopt1.o inp.o maketime.o partime.o patch.o pch.o quote.o quotearg.o quotesys.o util.o version.o xmalloc.o error.o\n\n# Check\n./patch --version\n\n# Install\nmkdir -p ${out}/bin\ncp ./patch ${out}/bin\nchmod 555 ${out}/bin/patch\n"
+      },
+      "inputSrcs": [
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "inputDrvs": {
+        "/nix/store/m2khnp0iw665w7zjkyvil62v5wjlbl8i-patch-2.5.9.tar.gz.drv": [
+          "out"
+        ],
+        "/nix/store/rhk6vr1hcpvmknj9f4jksczgvdv0fnd2-tinycc-mes-libs-unstable-2025-12-03.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/0iw7hh602vvvbw5891f1aj5widawcdrk-gnupatch-2.5.9-builder",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/nqn9nizwqy5201zcv0jn5l7pnjm8i637-kaem-footer.M1-1.9.1.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/ay66a8n79zygqfpp0fj8qrc0896v780q-kaem-footer.M1-1.9.1\",\"\",\"\")],[(\"/nix/store/xsn3z4sqkn6ac7mlq35b62qs31mlnhbw-blood-elf-0-1.9.1.drv\",[\"out\"]),(\"/nix/store/zp92khnxilvlvdha1wan9c8xh3ns7qsc-kaem.M1-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/pc7xsqqlrmd36wlnpikj5kfr2rrpfmck-blood-elf-0-1.9.1\",[\"--64\",\"-f\",\"/nix/store/yx49h47aa083q8yqpjblvwy94ynvxljn-kaem.M1-1.9.1\",\"--little-endian\",\"-o\",\"/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9\"],[(\"builder\",\"/nix/store/pc7xsqqlrmd36wlnpikj5kfr2rrpfmck-blood-elf-0-1.9.1\"),(\"name\",\"kaem-footer.M1-1.9.1\"),(\"out\",\"/nix/store/ay66a8n79zygqfpp0fj8qrc0896v780q-kaem-footer.M1-1.9.1\"),(\"pname\",\"kaem-footer.M1\"),(\"system\",\"x86_64-linux\"),(\"version\",\"1.9.1\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/pc7xsqqlrmd36wlnpikj5kfr2rrpfmck-blood-elf-0-1.9.1",
+      "args": [
+        "--64",
+        "-f",
+        "/nix/store/yx49h47aa083q8yqpjblvwy94ynvxljn-kaem.M1-1.9.1",
+        "--little-endian",
+        "-o",
+        "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9"
+      ],
+      "env": {
+        "builder": "/nix/store/pc7xsqqlrmd36wlnpikj5kfr2rrpfmck-blood-elf-0-1.9.1",
+        "name": "kaem-footer.M1-1.9.1",
+        "out": "/nix/store/ay66a8n79zygqfpp0fj8qrc0896v780q-kaem-footer.M1-1.9.1",
+        "pname": "kaem-footer.M1",
+        "system": "x86_64-linux",
+        "version": "1.9.1"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/xsn3z4sqkn6ac7mlq35b62qs31mlnhbw-blood-elf-0-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zp92khnxilvlvdha1wan9c8xh3ns7qsc-kaem.M1-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/ay66a8n79zygqfpp0fj8qrc0896v780q-kaem-footer.M1-1.9.1",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/p8pjj3l30a78ls2hlv9bw5x3b41cj93v-diffutils-static-get-version-3.12.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/0y1zv8if04w16waddfzzrvmg50j0mnd2-diffutils-static-get-version-3.12\",\"\",\"\")],[(\"/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv\",[\"out\"]),(\"/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv\",[\"out\"]),(\"/nix/store/vwa6si0hhb76s3zc20izxbh1607zyyci-diffutils-static-3.12.drv\",[\"out\"])],[\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],\"x86_64-linux\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\",[\"-e\",\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],[(\"PATH\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin\"),(\"SHELL\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"buildCommand\",\"/nix/store/dfnb45yhd8xcfycdhsx57mjrszsnbdhb-diffutils-static-3.12/bin/diff --version\\nmkdir $out\\n\"),(\"builder\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"name\",\"diffutils-static-get-version-3.12\"),(\"out\",\"/nix/store/0y1zv8if04w16waddfzzrvmg50j0mnd2-diffutils-static-get-version-3.12\"),(\"passAsFile\",\"buildCommand\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "env": {
+        "PATH": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin",
+        "SHELL": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "buildCommand": "/nix/store/dfnb45yhd8xcfycdhsx57mjrszsnbdhb-diffutils-static-3.12/bin/diff --version\nmkdir $out\n",
+        "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "name": "diffutils-static-get-version-3.12",
+        "out": "/nix/store/0y1zv8if04w16waddfzzrvmg50j0mnd2-diffutils-static-get-version-3.12",
+        "passAsFile": "buildCommand",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
+        "/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv": [
+          "out"
+        ],
+        "/nix/store/vwa6si0hhb76s3zc20izxbh1607zyyci-diffutils-static-3.12.drv": [
+          "out"
+        ]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/0y1zv8if04w16waddfzzrvmg50j0mnd2-diffutils-static-get-version-3.12",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/pvb5zk3dym7mmf825agwmrsk8vxqj29z-gnutar-static-get-version-1.35.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/x8ls6hg74mjbwms7zm7ll5dwzxddd5b1-gnutar-static-get-version-1.35\",\"\",\"\")],[(\"/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv\",[\"out\"]),(\"/nix/store/lrahhnksqxiphhrk9kk13s52sip49xbb-gnutar-static-1.35.drv\",[\"out\"]),(\"/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv\",[\"out\"])],[\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],\"x86_64-linux\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\",[\"-e\",\"/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh\"],[(\"PATH\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin\"),(\"SHELL\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"buildCommand\",\"/nix/store/yd4p7mxc7rwgw4a790a5npswg8fcwyc3-gnutar-static-1.35/bin/tar --version\\nmkdir $out\\n\"),(\"builder\",\"/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash\"),(\"name\",\"gnutar-static-get-version-1.35\"),(\"out\",\"/nix/store/x8ls6hg74mjbwms7zm7ll5dwzxddd5b1-gnutar-static-get-version-1.35\"),(\"passAsFile\",\"buildCommand\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+      "args": [
+        "-e",
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "env": {
+        "PATH": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin:/nix/store/2jpvy7qfi314ng9la3s1lyvlm2h99vq6-bootstrap-coreutils-musl-9.11/bin",
+        "SHELL": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "buildCommand": "/nix/store/yd4p7mxc7rwgw4a790a5npswg8fcwyc3-gnutar-static-1.35/bin/tar --version\nmkdir $out\n",
+        "builder": "/nix/store/zy3y32balw5hqqaj8ac0migg6nasl6vk-bash-5.3/bin/bash",
+        "name": "gnutar-static-get-version-1.35",
+        "out": "/nix/store/x8ls6hg74mjbwms7zm7ll5dwzxddd5b1-gnutar-static-get-version-1.35",
+        "passAsFile": "buildCommand",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [
+        "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
+      ],
+      "inputDrvs": {
+        "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
+        "/nix/store/lrahhnksqxiphhrk9kk13s52sip49xbb-gnutar-static-1.35.drv": [
+          "out"
+        ],
+        "/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv": [
+          "out"
+        ]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/x8ls6hg74mjbwms7zm7ll5dwzxddd5b1-gnutar-static-get-version-1.35",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/qjzpl6l7b9sr55xh576zyr61p6pawzf7-ln-boot-unstable-2023-05-22.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/s3njhj6y078jm6q9iq62dkc4ab4srdk2-ln-boot-unstable-2023-05-22\",\"\",\"\")],[(\"/nix/store/cwsp8d28ypl2yvhbbhlvd9c3w0mdrkp3-ln-boot-unstable-2023-05-22-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/8qw1jdn5nmlfxwmphy7wdrb8ksfxg8c1-ln-boot-unstable-2023-05-22-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"ln-boot-unstable-2023-05-22\"),(\"out\",\"/nix/store/s3njhj6y078jm6q9iq62dkc4ab4srdk2-ln-boot-unstable-2023-05-22\"),(\"pname\",\"ln-boot\"),(\"system\",\"x86_64-linux\"),(\"version\",\"unstable-2023-05-22\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/8qw1jdn5nmlfxwmphy7wdrb8ksfxg8c1-ln-boot-unstable-2023-05-22-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "ln-boot-unstable-2023-05-22",
+        "out": "/nix/store/s3njhj6y078jm6q9iq62dkc4ab4srdk2-ln-boot-unstable-2023-05-22",
+        "pname": "ln-boot",
+        "system": "x86_64-linux",
+        "version": "unstable-2023-05-22"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/cwsp8d28ypl2yvhbbhlvd9c3w0mdrkp3-ln-boot-unstable-2023-05-22-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/s3njhj6y078jm6q9iq62dkc4ab4srdk2-ln-boot-unstable-2023-05-22",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/r2bqnrxf9bpbq0h013h2yh6piacz49ql-crt.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/ax6p3zksw6b1v2sd2s419swjxd4swvdi-crt\",\"\",\"\")],[(\"/nix/store/54zbninnz5i47975x5gzfmal50q29zyq-crt-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/6n126gd6gqyjhwdsii4wi265rfkskvby-crt-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"crt\"),(\"out\",\"/nix/store/ax6p3zksw6b1v2sd2s419swjxd4swvdi-crt\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/6n126gd6gqyjhwdsii4wi265rfkskvby-crt-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "crt",
+        "out": "/nix/store/ax6p3zksw6b1v2sd2s419swjxd4swvdi-crt",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/54zbninnz5i47975x5gzfmal50q29zyq-crt-builder.drv": ["out"],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/ax6p3zksw6b1v2sd2s419swjxd4swvdi-crt",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/rq77y1w9cbyx76dqcnw4wa24w1wq3ybw-M2-0.c-1.9.1.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/0mcg84c9y2wvxqlg56hky8n8prgm6v7y-M2-0.c-1.9.1\",\"\",\"\")],[(\"/nix/store/2jwh5pdbg0mff2bhxvc2vam8bm05wa08-catm-1.9.1.drv\",[\"out\"]),(\"/nix/store/2kbbzfsz1hzd21yj0h989s3z40cgrp58-stage0-posix-1.9.1-source.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1\",[\"/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2libc/amd64/linux/bootstrap.c\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc.h\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2libc/bootstrappable.c\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_globals.c\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_reader.c\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_strings.c\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_types.c\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_emit.c\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_core.c\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_macro.c\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc.c\"],[(\"builder\",\"/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1\"),(\"name\",\"M2-0.c-1.9.1\"),(\"out\",\"/nix/store/0mcg84c9y2wvxqlg56hky8n8prgm6v7y-M2-0.c-1.9.1\"),(\"pname\",\"M2-0.c\"),(\"system\",\"x86_64-linux\"),(\"version\",\"1.9.1\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1",
+      "args": [
+        "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2libc/amd64/linux/bootstrap.c",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc.h",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2libc/bootstrappable.c",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_globals.c",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_reader.c",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_strings.c",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_types.c",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_emit.c",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_core.c",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc_macro.c",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2-Planet/cc.c"
+      ],
+      "env": {
+        "builder": "/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1",
+        "name": "M2-0.c-1.9.1",
+        "out": "/nix/store/0mcg84c9y2wvxqlg56hky8n8prgm6v7y-M2-0.c-1.9.1",
+        "pname": "M2-0.c",
+        "system": "x86_64-linux",
+        "version": "1.9.1"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/2jwh5pdbg0mff2bhxvc2vam8bm05wa08-catm-1.9.1.drv": ["out"],
+        "/nix/store/2kbbzfsz1hzd21yj0h989s3z40cgrp58-stage0-posix-1.9.1-source.drv": [
+          "out"
+        ]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/0mcg84c9y2wvxqlg56hky8n8prgm6v7y-M2-0.c-1.9.1",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/salhf0y3pwji5rc43kgh51czb4ck6qgx-hex2_linker-0-0.hex2-1.9.1.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/lqsfiyj6vw701j53pb0f0g0hlsf71w6r-hex2_linker-0-0.hex2-1.9.1\",\"\",\"\")],[(\"/nix/store/2jwh5pdbg0mff2bhxvc2vam8bm05wa08-catm-1.9.1.drv\",[\"out\"]),(\"/nix/store/2kbbzfsz1hzd21yj0h989s3z40cgrp58-stage0-posix-1.9.1-source.drv\",[\"out\"]),(\"/nix/store/33fk6f3q18k6ifvg92vgsnmck9dcsqli-hex2_linker-0.hex2-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1\",[\"/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9\",\"/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2libc/amd64/ELF-amd64-debug.hex2\",\"/nix/store/g3rz7z00xzxp2fbgjsk8ar52dkbr3gly-hex2_linker-0.hex2-1.9.1\"],[(\"builder\",\"/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1\"),(\"name\",\"hex2_linker-0-0.hex2-1.9.1\"),(\"out\",\"/nix/store/lqsfiyj6vw701j53pb0f0g0hlsf71w6r-hex2_linker-0-0.hex2-1.9.1\"),(\"pname\",\"hex2_linker-0-0.hex2\"),(\"system\",\"x86_64-linux\"),(\"version\",\"1.9.1\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1",
+      "args": [
+        "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+        "/nix/store/4f7nm8dblrdy74gmsl62b25rjrh4jcz3-stage0-posix-1.9.1-source/M2libc/amd64/ELF-amd64-debug.hex2",
+        "/nix/store/g3rz7z00xzxp2fbgjsk8ar52dkbr3gly-hex2_linker-0.hex2-1.9.1"
+      ],
+      "env": {
+        "builder": "/nix/store/zrqh987c35f7rmlzyppg9f2rkhk98djr-catm-1.9.1",
+        "name": "hex2_linker-0-0.hex2-1.9.1",
+        "out": "/nix/store/lqsfiyj6vw701j53pb0f0g0hlsf71w6r-hex2_linker-0-0.hex2-1.9.1",
+        "pname": "hex2_linker-0-0.hex2",
+        "system": "x86_64-linux",
+        "version": "1.9.1"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/2jwh5pdbg0mff2bhxvc2vam8bm05wa08-catm-1.9.1.drv": ["out"],
+        "/nix/store/2kbbzfsz1hzd21yj0h989s3z40cgrp58-stage0-posix-1.9.1-source.drv": [
+          "out"
+        ],
+        "/nix/store/33fk6f3q18k6ifvg92vgsnmck9dcsqli-hex2_linker-0.hex2-1.9.1.drv": [
+          "out"
+        ]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/lqsfiyj6vw701j53pb0f0g0hlsf71w6r-hex2_linker-0-0.hex2-1.9.1",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/sxlbn3vjbnxp6nmbmlk2g36fsjywbbdz-bash53-010.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/5ramk5ygw18qcni7f7j6jq7hmz1w439h-bash53-010\",\"sha256\",\"cf76f1cce2ea300c18bff9f002d21f280cc931acd17c28518110b93fe6e72569\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"bash53-010\"),(\"out\",\"/nix/store/5ramk5ygw18qcni7f7j6jq7hmz1w439h-bash53-010\"),(\"outputHash\",\"0s95wzk3zf8hh58jhz6imhqwj3183z905w7rpwc0qc7awb6g2xng\"),(\"outputHashAlgo\",\"sha256\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://ftpmirror.gnu.org/bash/bash-5.3-patches/bash53-010\"),(\"urls\",\"https://ftpmirror.gnu.org/bash/bash-5.3-patches/bash53-010\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "bash53-010",
+        "out": "/nix/store/5ramk5ygw18qcni7f7j6jq7hmz1w439h-bash53-010",
+        "outputHash": "0s95wzk3zf8hh58jhz6imhqwj3183z905w7rpwc0qc7awb6g2xng",
+        "outputHashAlgo": "sha256",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://ftpmirror.gnu.org/bash/bash-5.3-patches/bash53-010",
+        "urls": "https://ftpmirror.gnu.org/bash/bash-5.3-patches/bash53-010"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/5ramk5ygw18qcni7f7j6jq7hmz1w439h-bash53-010",
+          "hashAlgo": "sha256",
+          "hash": "cf76f1cce2ea300c18bff9f002d21f280cc931acd17c28518110b93fe6e72569"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/vp96rf14gfjrs529f8d3a7cgb3zf95q7-libtcc1.a-builder.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/pinq5i0a6nv84glkw22a1b7fq7g6q37z-libtcc1.a-builder\",\"\",\"\")],[(\"/nix/store/4id1z907zlr2vf8x4hjqvgv2hb12cyji-tccdefs-unstable-2025-12-03.drv\",[\"out\"]),(\"/nix/store/gza0lqypps3n1yaxmpiagip2dqpscqf4-tinycc-mes-boot-unstable-2025-12-03.drv\",[\"out\"]),(\"/nix/store/wn8z9pcwr2mnqcp1f9wr3dcbizgc1isg-tinycc-unstable-2025-12-03-source.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],[(\"PATH\",\"/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"destination\",\"\"),(\"destinationDir\",\".\"),(\"name\",\"libtcc1.a-builder\"),(\"out\",\"/nix/store/pinq5i0a6nv84glkw22a1b7fq7g6q37z-libtcc1.a-builder\"),(\"passAsFile\",\"text\"),(\"system\",\"x86_64-linux\"),(\"text\",\"/nix/store/v906xrvjy6yazi6gc0l4k8swxxzrl03g-tinycc-mes-boot-unstable-2025-12-03/bin/tcc -c -D TCC_TARGET_X86_64=1 -D HAVE_FLOAT=1 -D HAVE_LONG_LONG=1 -D CONFIG_TCC_PREDEFS=1 -I /nix/store/626vha9xkrg2f3ydw80253072zv6lba0-tccdefs-unstable-2025-12-03 -D CONFIG_TCC_SEMLOCK=0 -c /nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source/tinycc-cb41cbfe717e4c00d7bb70035cda5ee5f0ff9341/lib/libtcc1.c\\n/nix/store/v906xrvjy6yazi6gc0l4k8swxxzrl03g-tinycc-mes-boot-unstable-2025-12-03/bin/tcc -c -D TCC_TARGET_X86_64=1 -D HAVE_FLOAT=1 -D HAVE_LONG_LONG=1 -D CONFIG_TCC_PREDEFS=1 -I /nix/store/626vha9xkrg2f3ydw80253072zv6lba0-tccdefs-unstable-2025-12-03 -D CONFIG_TCC_SEMLOCK=0 -c /nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source/tinycc-cb41cbfe717e4c00d7bb70035cda5ee5f0ff9341/lib/alloca.S\\n/nix/store/v906xrvjy6yazi6gc0l4k8swxxzrl03g-tinycc-mes-boot-unstable-2025-12-03/bin/tcc -ar cr ${out} libtcc1.o alloca.o\\n\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "env": {
+        "PATH": "/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "destination": "",
+        "destinationDir": ".",
+        "name": "libtcc1.a-builder",
+        "out": "/nix/store/pinq5i0a6nv84glkw22a1b7fq7g6q37z-libtcc1.a-builder",
+        "passAsFile": "text",
+        "system": "x86_64-linux",
+        "text": "/nix/store/v906xrvjy6yazi6gc0l4k8swxxzrl03g-tinycc-mes-boot-unstable-2025-12-03/bin/tcc -c -D TCC_TARGET_X86_64=1 -D HAVE_FLOAT=1 -D HAVE_LONG_LONG=1 -D CONFIG_TCC_PREDEFS=1 -I /nix/store/626vha9xkrg2f3ydw80253072zv6lba0-tccdefs-unstable-2025-12-03 -D CONFIG_TCC_SEMLOCK=0 -c /nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source/tinycc-cb41cbfe717e4c00d7bb70035cda5ee5f0ff9341/lib/libtcc1.c\n/nix/store/v906xrvjy6yazi6gc0l4k8swxxzrl03g-tinycc-mes-boot-unstable-2025-12-03/bin/tcc -c -D TCC_TARGET_X86_64=1 -D HAVE_FLOAT=1 -D HAVE_LONG_LONG=1 -D CONFIG_TCC_PREDEFS=1 -I /nix/store/626vha9xkrg2f3ydw80253072zv6lba0-tccdefs-unstable-2025-12-03 -D CONFIG_TCC_SEMLOCK=0 -c /nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source/tinycc-cb41cbfe717e4c00d7bb70035cda5ee5f0ff9341/lib/alloca.S\n/nix/store/v906xrvjy6yazi6gc0l4k8swxxzrl03g-tinycc-mes-boot-unstable-2025-12-03/bin/tcc -ar cr ${out} libtcc1.o alloca.o\n"
+      },
+      "inputSrcs": [
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "inputDrvs": {
+        "/nix/store/4id1z907zlr2vf8x4hjqvgv2hb12cyji-tccdefs-unstable-2025-12-03.drv": [
+          "out"
+        ],
+        "/nix/store/gza0lqypps3n1yaxmpiagip2dqpscqf4-tinycc-mes-boot-unstable-2025-12-03.drv": [
+          "out"
+        ],
+        "/nix/store/wn8z9pcwr2mnqcp1f9wr3dcbizgc1isg-tinycc-unstable-2025-12-03-source.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/pinq5i0a6nv84glkw22a1b7fq7g6q37z-libtcc1.a-builder",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/w2qpwakkd81nr6k45p2wyd24x5n2ij9k-mes-crt1-0.27.1.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/h00k54yz4cyxcjwy3790f6j1i3wah9ad-mes-crt1-0.27.1\",\"\",\"\")],[(\"/nix/store/9b5xvzhkkyvf9k6mxskgawzsq2129iga-mes-crt1-0.27.1-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/25w8kwblv1cnlkhl91mbzdr2b9yzbdnd-mes-crt1-0.27.1-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"mes-crt1-0.27.1\"),(\"out\",\"/nix/store/h00k54yz4cyxcjwy3790f6j1i3wah9ad-mes-crt1-0.27.1\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/25w8kwblv1cnlkhl91mbzdr2b9yzbdnd-mes-crt1-0.27.1-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "mes-crt1-0.27.1",
+        "out": "/nix/store/h00k54yz4cyxcjwy3790f6j1i3wah9ad-mes-crt1-0.27.1",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/9b5xvzhkkyvf9k6mxskgawzsq2129iga-mes-crt1-0.27.1-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/h00k54yz4cyxcjwy3790f6j1i3wah9ad-mes-crt1-0.27.1",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/wn8z9pcwr2mnqcp1f9wr3dcbizgc1isg-tinycc-unstable-2025-12-03-source.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source\",\"\",\"\")],[(\"/nix/store/7nhdvy4cj7rqk8zfxi248bkqgfxkwzxg-tinycc-unstable-2025-12-03-source-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/197bm2k397bn8zy56p4d5ic0yiwqy1yl-tinycc-unstable-2025-12-03-source-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"tinycc-unstable-2025-12-03-source\"),(\"out\",\"/nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/197bm2k397bn8zy56p4d5ic0yiwqy1yl-tinycc-unstable-2025-12-03-source-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "tinycc-unstable-2025-12-03-source",
+        "out": "/nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/7nhdvy4cj7rqk8zfxi248bkqgfxkwzxg-tinycc-unstable-2025-12-03-source-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/x8z156d2j6jdbgjpdg8qpn7jnsixl0xk-crt-builder.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/wc062d517lsdlyprjzdznfc6ichi6r2s-crt-builder\",\"\",\"\")],[(\"/nix/store/43c53m8vn9xgm336dgb8fzm24a0sfak9-tinycc-boot-mes-unstable-2024-07-07.drv\",[\"out\"]),(\"/nix/store/fbaq796w3day6gw5sdvw014v9ppip38q-mes-libc-0.27.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],[(\"PATH\",\"/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"destination\",\"\"),(\"destinationDir\",\".\"),(\"name\",\"crt-builder\"),(\"out\",\"/nix/store/wc062d517lsdlyprjzdznfc6ichi6r2s-crt-builder\"),(\"passAsFile\",\"text\"),(\"system\",\"x86_64-linux\"),(\"text\",\"mkdir -p ${out}/lib\\n/nix/store/wdv8qidsgiljsi30145zip0i2q8f8f7f-tinycc-boot-mes-unstable-2024-07-07/bin/tcc -std=c11 -c -o ${out}/lib/crt1.o /nix/store/rc3p9vwch6l2ljhr5q6a8q8kyfkf4d9y-mes-libc-0.27.1/lib/crt1.c\\n/nix/store/wdv8qidsgiljsi30145zip0i2q8f8f7f-tinycc-boot-mes-unstable-2024-07-07/bin/tcc -std=c11 -c -o ${out}/lib/crtn.o /nix/store/rc3p9vwch6l2ljhr5q6a8q8kyfkf4d9y-mes-libc-0.27.1/lib/crtn.c\\n/nix/store/wdv8qidsgiljsi30145zip0i2q8f8f7f-tinycc-boot-mes-unstable-2024-07-07/bin/tcc -std=c11 -c -o ${out}/lib/crti.o /nix/store/rc3p9vwch6l2ljhr5q6a8q8kyfkf4d9y-mes-libc-0.27.1/lib/crti.c\\n\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "env": {
+        "PATH": "/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "destination": "",
+        "destinationDir": ".",
+        "name": "crt-builder",
+        "out": "/nix/store/wc062d517lsdlyprjzdznfc6ichi6r2s-crt-builder",
+        "passAsFile": "text",
+        "system": "x86_64-linux",
+        "text": "mkdir -p ${out}/lib\n/nix/store/wdv8qidsgiljsi30145zip0i2q8f8f7f-tinycc-boot-mes-unstable-2024-07-07/bin/tcc -std=c11 -c -o ${out}/lib/crt1.o /nix/store/rc3p9vwch6l2ljhr5q6a8q8kyfkf4d9y-mes-libc-0.27.1/lib/crt1.c\n/nix/store/wdv8qidsgiljsi30145zip0i2q8f8f7f-tinycc-boot-mes-unstable-2024-07-07/bin/tcc -std=c11 -c -o ${out}/lib/crtn.o /nix/store/rc3p9vwch6l2ljhr5q6a8q8kyfkf4d9y-mes-libc-0.27.1/lib/crtn.c\n/nix/store/wdv8qidsgiljsi30145zip0i2q8f8f7f-tinycc-boot-mes-unstable-2024-07-07/bin/tcc -std=c11 -c -o ${out}/lib/crti.o /nix/store/rc3p9vwch6l2ljhr5q6a8q8kyfkf4d9y-mes-libc-0.27.1/lib/crti.c\n"
+      },
+      "inputSrcs": [
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "inputDrvs": {
+        "/nix/store/43c53m8vn9xgm336dgb8fzm24a0sfak9-tinycc-boot-mes-unstable-2024-07-07.drv": [
+          "out"
+        ],
+        "/nix/store/fbaq796w3day6gw5sdvw014v9ppip38q-mes-libc-0.27.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/wc062d517lsdlyprjzdznfc6ichi6r2s-crt-builder",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/xqnj45vmc4akiawlj6z83yvlbgg0d4bg-tccdefs-unstable-2025-12-03-builder.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/gmypb6zybfmhgrazdgcjxbi1vfk23dy9-tccdefs-unstable-2025-12-03-builder\",\"\",\"\")],[(\"/nix/store/bgjwrca3m6p7r00sfk7s6fg78zfawxa9-tinycc-bootstrappable-unstable-2024-07-07.drv\",[\"out\"]),(\"/nix/store/midrq54p6py7mx6bcnfdf0j0dbashz81-tinycc-bootstrappable-libs-unstable-2024-07-07.drv\",[\"out\"]),(\"/nix/store/wn8z9pcwr2mnqcp1f9wr3dcbizgc1isg-tinycc-unstable-2025-12-03-source.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[\"/nix/store/kqi6x4rd1a8q3dm1w6r03xy3czsiq1r6-config_tccdefs.h\",\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem\"],[(\"PATH\",\"/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"destination\",\"\"),(\"destinationDir\",\".\"),(\"name\",\"tccdefs-unstable-2025-12-03-builder\"),(\"out\",\"/nix/store/gmypb6zybfmhgrazdgcjxbi1vfk23dy9-tccdefs-unstable-2025-12-03-builder\"),(\"passAsFile\",\"text\"),(\"system\",\"x86_64-linux\"),(\"text\",\"mkdir ${out}\\n/nix/store/sgdahm8nqp847xakia5gscmx5fpml0q5-tinycc-bootstrappable-unstable-2024-07-07/bin/tcc \\\\\\n  -B /nix/store/as082dzcylwws2yp8gklqhn1s0z5pq04-tinycc-bootstrappable-libs-unstable-2024-07-07/lib \\\\\\n  -DC2STR \\\\\\n  -o c2str \\\\\\n  /nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source/tinycc-cb41cbfe717e4c00d7bb70035cda5ee5f0ff9341/conftest.c\\n./c2str /nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source/tinycc-cb41cbfe717e4c00d7bb70035cda5ee5f0ff9341/include/tccdefs.h tccdefs_.h\\ncatm ${out}/tccdefs_.h tccdefs_.h /nix/store/kqi6x4rd1a8q3dm1w6r03xy3czsiq1r6-config_tccdefs.h\\n\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "env": {
+        "PATH": "/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "destination": "",
+        "destinationDir": ".",
+        "name": "tccdefs-unstable-2025-12-03-builder",
+        "out": "/nix/store/gmypb6zybfmhgrazdgcjxbi1vfk23dy9-tccdefs-unstable-2025-12-03-builder",
+        "passAsFile": "text",
+        "system": "x86_64-linux",
+        "text": "mkdir ${out}\n/nix/store/sgdahm8nqp847xakia5gscmx5fpml0q5-tinycc-bootstrappable-unstable-2024-07-07/bin/tcc \\\n  -B /nix/store/as082dzcylwws2yp8gklqhn1s0z5pq04-tinycc-bootstrappable-libs-unstable-2024-07-07/lib \\\n  -DC2STR \\\n  -o c2str \\\n  /nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source/tinycc-cb41cbfe717e4c00d7bb70035cda5ee5f0ff9341/conftest.c\n./c2str /nix/store/4g27wz5vav5naa3ynd504v63i6yg08ky-tinycc-unstable-2025-12-03-source/tinycc-cb41cbfe717e4c00d7bb70035cda5ee5f0ff9341/include/tccdefs.h tccdefs_.h\ncatm ${out}/tccdefs_.h tccdefs_.h /nix/store/kqi6x4rd1a8q3dm1w6r03xy3czsiq1r6-config_tccdefs.h\n"
+      },
+      "inputSrcs": [
+        "/nix/store/kqi6x4rd1a8q3dm1w6r03xy3czsiq1r6-config_tccdefs.h",
+        "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
+      ],
+      "inputDrvs": {
+        "/nix/store/bgjwrca3m6p7r00sfk7s6fg78zfawxa9-tinycc-bootstrappable-unstable-2024-07-07.drv": [
+          "out"
+        ],
+        "/nix/store/midrq54p6py7mx6bcnfdf0j0dbashz81-tinycc-bootstrappable-libs-unstable-2024-07-07.drv": [
+          "out"
+        ],
+        "/nix/store/wn8z9pcwr2mnqcp1f9wr3dcbizgc1isg-tinycc-unstable-2025-12-03-source.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/gmypb6zybfmhgrazdgcjxbi1vfk23dy9-tccdefs-unstable-2025-12-03-builder",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/yglzrih7p6n7myi80gidsxv1v8f4v1ka-diffutils-3.8.tar.xz.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/021kkbvplg4z72pp3hp1vjp74qz7g92l-diffutils-3.8.tar.xz\",\"sha256\",\"a6bdd7d1b31266d11c4f4de6c1b748d4607ab0231af5188fc2533d0ae2438fec\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"diffutils-3.8.tar.xz\"),(\"out\",\"/nix/store/021kkbvplg4z72pp3hp1vjp74qz7g92l-diffutils-3.8.tar.xz\"),(\"outputHash\",\"sha256-pr3X0bMSZtEcT03mwbdI1GB6sCMa9RiPwlM9CuJDj+w=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://ftpmirror.gnu.org/diffutils/diffutils-3.8.tar.xz\"),(\"urls\",\"https://ftpmirror.gnu.org/diffutils/diffutils-3.8.tar.xz\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "diffutils-3.8.tar.xz",
+        "out": "/nix/store/021kkbvplg4z72pp3hp1vjp74qz7g92l-diffutils-3.8.tar.xz",
+        "outputHash": "sha256-pr3X0bMSZtEcT03mwbdI1GB6sCMa9RiPwlM9CuJDj+w=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://ftpmirror.gnu.org/diffutils/diffutils-3.8.tar.xz",
+        "urls": "https://ftpmirror.gnu.org/diffutils/diffutils-3.8.tar.xz"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/021kkbvplg4z72pp3hp1vjp74qz7g92l-diffutils-3.8.tar.xz",
+          "hashAlgo": "sha256",
+          "hash": "a6bdd7d1b31266d11c4f4de6c1b748d4607ab0231af5188fc2533d0ae2438fec"
+        }
+      }
+    },
+    {
+      "path": "/nix/store/z1k71ibnlv0616akq6fg0yk2clv2ppfj-tinycc-boot1-libs-unstable-2024-07-07.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/dx751kyygzkj4bcpylwykb2qm923ij92-tinycc-boot1-libs-unstable-2024-07-07\",\"\",\"\")],[(\"/nix/store/34vmg1140k58kb2j63gsp0f1n45rg5cc-tinycc-boot1-libs-unstable-2024-07-07-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/f1iaknlw8hnhpjjrln6rwpg2q1kii8xd-tinycc-boot1-libs-unstable-2024-07-07-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"tinycc-boot1-libs-unstable-2024-07-07\"),(\"out\",\"/nix/store/dx751kyygzkj4bcpylwykb2qm923ij92-tinycc-boot1-libs-unstable-2024-07-07\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/f1iaknlw8hnhpjjrln6rwpg2q1kii8xd-tinycc-boot1-libs-unstable-2024-07-07-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "tinycc-boot1-libs-unstable-2024-07-07",
+        "out": "/nix/store/dx751kyygzkj4bcpylwykb2qm923ij92-tinycc-boot1-libs-unstable-2024-07-07",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/34vmg1140k58kb2j63gsp0f1n45rg5cc-tinycc-boot1-libs-unstable-2024-07-07-builder.drv": [
+          "out"
+        ],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/dx751kyygzkj4bcpylwykb2qm923ij92-tinycc-boot1-libs-unstable-2024-07-07",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/z71ygq0f15ygaq9yxqbssdqrryzx9xn9-crt.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/cr2fwxa84q97n7h9v13wapmzdinq585g-crt\",\"\",\"\")],[(\"/nix/store/6nz7fix73p045w536s53idblfknf8zcp-crt-builder.drv\",[\"out\"]),(\"/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv\",[\"out\"]),(\"/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv\",[\"out\"]),(\"/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv\",[\"out\"])],[],\"x86_64-linux\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\",[\"--verbose\",\"--strict\",\"--file\",\"/nix/store/5h3jad437fqwzn2cmvj241wapc09a6sc-crt-builder\"],[(\"PATH\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin\"),(\"builder\",\"/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem\"),(\"name\",\"crt\"),(\"out\",\"/nix/store/cr2fwxa84q97n7h9v13wapmzdinq585g-crt\"),(\"system\",\"x86_64-linux\")])",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+      "args": [
+        "--verbose",
+        "--strict",
+        "--file",
+        "/nix/store/5h3jad437fqwzn2cmvj241wapc09a6sc-crt-builder"
+      ],
+      "env": {
+        "PATH": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin:/nix/store/53zd871rgpcvi7qmqkffxhzaiq0is7k4-mescc-tools-1.9.1/bin:/nix/store/nf45b5s985mn73828jb6pfq0g85j0hvg-mescc-tools-extra-1.9.1/bin",
+        "builder": "/nix/store/n3mfz1lj8rbz0cspkfrvxiy9h5hm0vzg-kaem-1.9.1/bin/kaem",
+        "name": "crt",
+        "out": "/nix/store/cr2fwxa84q97n7h9v13wapmzdinq585g-crt",
+        "system": "x86_64-linux"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {
+        "/nix/store/6nz7fix73p045w536s53idblfknf8zcp-crt-builder.drv": ["out"],
+        "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/yjp7zwabw9xcm6g42736mbhlvcddw410-mescc-tools-extra-1.9.1.drv": [
+          "out"
+        ],
+        "/nix/store/zlsfxdxsnzp1nzzw113avl2v0s5mgjpr-kaem-1.9.1.drv": ["out"]
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/cr2fwxa84q97n7h9v13wapmzdinq585g-crt",
+          "hashAlgo": "",
+          "hash": ""
+        }
+      }
+    },
+    {
+      "path": "/nix/store/zkahlx2yk2sdlfmcf3pjn62vzw91zy3b-CVE-2026-55199.patch.drv",
+      "aterm": "Derive([(\"out\",\"/nix/store/1pd10jmsqkyhsn0r4lcax7njjsbxzziv-CVE-2026-55199.patch\",\"sha256\",\"00565ae64a2185aeb6684d227f9724980749d1364d7237cfdf6c83ce7a0484da\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[(\"builder\",\"builtin:fetchurl\"),(\"executable\",\"\"),(\"impureEnvVars\",\"http_proxy https_proxy ftp_proxy all_proxy no_proxy\"),(\"name\",\"CVE-2026-55199.patch\"),(\"out\",\"/nix/store/1pd10jmsqkyhsn0r4lcax7njjsbxzziv-CVE-2026-55199.patch\"),(\"outputHash\",\"sha256-AFZa5kohha62aE0if5ckmAdJ0TZNcjfP32yDznoEhNo=\"),(\"outputHashAlgo\",\"\"),(\"outputHashMode\",\"flat\"),(\"preferLocalBuild\",\"1\"),(\"system\",\"builtin\"),(\"unpack\",\"\"),(\"url\",\"https://salsa.debian.org/debian/libssh2/-/raw/1d4906e6ebe85a9da2931ba33677ead96a61f07f/debian/patches/CVE-2026-55199.patch\"),(\"urls\",\"https://salsa.debian.org/debian/libssh2/-/raw/1d4906e6ebe85a9da2931ba33677ead96a61f07f/debian/patches/CVE-2026-55199.patch\")])",
+      "system": "builtin",
+      "builder": "builtin:fetchurl",
+      "args": [],
+      "env": {
+        "builder": "builtin:fetchurl",
+        "executable": "",
+        "impureEnvVars": "http_proxy https_proxy ftp_proxy all_proxy no_proxy",
+        "name": "CVE-2026-55199.patch",
+        "out": "/nix/store/1pd10jmsqkyhsn0r4lcax7njjsbxzziv-CVE-2026-55199.patch",
+        "outputHash": "sha256-AFZa5kohha62aE0if5ckmAdJ0TZNcjfP32yDznoEhNo=",
+        "outputHashAlgo": "",
+        "outputHashMode": "flat",
+        "preferLocalBuild": "1",
+        "system": "builtin",
+        "unpack": "",
+        "url": "https://salsa.debian.org/debian/libssh2/-/raw/1d4906e6ebe85a9da2931ba33677ead96a61f07f/debian/patches/CVE-2026-55199.patch",
+        "urls": "https://salsa.debian.org/debian/libssh2/-/raw/1d4906e6ebe85a9da2931ba33677ead96a61f07f/debian/patches/CVE-2026-55199.patch"
+      },
+      "inputSrcs": [],
+      "inputDrvs": {},
+      "outputs": {
+        "out": {
+          "path": "/nix/store/1pd10jmsqkyhsn0r4lcax7njjsbxzziv-CVE-2026-55199.patch",
+          "hashAlgo": "sha256",
+          "hash": "00565ae64a2185aeb6684d227f9724980749d1364d7237cfdf6c83ce7a0484da"
+        }
+      }
+    }
+  ]
+}

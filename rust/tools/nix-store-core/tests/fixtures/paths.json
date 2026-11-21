@@ -1,0 +1,1340 @@
+{
+  "nix": "nix (Nix) 2.31.4",
+  "storePaths": [
+    {
+      "path": "/nix/store/006msv92fpb81d9y253g52d84vyqkcpp-plutovg-1.3.3",
+      "narHash": "sha256-2LesO8+HEaWwNIcg4/ZahAhrEVx60bfEbP5QBRRAPqA=",
+      "narHashBase16": "d8b7ac3bcf8711a5b0348720e3f65a84086b115c7ad1b7c46cfe500514403ea0",
+      "narHashNix32": "181y80a0al7ydk2bglbsbh8nn244bbvf68476jqaa4c7rwxsrdyq",
+      "narSize": 495976,
+      "references": [
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/b8pqz1rcvmpyfrg81yqsv6w9q5kczxc2-plutovg-1.3.3.drv",
+      "signatures": [
+        "cache.nixos.org-1:Rhg6SytIJSQpkJiPOWdDhJNvWr1Vxuazb2gLeQE7tY/PCxUa39fSwFUKg3ZRzG2V2qttYy2MHn4s7E4w0abtDQ=="
+      ],
+      "ca": null,
+      "closureSize": 5,
+      "closureSha256": "d7dc501ffe952358310931e4f619dbc8b602990269f0fca8d8425cf9948d252b",
+      "closure": [
+        "/nix/store/006msv92fpb81d9y253g52d84vyqkcpp-plutovg-1.3.3",
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8"
+      ]
+    },
+    {
+      "path": "/nix/store/00yzvav9v32qskq0klaiq1j86adzcd86-vscode-extensions-json",
+      "narHash": "sha256-0ErryX4BTWDPSUjTJd4UVivEILqcUdU7bW+c8OLQ9zE=",
+      "narHashBase16": "d04aebc97e014d60cf4948d325de14562bc420ba9c51d53b6d6f9cf0e2d0f731",
+      "narHashNix32": "0cgps3ig173gdlxxalcwp8hc8asn2kg2bls8977n0k81gv4ynjnh",
+      "narSize": 18416,
+      "references": [
+        "/nix/store/0yp4hzdia5zq8mzin16z6apx6g56xbhj-vscode-extension-kamadorueda-alejandra-1.0.0",
+        "/nix/store/3awc6mfal4f8srvi41fcw7x5ima0g49i-vscode-emerald-lang-0.1.0",
+        "/nix/store/5h97slkj2y9jwj4va75l9rdvdpcsl3wd-vscode-extension-ms-vscode-test-adapter-converter-0.2.1",
+        "/nix/store/84ksbdlyymgyrilascj7kvk50dv2frjm-vscode-extension-yoavbls-pretty-ts-errors-0.8.7",
+        "/nix/store/9ng3kqhdy9jf21bsw264811d6c771spk-vscode-extension-bbenoist-nix-1.0.1",
+        "/nix/store/9ywdka278m3mnkx73vc0fb3nzp3f0aj1-vscode-extension-charliermarsh-ruff-2026.96.0",
+        "/nix/store/ady8qqdjcixkf1anrjqz1zrqficzma3f-vscode-extension-vspacecode-whichkey-0.11.4",
+        "/nix/store/ar8dhrkyjbiijy0yry62d47mfdm9684k-vscode-extension-littlefoxteam-vscode-python-test-adapter-0.8.2",
+        "/nix/store/d45zkmwvgjk4iryafy22im5whwj5v5p6-vscode-extension-tamasfe-even-better-toml-0.21.2",
+        "/nix/store/dqsz9imka77fzmvc63xw1m4w7hnjm0m4-vscode-extension-mermaidchart-vscode-mermaid-chart-2.8.4",
+        "/nix/store/fb3grwsrks794gq4g5vvygq0y37pb7hk-vscode-extension-ms-python-python-2026.11.2026110601",
+        "/nix/store/ga48wjgirs39ak6h47is09kvgq9p0ssq-vscode-extension-jeanp413-open-remote-ssh-0.5.1",
+        "/nix/store/ghx0mvcsvcqnqz391i2nr6ciaa4i9him-vscode-extension-sugatoray-vscode-git-extension-pack-1.2.0",
+        "/nix/store/hg63zc4rl34gz54whqx5g25zfyp79xcb-vscode-extension-ms-toolsai-jupyter-renderers-1.3.2025062701",
+        "/nix/store/hhrbnw31jqwxqfkkb29y0l94m2lp9c6b-vscode-extension-ms-toolsai-jupyter-2026.6.2026071501",
+        "/nix/store/hs2d4krh6bzyi1znag244wvb5agcrrd5-vscode-voltaic-lang-0.2.0",
+        "/nix/store/iwx9661lrhmf4cpq9iawf4r6w2g7z4kw-vscode-extension-vscodevim-vim-1.32.4",
+        "/nix/store/jh54fivzg6ddi7s6lij1v44fawwh5y6p-vscode-extension-tintedtheming-base16-tinted-themes-0.56.0",
+        "/nix/store/kzfkvz9kqi9a5valv1rsgl0j1qlznfqy-vscode-extension-ms-python-debugpy-2026.7.13161007",
+        "/nix/store/ll5n98jsb5z6m37jcvzybfj6b36jh9c5-vscode-extension-redhat-vscode-yaml-2.1.2026111808",
+        "/nix/store/mhdv9gpm33bizm5lbl58l0d2mjakd6cg-vscode-extension-astral-sh-ty-2026.108.0",
+        "/nix/store/qfbs8fzkyfwff3qd6jarwvkdmm3dxwfg-vscode-extension-mhutchie-git-graph-1.30.0",
+        "/nix/store/rnywy5vqpw9bpq8rv8a0vb5b6skcm1j1-vscode-extension-hbenl-vscode-test-explorer-2.22.1",
+        "/nix/store/syv14kldhmwb1ah26y35s246y7mn6fy5-vscode-extension-ms-azuretools-vscode-docker-2.0.0",
+        "/nix/store/xgllq83abzwqjgp969n4rhdfcg6d1agx-vscode-extension-vgalaktionov-moonscript-0.1.1",
+        "/nix/store/yvadk28m6vpgjbxbp47zp8425bwvcy8w-vscode-extension-mikestead-dotenv-1.0.1"
+      ],
+      "deriver": "/nix/store/wksdqbs8lwcq2z4chgylxrbfvpil2byf-vscode-extensions-json.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 103,
+      "closureSha256": "2873e99acead3b5afb99de0c5ad47ca6e880d07adc181b8e97452fa3c4664720"
+    },
+    {
+      "path": "/nix/store/0s2g17x61j0q9ilr8skwnf0mfz6qv6vv-libplacebo-5.264.1",
+      "narHash": "sha256-aWM4VENewlURYQMfoxjA4eBJa8XJGTenTzA9/vRxzbE=",
+      "narHashBase16": "69633854435ec2551161031fa318c0e1e0496bc5c91937a74f303dfef471cdb1",
+      "narHashNix32": "1cfdf7sgwg9h9ykkf6f9qmmlkq71q0ca67q3c48mbhjy8da3hqv9",
+      "narSize": 1390312,
+      "references": [
+        "/nix/store/0s2g17x61j0q9ilr8skwnf0mfz6qv6vv-libplacebo-5.264.1",
+        "/nix/store/1l0a4cq8ahhpgwx0byq2zcsi316mlzm1-vulkan-loader-1.4.363.0",
+        "/nix/store/28z11yz990sjcd8hh73r66mfk3mc4gab-lcms2-2.19.1",
+        "/nix/store/f9rx5ciyxbk16b2ri7in9bwnnr8mcakf-libdovi-3.3.1",
+        "/nix/store/h39qml87bd24gdsvnmgspcf1awi5c57p-libunwind-1.8.3",
+        "/nix/store/q9nicibnx3b3n2vh1q2psz7nf7s6df85-shaderc-2026.1-lib",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/91lcssm300wzmwxvq8zf1z5n0xi3291h-libplacebo-5.264.1.drv",
+      "signatures": [
+        "cache.nixos.org-1:NMVXGmfJeCSjFYVSXEE8FiaptCkkasqm2HjHdyS4rOMaQZHjoHvc23nQT47ClVcftMyeJiaT2shcSw7IU9m9Cg=="
+      ],
+      "ca": null,
+      "closureSize": 14,
+      "closureSha256": "432f25b31d2142bf2f5a7e1f2f12f73c51a42ec7d8d45eaee932bc2fc9cb0548"
+    },
+    {
+      "path": "/nix/store/1j55k6j90bjdgw6xkmp2s4w4w98grjzk-libaio-0.3.113",
+      "narHash": "sha256-ZLWgTCPZ6aSSzvhhnk+LibvIbw/MX5iu6/NxpbA2ii4=",
+      "narHashBase16": "64b5a04c23d9e9a492cef8619e4f8b89bbc86f0fcc5f98aeebf371a5b0368a2e",
+      "narHashNix32": "0bla6sqaawgkxfp9hpyc1xpwifw9id7rwqgqrs9a9sfr4d6a1db4",
+      "narSize": 43144,
+      "references": [
+        "/nix/store/hd6qrzgv3g0079rb7xgkc58q17hxjygd-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/an73pz9pjyk1wc2w5mpbs4md7xwh3lr4-libaio-0.3.113.drv",
+      "signatures": [
+        "cache.nixos.org-1:MokClFxfRc2gy8DhY1g/rnkcw6CQ/9dWa4XuISKlg7OFPuiZ8+koS2wLnsHUiZRl7x/N2ienIt033GZh15YCAQ=="
+      ],
+      "ca": null,
+      "closureSize": 5,
+      "closureSha256": "5833b823457f588949ce2d69f0b80b8d58b72cebe501f497782f2cce6f719afe",
+      "closure": [
+        "/nix/store/1j55k6j90bjdgw6xkmp2s4w4w98grjzk-libaio-0.3.113",
+        "/nix/store/49jal3dycgfsnfgcznk5lk86s0hzghkv-xgcc-16.2.0-libgcc",
+        "/nix/store/hd6qrzgv3g0079rb7xgkc58q17hxjygd-glibc-2.44-57",
+        "/nix/store/qnlhmxlgaspnpan6l7b5a2f42nsazls7-libidn2-2.3.8",
+        "/nix/store/v4vjqxppyslb8kb2cn9kyyyb0p9h8hhf-libunistring-1.4.2"
+      ]
+    },
+    {
+      "path": "/nix/store/239p2pmm14kzp5qfd0qa401rwdcfhwin-vimplugin-vim-endwise-1.3-unstable-2025-11-05",
+      "narHash": "sha256-DnyfqrHMRRHNlpcC0zk6oJpUcWp6Fm6OOm7+j1lKPvQ=",
+      "narHashBase16": "0e7c9faab1cc4511cd969702d3393aa09a54716a7a166e8e3a6efe8f594a3ef4",
+      "narHashNix32": "1x1y99cqzzkf7a76w5ksd9qm96m078wx60lpjv6i2ifcn6m9yz0f",
+      "narSize": 14272,
+      "references": [],
+      "deriver": "/nix/store/kkd8172s48yvnbrkl2gslkrnh3rkglf7-vimplugin-vim-endwise-1.3-unstable-2025-11-05.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "e5f68ed541f6d197fe423b04c81fca9b59765d66b492ec0a23417f2d915cdbc9",
+      "closure": [
+        "/nix/store/239p2pmm14kzp5qfd0qa401rwdcfhwin-vimplugin-vim-endwise-1.3-unstable-2025-11-05"
+      ]
+    },
+    {
+      "path": "/nix/store/23vrkdpvi6qbm371c8ccd9hm70r5mlxp-ddcutil-3.0.2",
+      "narHash": "sha256-xHk20isPrf7aVXGecNIvCL1cSnBBSblH617I3r0EHdc=",
+      "narHashBase16": "c47936d22b0fadfeda55719e70d22f08bd5c4a704149b947eb5ec8debd041dd7",
+      "narHashNix32": "1mqx0jyxxj2yxd3vjja1f155rg885z9717kiapdgxb8g5g93cyf4",
+      "narSize": 3564472,
+      "references": [
+        "/nix/store/23vrkdpvi6qbm371c8ccd9hm70r5mlxp-ddcutil-3.0.2",
+        "/nix/store/5j2w6s0j5jnjdb07qcgka29lblnrszrf-systemd-minimal-libs-262",
+        "/nix/store/bmjz9qdcncaxqr7vvl4x6dxqk4ckdxi0-jansson-2.15.1",
+        "/nix/store/ig03w1najff9c7rfi3fm7fsnr1azkfs7-libxext-1.3.7",
+        "/nix/store/j7nqmiia4h15b5gsqjdv091nsg9i1axp-acl-2.4.0",
+        "/nix/store/kp68n1q6r8lzpf5mxjmfasn3zq2pql4x-zlib-1.3.2",
+        "/nix/store/nm4nadhjw0m873b1g7b63jlv9qwhphqg-libdrm-2.4.134",
+        "/nix/store/nz6yl26svfj0qap9qnpvd26yp2gxn3xl-libx11-1.8.14",
+        "/nix/store/qbv74lpzb7i6zkv1kd3wzm7i758vmn1v-dbus-1.16.2-lib",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rj0sh9bqfc62j2jvh6zahd0a9rpnwgw9-glib-2.90.0",
+        "/nix/store/s50a95k9yig5a9y1v014yg47kj0cy638-libxrandr-1.5.5",
+        "/nix/store/w5cmsqrnjv6mjbji3nbwdcx860bqxzgy-libusb-1.0.30"
+      ],
+      "deriver": "/nix/store/qxfnwfary9iz281kxlxn3a9cxbgpsv8s-ddcutil-3.0.2.drv",
+      "signatures": [
+        "cache.nixos.org-1:iyklbMSFt0WYoGtiPQ9KmnkoYq4dpEQqgKxnb1f6av+lbTq719fZ+XgAe0cOeR0Cn0i26vb4GAHKVJo2V+zvBA=="
+      ],
+      "ca": null,
+      "closureSize": 41,
+      "closureSha256": "80dc5ad2fc3db6cf53084deb1cfe120e2658f18260f9e5e0d40a904253bd9ef0"
+    },
+    {
+      "path": "/nix/store/2x9l3rwd2pccp33qkpv0xg2b9ljcbz8d-vimplugin-nvim-treesitter-0.10.0-unstable-2026-11-18",
+      "narHash": "sha256-sZy+YYu1YtFYEA36o+xKkoGYziXmWNEyCqOCw9IJVZc=",
+      "narHashBase16": "b19cbe618bb562d158100dfaa3ec4a928198ce25e658d1320aa382c3d2095597",
+      "narHashNix32": "15sm179c70m318rd2n764p79i0cj9bna7yhd21cd2qmmidhvx75i",
+      "narSize": 2172392,
+      "references": [
+        "/nix/store/a50ml7za6h61m4mv4cdbvkl33c6sx5yn-coreutils-9.12",
+        "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20"
+      ],
+      "deriver": "/nix/store/viyd1ljfnvnpcpaicvgamsksa1kpiq0c-vimplugin-nvim-treesitter-0.10.0-unstable-2026-11-18.drv",
+      "signatures": [
+        "cache.nixos.org-1:NOIj8FKs10/zCbj+f+mN8kZzp/7YTSbpHlBN3kM3euN6HY0fPiYA5zctt/EvYzk0RC2WiXwIFf/eKRtJ8eItCw=="
+      ],
+      "ca": null,
+      "closureSize": 12,
+      "closureSha256": "71c1ba43eade89aed17b934c5c9c4e37670f40ff8b58c821da0c4f2f366c37ea"
+    },
+    {
+      "path": "/nix/store/3vb1291c8vqz82vdasl667h41la545iy-w3m-0.5.6",
+      "narHash": "sha256-p2HrLwvD30+oOdZQPW6CTFuWiHvk4L9ay7usgJKVGkU=",
+      "narHashBase16": "a761eb2f0bc3df4fa839d6503d6e824c5b96887be4e0bf5acbbbac8092951a45",
+      "narHashNix32": "0i8sjn981b5vrddbzq74gf49cnsch9p3sl6n76l4zpy31cpynqd7",
+      "narSize": 2307392,
+      "references": [
+        "/nix/store/2jdg05x5gwsx4xj2323x19kc3hb3b0kj-boehm-gc-8.2.12",
+        "/nix/store/3h4ifcg10i9j0kj5c0cmas23v15pc7cl-openssl-3.5.9",
+        "/nix/store/3vb1291c8vqz82vdasl667h41la545iy-w3m-0.5.6",
+        "/nix/store/adz753psjvfr4j597fprrh4p0cvjylx9-ncurses-6.6",
+        "/nix/store/cfq68xjlcbls4h1042byakc1rdwbm0nl-gpm-1.20.7-unstable-2020-06-17",
+        "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20",
+        "/nix/store/kp68n1q6r8lzpf5mxjmfasn3zq2pql4x-zlib-1.3.2",
+        "/nix/store/niqsa6mxqsyax9lzbm261a2ml6m71vb6-perl-5.42.3",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/wmh4xg3557sicfyllmi9ymd8sxaw51wv-man-db-2.13.1"
+      ],
+      "deriver": "/nix/store/3vkpai95k936pw7x2r4b35c4rc19prlw-w3m-0.5.6.drv",
+      "signatures": [
+        "cache.nixos.org-1:J7MOqh5UdVBjHa/MKOzaOcJ9UZBw4lUvbd3rof763cOnG4T2r0KB2Wj/7D3UfkXwGoDCeKHFDZ2kZqJcYwIhBA=="
+      ],
+      "ca": null,
+      "closureSize": 34,
+      "closureSha256": "9c06c799a3df7042a413789ad0641054d37bf1d346511f31126e693561586084"
+    },
+    {
+      "path": "/nix/store/447pdx973scygrbl10rwpjycf7727npl-unit-docker.service",
+      "narHash": "sha256-v1U2/dNSMQ/ijdDFPZNLxD3b5ECYj/cIqEiCxQdGgw4=",
+      "narHashBase16": "bf5536fdd352310fe28dd0c53d934bc43ddbe440988ff708a84882c50746830e",
+      "narHashNix32": "03l38q3wb0j8m04gg3wq83jdngf49f9kvifhipi0ycajsgykcmdz",
+      "narSize": 2312,
+      "references": [
+        "/nix/store/4rq906znj0xlhvldch5xcfvbfjksai53-daemon.json",
+        "/nix/store/5sgjjiqn90zmvlvlgadw7ss00nn3hpjb-gnugrep-3.12",
+        "/nix/store/5zsc280i2i7bqgjn7kln87w1ss6li22f-findutils-4.11.0",
+        "/nix/store/a50ml7za6h61m4mv4cdbvkl33c6sx5yn-coreutils-9.12",
+        "/nix/store/aj08b694apkc1jay2akywym9ghlailf5-procps-4.0.7",
+        "/nix/store/d56p3jpksslx6pqypzl53xidcxxrz2kc-nss-cacert-3.131.1",
+        "/nix/store/kh0kk4mi6hr0cdvsc8rzd0jvr2c2vhwk-systemd-262",
+        "/nix/store/lx0adghcyhwc9h3cj8laxjd5sbjniy3c-glibc-locales-2.44-57",
+        "/nix/store/m3b1hhdk6jk98c7c87nlvmac66mrxd4m-docker-buildx-0.38.1",
+        "/nix/store/m76gmgmmx16dipvgfgsn3bxhrs3f4bgi-docker-29.9.3",
+        "/nix/store/s92hlmg73b3zlw38dfgm13v9cah2bm80-tzdata-2026f",
+        "/nix/store/vriz9cnrrba5k3y5hk559kpjxb2kl3si-docker-compose-5.7.1",
+        "/nix/store/x275j18p7dx6kv7vfj45saapbhbljia4-gnused-4.10"
+      ],
+      "deriver": "/nix/store/6c82fn1w1xpvwii2y14v0phh5fbrylfx-unit-docker.service.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 134,
+      "closureSha256": "a8c85dd7f6bf503788a8ec046a6a35af132dad37ef47292539c34cfb20220839"
+    },
+    {
+      "path": "/nix/store/4hn1mfkvf7dxfnc5hpy2b5j6qpawc7fp-fuse-3.18.2-man",
+      "narHash": "sha256-FV+3m93FaAIaLK9Fr/uNIfyK1qZULvxlEPo78PLph+M=",
+      "narHashBase16": "155fb79bddc568021a2caf45affb8d21fc8ad6a6542efc6510fa3bf0f2e987e3",
+      "narHashNix32": "1qw7x7rg0fzs21jzqbjllvb8mz11ipxsyidg5hd04s65vndvfpqm",
+      "narSize": 6704,
+      "references": [],
+      "deriver": "/nix/store/i55dcvgim5ps07gl9jizxphy88gahf3m-fuse-3.18.2.drv",
+      "signatures": [
+        "cache.nixos.org-1:xofZLlVcoEWNJR4TFZqezxSjPZR8Pml6wAbf0zDmWOObqoKcZYbB/X4EqkBytAP3PI8Qy2dmKPUMTJ5XirlwAA=="
+      ],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "418a2a078e9e78fac8e4f4024c81acaff7ac55f3c1fb55672aebcc850189590c",
+      "closure": ["/nix/store/4hn1mfkvf7dxfnc5hpy2b5j6qpawc7fp-fuse-3.18.2-man"]
+    },
+    {
+      "path": "/nix/store/55b11m2vbhwrd1q9g22h838x6s582147-mariadb-connector-odbc-3.2.6",
+      "narHash": "sha256-t6ltHmgX2uPAGvkIvZiPrBUsjGoL2KYs+SfCqV+DLQY=",
+      "narHashBase16": "b7a96d1e6817dae3c01af908bd988fac152c8c6a0bd8a62cf927c2a95f832d06",
+      "narHashNix32": "01idhdgskhi7z4nadn0bda62q5dciycbs27r3b0f7nhpd0g6vadp",
+      "narSize": 1683904,
+      "references": [
+        "/nix/store/3h4ifcg10i9j0kj5c0cmas23v15pc7cl-openssl-3.5.9",
+        "/nix/store/55b11m2vbhwrd1q9g22h838x6s582147-mariadb-connector-odbc-3.2.6",
+        "/nix/store/bmkgk1svgrjw2d51iyimi24ksmys3icq-unixodbc-2.3.14",
+        "/nix/store/kp68n1q6r8lzpf5mxjmfasn3zq2pql4x-zlib-1.3.2",
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/sj6y6l803dnlhjlzpl5piv3iakkyjb1s-mariadb-connector-odbc-3.2.6.drv",
+      "signatures": [
+        "cache.nixos.org-1:qjwTiPdJ1DNRMxoT8vgjKcOdh6IBXQu6ES//TAm/iVdHUJsA0hl+bseHWWnmI3y6fvD9XouZL234Jn/c0rGgAA=="
+      ],
+      "ca": null,
+      "closureSize": 11,
+      "closureSha256": "c6c65201a6b9775c3f8f216d9de51e3e04a59e72a1009c5bc6b55426255f96e3"
+    },
+    {
+      "path": "/nix/store/5visbdw3r43jrfi4zmy4z12vj469hndb-etc-resolvconf.conf",
+      "narHash": "sha256-T56hf61aLmcpedbsadjjB51atYe+IPrMkz/gXOlBkyQ=",
+      "narHashBase16": "4f9ea17fad5a2e672979d6ec69d8e3079d5ab587be20facc933fe05ce9419324",
+      "narHashNix32": "094k87lmrq1zjg6gl85yhysmm787wgc6kv6ng4lnfbjsmmzs37jg",
+      "narSize": 552,
+      "references": [],
+      "deriver": "/nix/store/x5vfqdyxjqgpmr5zpf48f82aa62ywchn-etc-resolvconf.conf.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "546a92914576dd7ea8366505d21d3e7088b221216bd4f594da5a0c7807228073",
+      "closure": [
+        "/nix/store/5visbdw3r43jrfi4zmy4z12vj469hndb-etc-resolvconf.conf"
+      ]
+    },
+    {
+      "path": "/nix/store/5xzzqzxcmnmy3svfhy56is2gyii8dld5-python3.14-defusedxml-0.8.0rc2",
+      "narHash": "sha256-p3juVYAQJwkrneZq6PLeyMMKLkZ3p+47R8XxntR5D44=",
+      "narHashBase16": "a778ee55801027092b9de66ae8f2dec8c30a2e4677a7ee3b47c5f19ed4790f8e",
+      "narHashNix32": "13hgg7a9xwf58wxyx9vp8qp0mhy8vvrfhsp6klmhj9qhh1aywy57",
+      "narSize": 159896,
+      "references": [
+        "/nix/store/5xzzqzxcmnmy3svfhy56is2gyii8dld5-python3.14-defusedxml-0.8.0rc2",
+        "/nix/store/bya4ansy58az5133kryqp2cvrxbnz8qy-python3-3.14.10"
+      ],
+      "deriver": "/nix/store/nxw1y426y7n7f1c9n8qdkap3lrw8ysj4-python3.14-defusedxml-0.8.0rc2.drv",
+      "signatures": [
+        "cache.nixos.org-1:yFnYzrJUUm3onSpZIHkL9VKrWM2SvExaOD92+OK5e3Q1uGxvuqnqOqIIWoyt4um8R8sDuGsN9Hvz7W4fEmfKDQ=="
+      ],
+      "ca": null,
+      "closureSize": 24,
+      "closureSha256": "071cdfdfbf5c8e8217415e9e5f00c0e0380286d622dd7647a9e8ce8a47631682"
+    },
+    {
+      "path": "/nix/store/6sivf0v60igw7blf04x1hmlsc0l3fkqk-hyprsunset-0.4.0",
+      "narHash": "sha256-8GZ9Ff5P2WRNN6uCllVnQ1lhilw8kwA3Oisnw4d6en4=",
+      "narHashBase16": "f0667d15fe4fd9644d37ab829655674359618a5c3c9300373a2b27c3877a7a7e",
+      "narHashNix32": "0zksga3w69rb78vh14rwbj562na3cxard0mb6x6n9nagzqapsrph",
+      "narSize": 408960,
+      "references": [
+        "/nix/store/6sivf0v60igw7blf04x1hmlsc0l3fkqk-hyprsunset-0.4.0",
+        "/nix/store/cl4z6gi9z0ljckrgrwrz9rjk8wh09g1c-hyprlang-0.6.8",
+        "/nix/store/fr41blzp9gni5x86ylzrkh5s88m47q3g-hyprutils-0.14.4",
+        "/nix/store/fw55hzw26p3srahg8278nwx63xkzwv4k-gcc-16.2.0-lib",
+        "/nix/store/md555jfqdvwxhzm93mv3yl1ki6a2yd3g-wayland-1.26.0",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/25q67jpnxmkdaz0hj3xlr69ia72n23nk-hyprsunset-0.4.0.drv",
+      "signatures": [
+        "cache.nixos.org-1:MydCPwADFjqtvJ6WXdMT0xtNzmqJ18s32t4NCZ9vhVa93Jx036TU5EifHzy2QFRwf6GIvrhiezuC5L2q0nidCw=="
+      ],
+      "ca": null,
+      "closureSize": 14,
+      "closureSha256": "5c4ab6c488e1d61c1b4f8fabbee3da33320ce019e75773fff9ad49915c9ef84b"
+    },
+    {
+      "path": "/nix/store/7k8hh4jmlib1gdv4acbsl9a00gahnb5k-slirp4netns-1.3.7",
+      "narHash": "sha256-w+BB6iBtQO+njndakWL21NRvxHm6hjCfw7JvwiX2hDs=",
+      "narHashBase16": "c3e041ea206d40efa78e775a9162f6d4d46fc479ba86309fc3b26fc225f6843b",
+      "narHashNix32": "0fw4yqjw4vxjqfgk11msg726zm6lyri92nkpiskyyh3d43m43q63",
+      "narSize": 95312,
+      "references": [
+        "/nix/store/7likdqzdqmcks2xlbv6kvm5kzww2z84s-libslirp-4.9.7",
+        "/nix/store/n8l4vd033frq0nyx310lzplv91r2c2sk-libseccomp-2.6.1-lib",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rj0sh9bqfc62j2jvh6zahd0a9rpnwgw9-glib-2.90.0"
+      ],
+      "deriver": "/nix/store/7z2ci27dp6c4apv7bfgs42hkn0k96mvf-slirp4netns-1.3.7.drv",
+      "signatures": [
+        "cache.nixos.org-1:7t6fgXOF3EskjVQQa9QblJ2QC3DuzmwnsZd3b+ozKtJyyYtz6s5Zbxw6E4PXjrrtiE0vUAsiqL6FZVUHIrXTCA=="
+      ],
+      "ca": null,
+      "closureSize": 15,
+      "closureSha256": "7693199ae69dbde04c5fdd9bfdd14b7b13038f6e6976a68ae1adb8c4ecba5fb3"
+    },
+    {
+      "path": "/nix/store/88zgafxp98c7zhqnzsl32xsxfrv646i2-zellij-theme-stylix.kdl",
+      "narHash": "sha256-WIkAPv1fFsHU+b2O6BqbV6PjA27qeRGEx4f2Wzzm1xc=",
+      "narHashBase16": "5889003efd5f16c1d4f9bd8ee81a9b57a3e3036eea791184c787f65b3ce6d717",
+      "narHashNix32": "05ypwqy5pxl7qy212ygadq1y78spkcdfi3mxz7ac25jzzlz012aq",
+      "narSize": 352,
+      "references": [],
+      "deriver": "/nix/store/5wf2035x0r9bm5a7n1cyyzjc8g8cfhqf-zellij-theme-stylix.kdl.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "1f18c755e009a9eb5940c89180982d216c73085a0123e3f5beb54d87d2b33054",
+      "closure": [
+        "/nix/store/88zgafxp98c7zhqnzsl32xsxfrv646i2-zellij-theme-stylix.kdl"
+      ]
+    },
+    {
+      "path": "/nix/store/8a1dk4n91dvn7wxkmcav58bpsqchh3c4-libxcrypt-4.5.2-man",
+      "narHash": "sha256-//bA4DjRir3igftPekVLufxOrGTqiBwXumero5s6ZTQ=",
+      "narHashBase16": "fff6c0e038d18abde281fb4f7a454bb9fc4eac64ea881c17ba67aba39b3a6534",
+      "narHashNix32": "0d357ads7av7p8bir27acjn4xz5r9d2plkzvh7ibv2ni73hc1xpz",
+      "narSize": 16952,
+      "references": [],
+      "deriver": "/nix/store/z6kyb366m1ngd7vx1hk1cfgqc7q69cqp-libxcrypt-4.5.2.drv",
+      "signatures": [
+        "cache.nixos.org-1:Flo2p1BswJh1/IrXsaDstIe4jjY2r7aMKJTcjry+dZG3XyDDPp1aS0o2vX1kqQ5umymiOMLR1p0VAXHU9WptCQ=="
+      ],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "9ce58839c98a1bc41d3866954d8b566554dc4c975b1917616da7c8b6ced25c8e",
+      "closure": [
+        "/nix/store/8a1dk4n91dvn7wxkmcav58bpsqchh3c4-libxcrypt-4.5.2-man"
+      ]
+    },
+    {
+      "path": "/nix/store/93hji1776aamdv6hngmg3kw1hk11bckm-unbound-1.26.2-lib",
+      "narHash": "sha256-+zI96h/N+R9UGT5WaSXocSqqeXqtnukV+9AXnxWWJ6A=",
+      "narHashBase16": "fb323dea1fcdf91f54193e566925e8712aaa797aad9ee915fbd0179f159627a0",
+      "narHashNix32": "1817jqary5yhzcayk7mdg9wslakix0jnjmiy35a1zyfd3zm3scpv",
+      "narSize": 1341640,
+      "references": [
+        "/nix/store/92ja7vd34akp38q0isl4hcniz5fm5njr-gmp-with-cxx-6.3.0",
+        "/nix/store/93hji1776aamdv6hngmg3kw1hk11bckm-unbound-1.26.2-lib",
+        "/nix/store/hd6qrzgv3g0079rb7xgkc58q17hxjygd-glibc-2.44-57",
+        "/nix/store/mvnj0xc80wh9yc47gg1jra8158s6idbv-libevent-2.1.13",
+        "/nix/store/r5p32w6rxvrbh6n1sd64mz3ypzxc2mv3-nettle-3.10.2"
+      ],
+      "deriver": "/nix/store/f6q9pw9cm9dn8mz12c5s0zn088kl0r75-unbound-1.26.2.drv",
+      "signatures": [
+        "cache.nixos.org-1:7q2B3k4sFklw57N9v4KvwbWhdyPWHXcBYP3Xt8TNPnNzriTx3ni4bo06QR7EqToUVuOSzA1Og2+lWPS592NZDg=="
+      ],
+      "ca": null,
+      "closureSize": 10,
+      "closureSha256": "ef52738522336e8ace5374820ae2c667732c52e9d37438a9ed20e42d34126d13"
+    },
+    {
+      "path": "/nix/store/9v2lngyzb9c9iwmqamwxxk5lgr6nvlbs-libbpf-1.8.0",
+      "narHash": "sha256-PbXjA9/VGMYtppQr6uFkKfGPR26AK0OoJ9jlnu0IbEs=",
+      "narHashBase16": "3db5e303dfd518c62da6942beae16429f18f476e802b43a827d8e59eed086c4b",
+      "narHashNix32": "0jvc13nrxrfq4yl46aw0dr3qzw99ckhylawllqnwc66mvw1y7d9x",
+      "narSize": 2296064,
+      "references": [
+        "/nix/store/9v2lngyzb9c9iwmqamwxxk5lgr6nvlbs-libbpf-1.8.0",
+        "/nix/store/kp68n1q6r8lzpf5mxjmfasn3zq2pql4x-zlib-1.3.2",
+        "/nix/store/pccp92fz19awp8wl8ni89wb4pzc47r8x-elfutils-0.195",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/gciyvgkc7jmvlhj7izg9g3l1993c9jgj-libbpf-1.8.0.drv",
+      "signatures": [
+        "cache.nixos.org-1:U4C5QYRVT81eUE1/vQo9KSlFrBypn8WFitFX7wsb2jYaKYX/810BKSgvL5NBNRtIwJTpnA/dSvAYawG8TgDQDg=="
+      ],
+      "ca": null,
+      "closureSize": 24,
+      "closureSha256": "016aab5775979987743f62bdd09ba052ff58dda310b349989215b0d3653042f3"
+    },
+    {
+      "path": "/nix/store/a861w4r71syih51dpk5s3hzjlnqc5cws-zellij-0.46.0",
+      "narHash": "sha256-k0pJdY/1zS8zyxmB2nMQaZcp0fv0YxYc/WNvi12CyHY=",
+      "narHashBase16": "934a49758ff5cd2f33cb1981da7310699729d1fbf463161cfd636f8b5d82c876",
+      "narHashNix32": "0xn8h9fqnvv3zlf1cqzlzg8jk5v921rxm08rrcrjzkgmixsljjlk",
+      "narSize": 6920,
+      "references": [
+        "/nix/store/j2cbnhprnnrlk240zrrxbmw4vxfqfqpn-zellij-unwrapped-0.46.0"
+      ],
+      "deriver": "/nix/store/zi1rwzpygjb3bkj10gw9rfbbbcbi1mhx-zellij-0.46.0.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 44,
+      "closureSha256": "7109fa494dd5d295e424bc61bca8440a224c69422c907b5cc8b9db08540e2da8"
+    },
+    {
+      "path": "/nix/store/afn4brgw6vs068xxgxxqb3ynywib0s9b-tree-sitter-po-0.0.0+rev=bd860a0",
+      "narHash": "sha256-jPqNW4OHxCGeEN6Yma0BGhgozW8i1kHYLeYQSSdwiLY=",
+      "narHashBase16": "8cfa8d5b8387c4219e10de9899ad011a1828cd6f22d641d82de61049277088b6",
+      "narHashNix32": "1dl8f0klj4765pc43mi2dz6jh60s06nrk66y22g23i47hddqvylc",
+      "narSize": 25528,
+      "references": [
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/zgn4chipr41bvmfbwdia7xqh01kx26vs-tree-sitter-po-0.0.0+rev=bd860a0.drv",
+      "signatures": [
+        "cache.nixos.org-1:qkK/Kgxy/F2vdsbGjDYWTK+0btRK8j/5eM9I1Z5WkbJlgoBDoVZf8yhpc05E7wK065Cu6EEETJtHFvyuPlZFBg=="
+      ],
+      "ca": null,
+      "closureSize": 7,
+      "closureSha256": "3979cac01723e31084f57af8d19371bd9fd878dcbf4f0a3897b0d196f4d9f22d",
+      "closure": [
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/afn4brgw6vs068xxgxxqb3ynywib0s9b-tree-sitter-po-0.0.0+rev=bd860a0",
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/qk6cz4ba571znqrsyhma192y8h50yi05-gcc-16.2.0-libgcc",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8"
+      ]
+    },
+    {
+      "path": "/nix/store/b95bs7xhy7lw7xfxmpil0wizbg673b8m-python3.14-autopep8-2.3.2",
+      "narHash": "sha256-QmOPuWnkJkp+xWtZ7CfaEjM1JTV3kpWM12Ei+hXdCjY=",
+      "narHashBase16": "42638fb969e4264a7ec56b59ec27da12333525357792958cd76122fa15dd0a36",
+      "narHashNix32": "0dhavlazl8k1sy69b4kp6ljkacqjv8kyqnbbqmz4l9p4d6wqyqs2",
+      "narSize": 568280,
+      "references": [
+        "/nix/store/b95bs7xhy7lw7xfxmpil0wizbg673b8m-python3.14-autopep8-2.3.2",
+        "/nix/store/bya4ansy58az5133kryqp2cvrxbnz8qy-python3-3.14.10",
+        "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20",
+        "/nix/store/zbbk7dpxf6n2gvzcdk4n17714blkprhh-python3.14-pycodestyle-2.15.0"
+      ],
+      "deriver": "/nix/store/pvzr34s9lr09mc4x70zd9c3mzh1fq2hh-python3.14-autopep8-2.3.2.drv",
+      "signatures": [
+        "cache.nixos.org-1:E3NQ8qer7YvpuskXnDydGF0KaTbZKEBkjyT3xiCqure9gZ1l430xsMeaVIot4cW4qqB550RF6XnmCiJfQ6cWCQ=="
+      ],
+      "ca": null,
+      "closureSize": 25,
+      "closureSha256": "ae45cc694ee21d932bcafced74d1c759a8632f6690a7676f2508a31166a50c1e"
+    },
+    {
+      "path": "/nix/store/byx69v9wr3l73yds9sq5q2azhqpjngcw-apparmor-closure-rules-security.wrappers.su",
+      "narHash": "sha256-62rjskxuN/NzoAIFwvidcjPSkP3uhzYcYCNqSpDg21g=",
+      "narHashBase16": "eb6ae3b24c6e37f373a00205c2f89d7233d290fdee87361c60236a4a90e0db58",
+      "narHashNix32": "0n6vw284lsi3c0f3d1zfzn8d4cvjkpwc4182l1rz6dvf9jrf6spb",
+      "narSize": 13512,
+      "references": [
+        "/nix/store/2a69456iqj6rzzc2ys7l2yypsv1w6l5m-zstd-1.5.7",
+        "/nix/store/2f32l9p6dchas8d1gbybzqvx2mnfinww-lz4-1.10.0-lib",
+        "/nix/store/2lm7ds4yw7m4gzmxxd2j7w9zsnlrxgpc-tcb-1.2",
+        "/nix/store/4bv0h6pn43z5j3vcijm6gwvg8xf2q4rv-linux-headers-static-7.3",
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/4vdll3ayvj82s2x722w9jzh1vqh6qj6p-libxcrypt-4.5.2",
+        "/nix/store/53wag47axb3bjnwn0imzksh4c9w3mgx7-glibc-2.44-57-bin",
+        "/nix/store/5j2w6s0j5jnjdb07qcgka29lblnrszrf-systemd-minimal-libs-262",
+        "/nix/store/5n1qsd423q10dlscj3k4np04imfv4nm2-xz-5.8.4",
+        "/nix/store/71x9j34qp7zj8awfcnmhvnna4m1qsx78-libbsd-0.12.2",
+        "/nix/store/7jik7skaxj1m75kjryzzybk7s9g23g5h-shadow-4.20.3",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/8hmmrkv0bgrg7l19ray9yj8dfi4dqqfp-libmd-1.3.0",
+        "/nix/store/ajn83h1fdvxjv69fg1fpi6wcmhbkmzh3-linux-pam-1.7.2",
+        "/nix/store/f66220a435299vxkqq7rnc66s479clg7-security-wrapper-su-x86_64-unknown-linux-musl",
+        "/nix/store/jwyvw11c6943vss7idigzz3kz76i0m2b-shadow-4.20.3-su",
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/qk6cz4ba571znqrsyhma192y8h50yi05-gcc-16.2.0-libgcc",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/r7gc1i2zv83m9pryidpdk1wdav72sg5s-audit-4.2.1-lib",
+        "/nix/store/rapxnw8qqv47psglrgfd2yg48rhzfpmz-db-4.8.30",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8",
+        "/nix/store/wlwfib24sapw01gny10balapq1pakz10-libcap-ng-0.9.6"
+      ],
+      "deriver": "/nix/store/hrbp9g5cc1lvjd4r5z3c7xrzm3lg4yml-apparmor-closure-rules-security.wrappers.su.drv",
+      "signatures": [
+        "cache.nixos.org-1:8OHG2VO0yvglne+EmsQekadvegDuGx2iLd2P0j3Rv0c31JGwRGHjvKCjkTePTIG+Y17frhmtqIrCeBBsheoADg=="
+      ],
+      "ca": null,
+      "closureSize": 24,
+      "closureSha256": "bc7379fc567beb86a47230f85167f5b514903abbe0143a6b3a1d9207bf4f065f"
+    },
+    {
+      "path": "/nix/store/cam9facnzvrba1gcr0np174mrhqk06cl-l",
+      "narHash": "sha256-cKC+gtN9AAdI1QhU97MQrzgF9rVxDdXJfz/py1qmjGs=",
+      "narHashBase16": "70a0be82d37d000748d50854f7b310af3805f6b5710dd5c97f3fe9cb5aa68c6b",
+      "narHashNix32": "0swclrdcps9zgz4xa3binpv0af5g22rzfm08sm40f03xsf1bx83h",
+      "narSize": 696,
+      "references": ["/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20"],
+      "deriver": "/nix/store/dszchdv58rpldfzmmyrnfh0f1k9586h6-l.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 6,
+      "closureSha256": "4b54c8a654d90361bd85a74b090f99a35c3d62282020f4fa315ee0c64373b718",
+      "closure": [
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/cam9facnzvrba1gcr0np174mrhqk06cl-l",
+        "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8"
+      ]
+    },
+    {
+      "path": "/nix/store/clz87m31r93h9rygi7f8k2m0qny9n6m6-check-dconf-db",
+      "narHash": "sha256-BS43TZ8N6s9yPSHgJEfF5nyZ+pNQYkeuiBOPNONeED0=",
+      "narHashBase16": "052e374d9f0deacf723d21e02447c5e67c99fa93506247ae88138f34e35e103d",
+      "narHashNix32": "0g8hbvik93qki2p4fqjhjgx9jz76qm3j9q117mrczshdkx6kfbh5",
+      "narSize": 4448,
+      "references": [],
+      "deriver": "/nix/store/26255bymcq08hcrd247h4xp03lfh09ay-check-dconf-db.drv",
+      "signatures": [
+        "cache.nixos.org-1:jWlMmj0JkCcG6hMtwir6NLjCC8EkUT0tet2nSOQsM8sHX6EbhjQC4S6AdqiKla+xqF/NsLoVUTiDiv3+L+47Aw=="
+      ],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "5de05a88e094d0070f1a4ecde13078df136ea7169d6d933e45be4ab4484775ba",
+      "closure": ["/nix/store/clz87m31r93h9rygi7f8k2m0qny9n6m6-check-dconf-db"]
+    },
+    {
+      "path": "/nix/store/d9a3vpwvnihd1kms0sc4sj430zv42dyn-acl-2.4.0-doc",
+      "narHash": "sha256-c+TmJHWMH+XL51r8dBsUO0p/kXbNIxYCG00jKUeAAkE=",
+      "narHashBase16": "73e4e624758c1fe5cbe75afc741b143b4a7f9176cd2316021b4d232947800241",
+      "narHashNix32": "0h82h13jj8sd3c11c8ydfs8pyjiv2hdp9z2swz5ya7wcfljfdr3k",
+      "narSize": 77496,
+      "references": [],
+      "deriver": "/nix/store/ml99y3vlz7na1zjsz6q9wpmmxhwkc6n7-acl-2.4.0.drv",
+      "signatures": [
+        "cache.nixos.org-1:kviBVeaokyMgD5tVebaZheM2bHnwsRR2y8L9eaufD5M/lhm6z83H5TweRlikODQmfByaKKfD5aVeVfUH877XDw=="
+      ],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "3b32b0522eb7316e4f480c6915e956276ec71fdf720cc49dd9e7d628713c8751",
+      "closure": ["/nix/store/d9a3vpwvnihd1kms0sc4sj430zv42dyn-acl-2.4.0-doc"]
+    },
+    {
+      "path": "/nix/store/dvqmfsz0082xqvi7drrsnahpdlnp3jw1-keyutils-1.6.3",
+      "narHash": "sha256-1qs4fGdyE7dbVN9fd03zs7Hyz2bNEsg8AOu6gCiO1ys=",
+      "narHashBase16": "d6ab387c677213b75b54df5f774df3b3b1f2cf66cd12c83c00ebba80288ed72b",
+      "narHashNix32": "0aypiql81fpb00ych4ndcv7z5cdkyd6pfpyzaidvf4vjcxy3iayn",
+      "narSize": 138152,
+      "references": [
+        "/nix/store/25svpf3rdkvkc43f0zp59j5g1wjlmfp5-keyutils-1.6.3-lib",
+        "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/aswl670zknzn1m8mldwfrznfkp1m2ri8-keyutils-1.6.3.drv",
+      "signatures": [
+        "cache.nixos.org-1:aS0GC2RIKFqb0KMME/UNeLpYg7Pp/6kpVxlANKpGl9v7+OxBPoNidKGNt0X3umf29l7dDz/fqUBTUIfCF0p8Aw=="
+      ],
+      "ca": null,
+      "closureSize": 7,
+      "closureSha256": "9c0503b4c5bd3f2cd5c230986de2fe9f0e802383aaac567d0b7988669cc16c44",
+      "closure": [
+        "/nix/store/25svpf3rdkvkc43f0zp59j5g1wjlmfp5-keyutils-1.6.3-lib",
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/dvqmfsz0082xqvi7drrsnahpdlnp3jw1-keyutils-1.6.3",
+        "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8"
+      ]
+    },
+    {
+      "path": "/nix/store/ffbsfilwwzgvvfcg4s9iyfrzxlgfpa1p-lua5.5-luafilesystem-1.9.0-1",
+      "narHash": "sha256-0U3Ae6KllyTWnFCStjsFVe8Jh+8LmoSsn/o49S9c9/c=",
+      "narHashBase16": "d14dc07ba2a59724d69c5092b63b0555ef0987ef0b9a84ac9ffa38f52f5cf7f7",
+      "narHashNix32": "1xzpbhpzaf7skyn896hbxy3hkvsm0lxvd4jhkkb295x5l9xw0kfi",
+      "narSize": 79832,
+      "references": [
+        "/nix/store/pz977x2548fmi7sj468blzfglvmc6nxx-lua-5.5.1",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/b1msavxlav8p6j2ix78wmp3z2k4ba3rh-lua5.5-luafilesystem-1.9.0-1.drv",
+      "signatures": [
+        "cache.nixos.org-1:pCCSBkOANXpC4bHF4O4WT2WDPzJm7uBoY4ax/1mIU4G8djXdpBJajoD5PxoVFpoHLaNqX495w8/oZZ+Z19THDg=="
+      ],
+      "ca": null,
+      "closureSize": 7,
+      "closureSha256": "c99042ac3cf14595cf048233b7a3186dd2f80a51a6aa4520b858b9289950b32c",
+      "closure": [
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/adz753psjvfr4j597fprrh4p0cvjylx9-ncurses-6.6",
+        "/nix/store/ffbsfilwwzgvvfcg4s9iyfrzxlgfpa1p-lua5.5-luafilesystem-1.9.0-1",
+        "/nix/store/pz977x2548fmi7sj468blzfglvmc6nxx-lua-5.5.1",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8"
+      ]
+    },
+    {
+      "path": "/nix/store/fqf7njdkvl8c926wij1zylbvzr6rbcki-etc-opt-chrome-policies-managed-default.json",
+      "narHash": "sha256-5/joiN/cwJ2EKm+mySH+0I4hdUYFNjvafOf5dNyHgO8=",
+      "narHashBase16": "e7f8e888dfdcc09d842a6fa6c921fed08e21754605363bda7ce7f974dc8780ef",
+      "narHashNix32": "1vw0hzf79yg7gkd3ndh58rsj33nhzqhwk9kg5a29vh6wvy4fiy77",
+      "narSize": 688,
+      "references": [],
+      "deriver": "/nix/store/0jr7f4x75n0b8ss2530dyfrrhwrbarc8-etc-opt-chrome-policies-managed-default.json.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "9545d25353aa340db4256c58ebea4c262d6e73acda3bc97669564a75befae312",
+      "closure": [
+        "/nix/store/fqf7njdkvl8c926wij1zylbvzr6rbcki-etc-opt-chrome-policies-managed-default.json"
+      ]
+    },
+    {
+      "path": "/nix/store/g6swnrw5m71xlif5bgwq56avpm691flh-tree-sitter-wxml-0.0.0+rev=1cc1761",
+      "narHash": "sha256-CgraoG1iHsWcawug9LcZ1OJ9Z6I0XRG0Gh7R50SXbnU=",
+      "narHashBase16": "0a0adaa06d621ec59c6b0ba0f4b719d4e27d67a2345d11b41a1ed1e744976e75",
+      "narHashNix32": "0xbfjx2fgl8y3as12p9ll9kpvqnl36vz980bdffca7k2dnhdl2ha",
+      "narSize": 45072,
+      "references": [
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/1d4ka0zvfsndwsgfhl1cdb4i0rbk1r0l-tree-sitter-wxml-0.0.0+rev=1cc1761.drv",
+      "signatures": [
+        "cache.nixos.org-1:oodYuqHAnmilp3ZFr7NMtzRd4FeehAGyT05DGQxAUa52iPhaw4T+5kKoLRbeLtXNxyDWf1qB/tSksZgqiUaGDA=="
+      ],
+      "ca": null,
+      "closureSize": 7,
+      "closureSha256": "e666e0fa32820c1cf2a8353b823c9eccf3e51102d377e91c3a259e827498330c",
+      "closure": [
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/g6swnrw5m71xlif5bgwq56avpm691flh-tree-sitter-wxml-0.0.0+rev=1cc1761",
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/qk6cz4ba571znqrsyhma192y8h50yi05-gcc-16.2.0-libgcc",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8"
+      ]
+    },
+    {
+      "path": "/nix/store/gwq32x88d44h1civc0q3iflb9r6rmghj-libwacom-2.20.0",
+      "narHash": "sha256-pjRwdrR9+DlOyTNWB4B2JUUulql04OLzDcrMbILi9hI=",
+      "narHashBase16": "a6347076b47df8394ec9335607807625452e96a974e0e2f30dcacc6c82e2f612",
+      "narHashNix32": "04pnwa16rk6a1pry5q3lm6b2wi95fs00fmikr573ky3xniv70d56",
+      "narSize": 1786280,
+      "references": [
+        "/nix/store/84xy4w9xamjkiiw2kbml67h414i8la4l-libgudev-238",
+        "/nix/store/a9ak89iklmzd510zz2z4am5hp5b9x4hw-libevdev-1.13.6",
+        "/nix/store/gwq32x88d44h1civc0q3iflb9r6rmghj-libwacom-2.20.0",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rj0sh9bqfc62j2jvh6zahd0a9rpnwgw9-glib-2.90.0"
+      ],
+      "deriver": "/nix/store/4vqr2825q00qfb7fdhmw3yc272fx0lh6-libwacom-2.20.0.drv",
+      "signatures": [
+        "cache.nixos.org-1:L6ib39GznpvEb76bP9Zc9hTX6GNoqh6lDuIdHPSM1uwODfqwLaWy6njh8OXg7Ktb30ddSoZwTFXvIxLWZAvVCQ=="
+      ],
+      "ca": null,
+      "closureSize": 19,
+      "closureSha256": "420900abccf613264c9cc8b9ca9475784a72f9c555931eb119e9c41f1a9ba259"
+    },
+    {
+      "path": "/nix/store/hlzvyhvj9p4wwdw77xp4rd2b40q9593w-perl5.42.3-Net-HTTP-6.23",
+      "narHash": "sha256-oNATHEfH7csg6oKH/zFk/FXXxRH3Ft6kjbkeCg6LzLk=",
+      "narHashBase16": "a0d0131c47c7edcb20ea8287ff3164fc55d7c511f716dea48db91e0a0e8bccb9",
+      "narHashNix32": "1ffcic70l7mrinjdw5pp272xfmgwchqzz1w2x8hcpvf78wf17l50",
+      "narSize": 38696,
+      "references": [
+        "/nix/store/dk23kv1h58r3ls64j9ril1kd1nahj54r-perl5.42.3-URI-5.36",
+        "/nix/store/hlzvyhvj9p4wwdw77xp4rd2b40q9593w-perl5.42.3-Net-HTTP-6.23"
+      ],
+      "deriver": "/nix/store/dbmkxsnc0xx4ybsncvagsha05ddw6k8q-perl5.42.3-Net-HTTP-6.23.drv",
+      "signatures": [
+        "cache.nixos.org-1:lA4T2t+iPoezBoW7Rrf1SXfH7IhEvykh8JRsgZk9yhwjmMI73wLbvofU9GLdhm96WDmE0ZXf/agj+Opb67T5BQ=="
+      ],
+      "ca": null,
+      "closureSize": 3,
+      "closureSha256": "6c91e76c39b31de37c1cb811472358741b21fdd9fdfdb4d8b8ca1be19499f0d5",
+      "closure": [
+        "/nix/store/dk23kv1h58r3ls64j9ril1kd1nahj54r-perl5.42.3-URI-5.36",
+        "/nix/store/hlzvyhvj9p4wwdw77xp4rd2b40q9593w-perl5.42.3-Net-HTTP-6.23",
+        "/nix/store/spwryqzk42mwsb5l7p9xr845gzkwjaxs-perl5.42.3-MIME-Base32-1.303"
+      ]
+    },
+    {
+      "path": "/nix/store/i327xs86zz6hwzbr8fbvdw7rwlzsjbwr-abstractions-tunables-alias",
+      "narHash": "sha256-47xh7099CdtQy0OH9pwfXuii/4dhMGUv50IIdTXNLHI=",
+      "narHashBase16": "e3bc61ef4f7d09db50cb4387f69c1f5ee8a2ff876130652fe742087535cd2c72",
+      "narHashNix32": "0wicrlspa222wwpnac31hzzs5s2y3yfgd1s3rd8dn2bx9zpn3g73",
+      "narSize": 304,
+      "references": [],
+      "deriver": "/nix/store/3m00g9dxyskl9xf64bjd3a9iyahbycpg-abstractions-tunables-alias.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "cdb85432aac3b981fc6edee38cd6f67e1375800575158d89f9cf8df5bf37479e",
+      "closure": [
+        "/nix/store/i327xs86zz6hwzbr8fbvdw7rwlzsjbwr-abstractions-tunables-alias"
+      ]
+    },
+    {
+      "path": "/nix/store/i6s2is23hwd5ghg8rczgcg2d3i7hs8ih-libde265-1.1.3",
+      "narHash": "sha256-UtwahJc7yn9JAvnp9HMP3ic3f2jVFpEWJUvlrChg010=",
+      "narHashBase16": "52dc1a84973bca7f4902f9e9f4730fde27377f68d5169116254be5ac2860d35d",
+      "narHashNix32": "0pfkc0larrab4lb925nmd1zkf9yy1xrz9sgr094pzjivjy21mp2j",
+      "narSize": 856040,
+      "references": [
+        "/nix/store/hd6qrzgv3g0079rb7xgkc58q17hxjygd-glibc-2.44-57",
+        "/nix/store/i6s2is23hwd5ghg8rczgcg2d3i7hs8ih-libde265-1.1.3",
+        "/nix/store/lp0rphjd5cqs0ilkd4by8klywxp8wq49-gcc-16.2.0-lib"
+      ],
+      "deriver": "/nix/store/s763qfa5mhc9a42i8r5xdq82hzfi4xpp-libde265-1.1.3.drv",
+      "signatures": [
+        "cache.nixos.org-1:o9toYZOzIi3gwnAOTQ4yecbW2j/X8SmYsbVQWhgCMrmddC4P2PRXW4R85UlJktM3ZmVADMLgz9FpWBZFdNdkDw=="
+      ],
+      "ca": null,
+      "closureSize": 7,
+      "closureSha256": "c79b01ce0dc82a96a1d94c64b01018635c4d7343d6ef0104945bd2035b7b7626",
+      "closure": [
+        "/nix/store/49jal3dycgfsnfgcznk5lk86s0hzghkv-xgcc-16.2.0-libgcc",
+        "/nix/store/9n2m4riyz8a7i2q692gac6ccjdgpwfg3-gcc-16.2.0-libgcc",
+        "/nix/store/hd6qrzgv3g0079rb7xgkc58q17hxjygd-glibc-2.44-57",
+        "/nix/store/i6s2is23hwd5ghg8rczgcg2d3i7hs8ih-libde265-1.1.3",
+        "/nix/store/lp0rphjd5cqs0ilkd4by8klywxp8wq49-gcc-16.2.0-lib",
+        "/nix/store/qnlhmxlgaspnpan6l7b5a2f42nsazls7-libidn2-2.3.8",
+        "/nix/store/v4vjqxppyslb8kb2cn9kyyyb0p9h8hhf-libunistring-1.4.2"
+      ]
+    },
+    {
+      "path": "/nix/store/ivyl4iiishf6xa1rrm2vyl512nym28xn-python3.14-cloudscraper-1.2.71",
+      "narHash": "sha256-2mNyQB9QiRJX4Gf9CMWHrNJp9PJR4Fr2AZNpcqpiMr4=",
+      "narHashBase16": "da6372401f50891257e067fd08c587acd269f4f251e05af601936972aa6232be",
+      "narHashNix32": "1gijcam74sck07v5mq2iybs6klmchz2hizb7w1bi52ah3x074qys",
+      "narSize": 1635936,
+      "references": [
+        "/nix/store/21pzxvm6cscwv03cxwqdiy5m5zwkjz8y-python3.14-requests-2.34.2",
+        "/nix/store/bya4ansy58az5133kryqp2cvrxbnz8qy-python3-3.14.10",
+        "/nix/store/cm2srw8lx18v5qlnlswmbnh444wiwz9a-python3.14-requests-toolbelt-1.0.0",
+        "/nix/store/ivyl4iiishf6xa1rrm2vyl512nym28xn-python3.14-cloudscraper-1.2.71",
+        "/nix/store/p9c14g25gjihnsll9yap0nri1vs42z26-python3.14-pyparsing-3.3.2"
+      ],
+      "deriver": "/nix/store/b62k263bv7m38w5xsm3ap2k9l5086j6d-python3.14-cloudscraper-1.2.71.drv",
+      "signatures": [
+        "cache.nixos.org-1:15jAkaOdQU6E5UzemYp11YgbKeqYZ+DbGGB/ZBziS0U8zhKFJOaBU5Pwf9KIxCjm4XfugW0AnedLMTYPYM3BCw=="
+      ],
+      "ca": null,
+      "closureSize": 32,
+      "closureSha256": "5860056732af19fd986279a2702f91b99aaacbdd451c6623a3dbfc3d719d485a"
+    },
+    {
+      "path": "/nix/store/jjgm27792yn2qiqxxkqpp5f1fn7j4x8s-bind-9.20.30-man",
+      "narHash": "sha256-07LItH549k3s3cq6tUveD2+CueiMNudGqy2Y6EiXH+4=",
+      "narHashBase16": "d3b2c8b47e78f64decddcabab54bde0f6f82b9e88c36e746ab2d98e848971fee",
+      "narHashNix32": "1vhzjx4fi61dmd3ffdlcx2wq4vqgvr5vbfnavpn4vxkqgsscicnk",
+      "narSize": 116088,
+      "references": [],
+      "deriver": "/nix/store/c833f41ljgz3pxwbx5r00bnrkk9hdzwg-bind-9.20.30.drv",
+      "signatures": [
+        "cache.nixos.org-1:sdWuMMsRDX/Q48YIO4EoOsuarGPezpx7JbNgesE6ehhzCNke8Q5WR2S6Rr5azjKLEJb/V69IWchnln1kXc0jAg=="
+      ],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "efcd0dc90d616ba73f5dd094cd75e0b1a7ae6a4d8edfe6d1d39595005c335a9e",
+      "closure": [
+        "/nix/store/jjgm27792yn2qiqxxkqpp5f1fn7j4x8s-bind-9.20.30-man"
+      ]
+    },
+    {
+      "path": "/nix/store/k76p9xvhgrp5w12a5lh4p22d2j9m3s6m-security-wrapper-newuidmap-x86_64-unknown-linux-musl",
+      "narHash": "sha256-tt1RN8mahfhnzP9/VnYYmOAPUuNs+D1QMUwBa13zRqI=",
+      "narHashBase16": "b6dd5137c99a85f867ccff7f56761898e00f52e36cf83d50314c016b5df346a2",
+      "narHashNix32": "18j6ydfnn0ac6583vy3cwd90zq4q31v5czzzrikzi1csr4vm3pdn",
+      "narSize": 71592,
+      "references": [
+        "/nix/store/4bv0h6pn43z5j3vcijm6gwvg8xf2q4rv-linux-headers-static-7.3",
+        "/nix/store/7jik7skaxj1m75kjryzzybk7s9g23g5h-shadow-4.20.3"
+      ],
+      "deriver": "/nix/store/9alljq7ydlbqg3zlhlz3bi3dpppl5i7p-security-wrapper-newuidmap-x86_64-unknown-linux-musl.drv",
+      "signatures": [
+        "cache.nixos.org-1:ezhp55DMjZ9qOZPCyknJ4dOhfBmcGKpP2caARho1BPrAPXI5XmWsU+W2skTx/e0tCpC8BKJTkPMTd6FDbo4xAA=="
+      ],
+      "ca": null,
+      "closureSize": 22,
+      "closureSha256": "b875c0ac2b51ef7915ecaed3867d2f54b02d16274e1bc29733dd95c9d9578988"
+    },
+    {
+      "path": "/nix/store/kd3pxnrw9s824lkgik5qai7izgxxw0hg-wireplumber-configs",
+      "narHash": "sha256-QAtqrOH3iNAtNafUOL4sXmv3SnmJBFLpsyD/0sniQ6E=",
+      "narHashBase16": "400b6aace1f788d02d35a7d438be2c5e6bf74a79890452e9b320ffd2c9e243a1",
+      "narHashNix32": "18a3wb4x5zr0nglm4149g55gfssy5jz3im576lnx127pw6n6l2s0",
+      "narSize": 1032,
+      "references": [
+        "/nix/store/7yck278h02i5mdy7i848aq1qaqk7rh74-wireplumber-extra-config",
+        "/nix/store/ggk9h05ga1rz1pkbglsh1951mck2aqfz-wireplumber-extra-scrips"
+      ],
+      "deriver": "/nix/store/as3755m75gavzafyjiqs1n6f8jwf7f0b-wireplumber-configs.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 4,
+      "closureSha256": "fc3c89c49d79fb567f6e5a0f55e435333aec75f8a7921902e62c191327505c7f",
+      "closure": [
+        "/nix/store/7yck278h02i5mdy7i848aq1qaqk7rh74-wireplumber-extra-config",
+        "/nix/store/ggk9h05ga1rz1pkbglsh1951mck2aqfz-wireplumber-extra-scrips",
+        "/nix/store/kd3pxnrw9s824lkgik5qai7izgxxw0hg-wireplumber-configs",
+        "/nix/store/qsc9b371ypil9yjcvwq6dcyp2jjpl12x-50-bluez.conf"
+      ]
+    },
+    {
+      "path": "/nix/store/kzba48dmvy1kbdwqdvnnmy6x7chhwis0-freetype-2.14.3-dev",
+      "narHash": "sha256-9AESbepbJrd95XVoo0CGV8V2fhlH7nYyIyjR2QjHlz0=",
+      "narHashBase16": "f401126dea5b26b77de57568a3408657c5767e1947ee76322328d1d908c7973d",
+      "narHashNix32": "0gcpqw4dkl984cr7dvj735z7diaphr0a6s3mwmyvf9jvx9ni40gl",
+      "narSize": 905488,
+      "references": [
+        "/nix/store/5q0g4w5b65dnrwr1adq72hzdq29yawsd-zlib-1.3.2-dev",
+        "/nix/store/92ymwd3gpjn4gf4gs9rhddmy3wi4zsb4-freetype-2.14.3",
+        "/nix/store/930sd5x7lp8xnwvzk2fpzg5ffwbjgbcz-bzip2-1.0.8",
+        "/nix/store/b11l20f7n0cmac252f6wn9k6kdr3qrmz-brotli-1.2.1-dev",
+        "/nix/store/d7pn11xv3qyfdfx33fgwvcqlnxhlnhpj-libpng-apng-1.6.59",
+        "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20",
+        "/nix/store/kjmgsnigdk34bmb5njr21ydhvjhahkba-bzip2-1.0.8-dev",
+        "/nix/store/kp68n1q6r8lzpf5mxjmfasn3zq2pql4x-zlib-1.3.2",
+        "/nix/store/kzba48dmvy1kbdwqdvnnmy6x7chhwis0-freetype-2.14.3-dev",
+        "/nix/store/lydp0w36a38j9dgnmqbwmpg7145m8cyh-libpng-apng-1.6.59-dev",
+        "/nix/store/sx0fyd6228r3m84d5bccs6d5kz81lh9n-brotli-1.2.1-lib"
+      ],
+      "deriver": "/nix/store/mjwkq5wwfissqzcbqmvy1j5178vq2p95-freetype-2.14.3.drv",
+      "signatures": [
+        "cache.nixos.org-1:XzXJyS6QvcwgYWD56XG+NpYdiIitfurndcVm8TN0BPTyFYVwcgPWkQGyZXpomPdXM9RVi/XaZWFAjyvpxauHCA=="
+      ],
+      "ca": null,
+      "closureSize": 18,
+      "closureSha256": "efe17862add42cc87a9ca8d4ae26f45fd25c5dd07d4588ecb275db92e2f9d4b9"
+    },
+    {
+      "path": "/nix/store/lj7i676is89cxgna2vzq63nyj5r1mxar-openssh-10.6p1-man",
+      "narHash": "sha256-Kq3y/dzkK+H0Xv1amAYW+818xTEO6K09npkrAzSgXuw=",
+      "narHashBase16": "2aadf2fddce42be1f45efd5a980616fbcd7cc5310ee8ad3d9e992b0334a05eec",
+      "narHashNix32": "1v2yl0s06awrkqysvs0f672prkgv2q39hnpxbvsf2az4vkyz5b9a",
+      "narSize": 115912,
+      "references": [],
+      "deriver": "/nix/store/lsniyd19b6qpqnwr09h1rz3bz7f8ly4s-openssh-10.6p1.drv",
+      "signatures": [
+        "cache.nixos.org-1:8OsHW2XYtAUhhkeCXYTDHjCMIu16flEqciX4DcOlY1TWH8/5J/vztsbOBWUv6iwpg2hg7xtoCTgL73wYVe+oDA=="
+      ],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "5bda8e6c37d3e141c34e5c1f5b7955a0ed94995f76f61b6c82b2ca50334372eb",
+      "closure": [
+        "/nix/store/lj7i676is89cxgna2vzq63nyj5r1mxar-openssh-10.6p1-man"
+      ]
+    },
+    {
+      "path": "/nix/store/m9k4p31r8rk3c8ld2fyazm5k7ffdgf9k-umockdev-0.19.3",
+      "narHash": "sha256-BIU7clOHCJnoNyxglObzdvboX47QrjAM01q9kW/wpAE=",
+      "narHashBase16": "04853b7253870899e8372c6094e6f376f6e85f8ed0ae300cd35abd916ff0a401",
+      "narHashNix32": "00d4y1pr3gassc631bnhirgyixknygk98q1c6zl9j247adr3p184",
+      "narSize": 385448,
+      "references": [
+        "/nix/store/6cgp5953rqhnayrvs884w1552nj2j3qr-libpcap-1.10.7-lib",
+        "/nix/store/m9k4p31r8rk3c8ld2fyazm5k7ffdgf9k-umockdev-0.19.3",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rj0sh9bqfc62j2jvh6zahd0a9rpnwgw9-glib-2.90.0",
+        "/nix/store/xj7bg66n0xqgk79jy1z5vnjscinf680j-systemd-minimal-262"
+      ],
+      "deriver": "/nix/store/43cb7irjd2v1ss6vfjj6r8aallk2xf6l-umockdev-0.19.3.drv",
+      "signatures": [
+        "cache.nixos.org-1:IeFC+ojnT6F5Hqe4YqSm6RJc0ko3DSC73B0D6/6OuIS87HNZSZ3HzHDcvCiBiHeB1NvUZlts6GV3iVMWbCnHBw=="
+      ],
+      "ca": null,
+      "closureSize": 31,
+      "closureSha256": "046bd11653878eb5b008a0d9c32b4b4157bc4f7becbada23358a0ec4ccebde87"
+    },
+    {
+      "path": "/nix/store/mdbznydq0gjrxmnp5p6awj0cjwf7qrhq-nixos-generate-config_fish-completions",
+      "narHash": "sha256-nW4cBdhKyN7wzRGI3DKL4peDGRRV3xz3k1+pGqrNjVg=",
+      "narHashBase16": "9d6e1c05d84ac8def0cd1188dc328be29783191455df1cf7935fa91aaacd8d58",
+      "narHashNix32": "0n4drnm1maazjgvirpsm2hcq75z2icrdr20irpqdxj2av02iqvlx",
+      "narSize": 1152,
+      "references": [],
+      "deriver": "/nix/store/c7d54khb23jk4cl4fhqahq7dkd0nxifa-nixos-generate-config_fish-completions.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "48a13ee40238c1f810a6a762c29ae4f1e30b660c0ce56946d59e95aee73f61bf",
+      "closure": [
+        "/nix/store/mdbznydq0gjrxmnp5p6awj0cjwf7qrhq-nixos-generate-config_fish-completions"
+      ]
+    },
+    {
+      "path": "/nix/store/n3d8d223b3xpkv4cfvja1rsafx1d5vx7-sqlite-connector-odbc-0.99991",
+      "narHash": "sha256-/ld4l3WGKF7+ImaOfbZ7z8UxxwSQkSrQfMaEPK9Xk2A=",
+      "narHashBase16": "fe5778977586285efe22668e7db67bcfc531c70490912ad07cc6843caf579360",
+      "narHashNix32": "0q4kaypkr166gk82m4ch0k3k3ifggfv7v3k64bz5wa46fnbphmzy",
+      "narSize": 371408,
+      "references": [
+        "/nix/store/bmkgk1svgrjw2d51iyimi24ksmys3icq-unixodbc-2.3.14",
+        "/nix/store/da0jhl7dj82flrp9wld11jp3pvs9raxa-sqlite-3.54.0",
+        "/nix/store/kp68n1q6r8lzpf5mxjmfasn3zq2pql4x-zlib-1.3.2",
+        "/nix/store/n3d8d223b3xpkv4cfvja1rsafx1d5vx7-sqlite-connector-odbc-0.99991",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/pj925m94hbcffxlgc36cx34w30fm26kb-sqlite-connector-odbc-0.99991.drv",
+      "signatures": [
+        "cache.nixos.org-1:8g723IpkpPMb6BSieBbFD9LWjmryA7YEABas0+jBL7xPyHFOO81fM+6XDJkLpViAj47jZyvl0meFV+zMEfdBCQ=="
+      ],
+      "ca": null,
+      "closureSize": 9,
+      "closureSha256": "7e0fdfd2330bfc815426b2d6e4f2a733880a4150d0443dcd5342fd67659890f0"
+    },
+    {
+      "path": "/nix/store/nx54q1iy4hw7fkr08hq7can3ldxqfb9y-libportal-0.9.1",
+      "narHash": "sha256-xwkFa4AdE8ELlD7uIjdZsPrbtRab5vsUNrzgMCU2UZk=",
+      "narHashBase16": "c709056b801d13c10b943eee223759b0fadbb5169be6fb1436bce03025365199",
+      "narHashNix32": "16ai6qjk1q5w6qagprlv2ssxpymhb4vj5viyjh5w24qxh1mha2f7",
+      "narSize": 237976,
+      "references": [
+        "/nix/store/nx54q1iy4hw7fkr08hq7can3ldxqfb9y-libportal-0.9.1",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rj0sh9bqfc62j2jvh6zahd0a9rpnwgw9-glib-2.90.0"
+      ],
+      "deriver": "/nix/store/5cn9ny5mai7xg7z0jsjl16q3qj0lw9vl-libportal-0.9.1.drv",
+      "signatures": [
+        "cache.nixos.org-1:6/AKWCMEEqqGdsA3LW7nUyf07A6F+4s8sHqEiswGoloahU4YWu3FEzfE0CnK8HzSy4J5swBTW31UpwpiavvbAQ=="
+      ],
+      "ca": null,
+      "closureSize": 13,
+      "closureSha256": "57cb9478603a2f488221bafa9558adf168e35e7a776cace404339dd47e899dbc"
+    },
+    {
+      "path": "/nix/store/pkzplm1h8v2m13v7nmaz68q7dvgxi80b-psmisc-23.7",
+      "narHash": "sha256-P0BB8mRjIOXW+6Meyq+kXhCXE6j/O9TTiya2r7ebHOs=",
+      "narHashBase16": "3f4041f2646320e5d6fba31ecaafa45e109713a8ff3bd4d38b26b6afb79b1ceb",
+      "narHashNix32": "1sqwkfvszdi6ig9x8fzzm09rf42yljpwl7m3zgbfa833ckr42h1z",
+      "narSize": 731968,
+      "references": [
+        "/nix/store/adz753psjvfr4j597fprrh4p0cvjylx9-ncurses-6.6",
+        "/nix/store/pkzplm1h8v2m13v7nmaz68q7dvgxi80b-psmisc-23.7",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/fchzw9xjrvw33233b5lg0xdy2d7wb02w-psmisc-23.7.drv",
+      "signatures": [
+        "cache.nixos.org-1:ICrihnLQbnjhpfsaD7JrW50ES8lpvQUQuMCL+ZZ/vEL0dtZShXa6YQqZJ3k3T1orIKhLg7vJWyVhd6hAU7lKDw=="
+      ],
+      "ca": null,
+      "closureSize": 6,
+      "closureSha256": "55099af83d243b75589879a05a8d44b6e71781c2ecc02d139181e18be4565c83",
+      "closure": [
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/adz753psjvfr4j597fprrh4p0cvjylx9-ncurses-6.6",
+        "/nix/store/pkzplm1h8v2m13v7nmaz68q7dvgxi80b-psmisc-23.7",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8"
+      ]
+    },
+    {
+      "path": "/nix/store/plgj6l4s9010xlpkrdda13vqyw3315zj-unit-run-wrappers.mount",
+      "narHash": "sha256-Zm6mScbzdTYVQLkHYSG53Wjx0BO/r9A/kpbXhZeBOhg=",
+      "narHashBase16": "666ea649c6f375361540b9076121b9dd68f1d013bfafd03f9296d78597813a18",
+      "narHashNix32": "061sh6bqbmwnj8zx1bxz2g8g2s6xp4hn21xr80akcxgkqr4scvk6",
+      "narSize": 392,
+      "references": [],
+      "deriver": "/nix/store/pfmxvlrim87gkqbbbn71va5hcsd41jy7-unit-run-wrappers.mount.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "cad2e67b8d3789baa7783259d3c1c8cf349158e5c8f9f57868711972a91458d1",
+      "closure": [
+        "/nix/store/plgj6l4s9010xlpkrdda13vqyw3315zj-unit-run-wrappers.mount"
+      ]
+    },
+    {
+      "path": "/nix/store/qbm6x04pn9a8lq6bmsxj8h6l25r896hw-agg-2.5",
+      "narHash": "sha256-7SHonenpe6HZx6eV1/JUU/+1H/eFygoVIfFvg2j0g+8=",
+      "narHashBase16": "ed21e89de9e97ba1d9c7a795d7f25453ffb51ff785ca0a1521f16f8368f483ef",
+      "narHashNix32": "1vw3yil86vzi44ahmjl5ywgvbzskakrdg5d7qzcs2yz9x6fyh8gd",
+      "narSize": 2091840,
+      "references": [
+        "/nix/store/92ymwd3gpjn4gf4gs9rhddmy3wi4zsb4-freetype-2.14.3",
+        "/nix/store/mvwmwcx125l9vnq8hnhq8hvk149iidil-sdl12-compat-1.2.78",
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/nz6yl26svfj0qap9qnpvd26yp2gxn3xl-libx11-1.8.14",
+        "/nix/store/qbm6x04pn9a8lq6bmsxj8h6l25r896hw-agg-2.5",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/8sqikgk5g7b56xmzjkf2v16j2lfidbxr-agg-2.5.drv",
+      "signatures": [
+        "cache.nixos.org-1:XYIzZ+AD4Ek3TSjwL7zO+bU1kCibw+qIJMQdiCU58WOSzUnstps4az22LKq/DdZ3A1xBQNqOjQ/Myq3qqIdXAg=="
+      ],
+      "ca": null,
+      "closureSize": 277,
+      "closureSha256": "acd575c0a07c63fc4551268093ec211800933a9239ab31118473f4c01c764bd8"
+    },
+    {
+      "path": "/nix/store/qykxxbyczr2fcr5x67ybw47kbgkkm8v0-nixos-icons-0-unstable-2025-06-28",
+      "narHash": "sha256-ZzSTQ5ATyDaMvp/ry1qNV+VPVtt6vrjJcIEythg2HMQ=",
+      "narHashBase16": "673493439013c8368cbe9febcb5a8d57e54f56db7abeb8c9708132b618361cc4",
+      "narHashNix32": "1i0w6qcbccl1f34vigksvdb4zrapimdcpswzps63dj0kj11r6d37",
+      "narSize": 1156352,
+      "references": [],
+      "deriver": "/nix/store/n0wp40psij2p19snj7lkj6jrjs81r3lv-nixos-icons-0-unstable-2025-06-28.drv",
+      "signatures": [
+        "cache.nixos.org-1:/ChK3I9hwrZHnbLV1rpkpJcv6mIpfgTfnlSe5Tc/gAbCkCv6+caq9mOuS5oZ2fsk5O6o0yw+A05IeNirhZQBCA=="
+      ],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "1afb1a8a82049a104bb815ee9e849c0374fa4a493e73d7240b2e91d70887325f",
+      "closure": [
+        "/nix/store/qykxxbyczr2fcr5x67ybw47kbgkkm8v0-nixos-icons-0-unstable-2025-06-28"
+      ]
+    },
+    {
+      "path": "/nix/store/riwjyphzcj1wd51k0xcq5ya5fc5rc25h-python3.14-jaraco-classes-3.4.0",
+      "narHash": "sha256-FxIe6udXsdtMAfdc8rmglGHxHVluen5IIT0kv9SMmoY=",
+      "narHashBase16": "17121eeae757b1db4c01f75cf2b9a09461f11d596e7a7e48213d24bfd48c9a86",
+      "narHashNix32": "11lsikaby91x4547wykfb4fz2qcll2wz4p7p056dpcapwzm1w4hp",
+      "narSize": 54960,
+      "references": [
+        "/nix/store/bya4ansy58az5133kryqp2cvrxbnz8qy-python3-3.14.10",
+        "/nix/store/p7rszbddfjqhxjikhsgrnpvsnhzhn2xk-python3.14-more-itertools-11.1.0",
+        "/nix/store/riwjyphzcj1wd51k0xcq5ya5fc5rc25h-python3.14-jaraco-classes-3.4.0"
+      ],
+      "deriver": "/nix/store/c6xzi3ighrr2w49xgrxa487j1ddbs4i8-python3.14-jaraco-classes-3.4.0.drv",
+      "signatures": [
+        "cache.nixos.org-1:SWsMIMwRoylJPL4NkCVUIhJEM9fG2h5Qo+ceM6iEQ/inmIE373DC3ZYrBHBseJBLt5Bi1l7cj9d2wQgMAeR4BQ=="
+      ],
+      "ca": null,
+      "closureSize": 26,
+      "closureSha256": "02efbbce36651d85d3c0c593fd685fb901048b6bf7a064aa30152186e86b1baa"
+    },
+    {
+      "path": "/nix/store/rwlm68yc4clz0hs5qnqpaq9zg0r8f6y1-unit-accounts-daemon.service",
+      "narHash": "sha256-heAR5UiBqcpx8BIsVhPSULFoC15ol1tgJBTgYQN6Ev8=",
+      "narHashBase16": "85e011e54881a9ca71f0122c5613d250b1680b5e68975b602414e061037a12ff",
+      "narHashNix32": "1zqjg81n3q0l4ih5p5v8bq5nicahs89mcb0jy1qwmac193ji3q45",
+      "narSize": 1392,
+      "references": [
+        "/nix/store/5sgjjiqn90zmvlvlgadw7ss00nn3hpjb-gnugrep-3.12",
+        "/nix/store/5zsc280i2i7bqgjn7kln87w1ss6li22f-findutils-4.11.0",
+        "/nix/store/9psv0vy8xq339lljalzlnn71f4zy6wzg-system-path",
+        "/nix/store/a50ml7za6h61m4mv4cdbvkl33c6sx5yn-coreutils-9.12",
+        "/nix/store/kh0kk4mi6hr0cdvsc8rzd0jvr2c2vhwk-systemd-262",
+        "/nix/store/lx0adghcyhwc9h3cj8laxjd5sbjniy3c-glibc-locales-2.44-57",
+        "/nix/store/s92hlmg73b3zlw38dfgm13v9cah2bm80-tzdata-2026f",
+        "/nix/store/x275j18p7dx6kv7vfj45saapbhbljia4-gnused-4.10"
+      ],
+      "deriver": "/nix/store/si9d7wr4bp20yfm8fwgxp1jkj7l1lw26-unit-accounts-daemon.service.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 2974,
+      "closureSha256": "692659f2ca9454d3d652c7e1b3bc018cf4a9913ffaaf691989aa4783568fe3b6"
+    },
+    {
+      "path": "/nix/store/s7mlgyqp82v8rv35cbr9jwnzb1x6qipk-libmnl-1.0.5",
+      "narHash": "sha256-xqemZlDPYVfAS3Ym2t/xO9NHNyHzk3XbxM+9Un8tQLM=",
+      "narHashBase16": "c6a7a66650cf6157c04b7626dadff13bd3473721f39375dbc4cfbd527f2d40b3",
+      "narHashNix32": "1cs05mzm5gfgqkdpb4zk44vlglrvy7gxl9kn9g05fqfga1kad9y6",
+      "narSize": 32328,
+      "references": [
+        "/nix/store/hd6qrzgv3g0079rb7xgkc58q17hxjygd-glibc-2.44-57",
+        "/nix/store/s7mlgyqp82v8rv35cbr9jwnzb1x6qipk-libmnl-1.0.5"
+      ],
+      "deriver": "/nix/store/5x40dvm0vmycd8dqj1wmwmrz4ycmpg7h-libmnl-1.0.5.drv",
+      "signatures": [
+        "cache.nixos.org-1:hTxicUNEi+uMlnB9G1lLyX1T2GXpw2DntZcMyKrfxrckJX1JSnWa3BbOZuvrdCoGcWXyyHBp7IntCuzvBY2kDw=="
+      ],
+      "ca": null,
+      "closureSize": 5,
+      "closureSha256": "063ebd22b973307acceff71f1ede43e5a04ac589a3e3b2c003440073a25b60d8",
+      "closure": [
+        "/nix/store/49jal3dycgfsnfgcznk5lk86s0hzghkv-xgcc-16.2.0-libgcc",
+        "/nix/store/hd6qrzgv3g0079rb7xgkc58q17hxjygd-glibc-2.44-57",
+        "/nix/store/qnlhmxlgaspnpan6l7b5a2f42nsazls7-libidn2-2.3.8",
+        "/nix/store/s7mlgyqp82v8rv35cbr9jwnzb1x6qipk-libmnl-1.0.5",
+        "/nix/store/v4vjqxppyslb8kb2cn9kyyyb0p9h8hhf-libunistring-1.4.2"
+      ]
+    },
+    {
+      "path": "/nix/store/sv4x7f9qbfd5m51xgivs9sb5sr5d0fi4-gnome-shell-extension-night-theme-switcher-86",
+      "narHash": "sha256-1NNKxDGLdXpDF+QDjyGRF+g8vAbyBmW88eZ6rcFMYZk=",
+      "narHashBase16": "d4d34ac4318b757a4317e4038f219117e83cbc06f20665bcf1e67aadc14c6199",
+      "narHashNix32": "16b19k0ssyp6y6y6a1pj0sy3rs0pj4hqy0z42x1plxcb6724mlyl",
+      "narSize": 199168,
+      "references": [],
+      "deriver": "/nix/store/7xwkc9z385qhdxy7q808sxz4vi7cy0jh-gnome-shell-extension-night-theme-switcher-86.drv",
+      "signatures": [
+        "cache.nixos.org-1:VwRC833rhp4g5yDegUTaljbMgirsAFUI/aMt+hkcj0/q99NcM0N/hyPp7zynWMdkETguWmOLJ54jwG6+g1HjBA=="
+      ],
+      "ca": null,
+      "closureSize": 1,
+      "closureSha256": "7b326fa76b75f4675f07bfc83e60ed9338c19c344961544bb394535111c4d782",
+      "closure": [
+        "/nix/store/sv4x7f9qbfd5m51xgivs9sb5sr5d0fi4-gnome-shell-extension-night-theme-switcher-86"
+      ]
+    },
+    {
+      "path": "/nix/store/vhfg79fwwqfrj40wlikpvxnrn055syj9-libaacs-0.11.1",
+      "narHash": "sha256-b63M1LtIJvMMZMWyKfIKYljx4q5mCOZKVxmvDQeoN78=",
+      "narHashBase16": "6fadccd4bb4826f30c64c5b229f20a6258f1e2ae6608e64a5719af0d07a837bf",
+      "narHashNix32": "1grpm03hvbqrax5fc236mvig2n321br2kcn5ch6g69j8pgacrbbg",
+      "narSize": 177952,
+      "references": [
+        "/nix/store/aaxqsmdi1n0250rask9qrs8qn6m1fmx5-libgcrypt-1.12.4-lib",
+        "/nix/store/lncjyfgmlkp9ziddalwb56nq4s5m11mp-libgpg-error-1.61",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/vhfg79fwwqfrj40wlikpvxnrn055syj9-libaacs-0.11.1"
+      ],
+      "deriver": "/nix/store/brv6fbg00agzvf1f2qjki1vlrw2l4v57-libaacs-0.11.1.drv",
+      "signatures": [
+        "cache.nixos.org-1:ipnpv+W5WZVcj/Ghdvv5zVTtcsFj736cFKntVp4olAznw7qy4ZI16/gu4hCdv/60KkTZp+maVj0+nGFCqfiECw=="
+      ],
+      "ca": null,
+      "closureSize": 7,
+      "closureSha256": "d455bd54da2915c29dddc342f26e2923acf0443dff6ee476822611bfcdf4784e",
+      "closure": [
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/aaxqsmdi1n0250rask9qrs8qn6m1fmx5-libgcrypt-1.12.4-lib",
+        "/nix/store/lncjyfgmlkp9ziddalwb56nq4s5m11mp-libgpg-error-1.61",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8",
+        "/nix/store/vhfg79fwwqfrj40wlikpvxnrn055syj9-libaacs-0.11.1"
+      ]
+    },
+    {
+      "path": "/nix/store/vjpka6vr6dz3aaq1d7j23b2nh2r81s7m-X-Restart-Triggers-apparmor",
+      "narHash": "sha256-rlq4Ah6VLIlRWV6LGMVXcEQRIHcLxroqSn0mbuPvD4Q=",
+      "narHashBase16": "ae5ab8021e952c8951595e8b18c55770441120770bc6ba2a4a7d266ee3ef0f84",
+      "narHashNix32": "110gxzinw9kx98mbmihbfwh12i3haz2ii2syb58qjb4m3q1bhnmf",
+      "narSize": 240,
+      "references": [
+        "/nix/store/9p2ll3jf2g4bh1slc7rci6w2yksk6325-apparmor.d",
+        "/nix/store/cz81ffrbqhz05w2ffz6flni2nzq8mhj4-etc-apparmor-parser.conf"
+      ],
+      "deriver": "/nix/store/inxicrc59gpxzhvzx92mx63vacnzhadk-X-Restart-Triggers-apparmor.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 3102,
+      "closureSha256": "15975111f6d3c8dca33b34fa512fbc3403d5b537a8ac01321bf7e7020556a6e7"
+    },
+    {
+      "path": "/nix/store/w8iyjb51hmbzf852ir6mgwx1kqh07k8g-libtasn1-4.21.0",
+      "narHash": "sha256-A8wKudhjvO/YQWYITJokeOSWkcwJD9H5t1TsKuIrYiY=",
+      "narHashBase16": "03cc0ab9d863bcefd84166084c9a2478e49691cc090fd1f9b754ec2ae22b6226",
+      "narHashNix32": "09k25gi2mv2lnzwx23q9rj8rdr3q4jd4q23687cfzg33v2whmk03",
+      "narSize": 105120,
+      "references": [
+        "/nix/store/hd6qrzgv3g0079rb7xgkc58q17hxjygd-glibc-2.44-57",
+        "/nix/store/w8iyjb51hmbzf852ir6mgwx1kqh07k8g-libtasn1-4.21.0"
+      ],
+      "deriver": "/nix/store/82736dil9c2bn14h2kw1xx817rrmjshi-libtasn1-4.21.0.drv",
+      "signatures": [
+        "cache.nixos.org-1:J6zd4NroLA2iRULmE8OrbACrcPa+Gsqr2kHvYQ8ZOgYr/Vcwzwah95w0/QJ2vEqEsYIEkn+YNT485ZNUrMMEAg=="
+      ],
+      "ca": null,
+      "closureSize": 5,
+      "closureSha256": "4803a95165185fb3be996de2f7f8e93699ef41dc99db3b84afba465a34e4861a",
+      "closure": [
+        "/nix/store/49jal3dycgfsnfgcznk5lk86s0hzghkv-xgcc-16.2.0-libgcc",
+        "/nix/store/hd6qrzgv3g0079rb7xgkc58q17hxjygd-glibc-2.44-57",
+        "/nix/store/qnlhmxlgaspnpan6l7b5a2f42nsazls7-libidn2-2.3.8",
+        "/nix/store/v4vjqxppyslb8kb2cn9kyyyb0p9h8hhf-libunistring-1.4.2",
+        "/nix/store/w8iyjb51hmbzf852ir6mgwx1kqh07k8g-libtasn1-4.21.0"
+      ]
+    },
+    {
+      "path": "/nix/store/wy5ixv93173fm93c84lniyili7gc18ms-tree-sitter-caddy-0.0.0+rev=2686186",
+      "narHash": "sha256-NplqHMZj9d0A9EoBEsM3IAi6rO19L5BksQ90kMLFcxU=",
+      "narHashBase16": "36996a1cc663f5dd00f44a0112c3372008baaced7d2f9064b10f7490c2c57315",
+      "narHashNix32": "05bkqp190x0gn5j90bvxxnnbl2106z1i40aayh0dvxb3qqf6m69n",
+      "narSize": 63120,
+      "references": [
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/5dcy4i5ffjgxwvlb0yf6cxg7vwajgfs2-tree-sitter-caddy-0.0.0+rev=2686186.drv",
+      "signatures": [
+        "cache.nixos.org-1:zVQpudESbcUkeQzbpVRWr4bAGUO5NLz72Bpo6hRYWkePW3I975xAYg7c+tT+dvIhJz7rOCO1re3Z3dYLlF1aDQ=="
+      ],
+      "ca": null,
+      "closureSize": 7,
+      "closureSha256": "f43623b01659d61c666bada6ac5fa4d0d6d5c8cc249d59a88d8c50b1005cdd0b",
+      "closure": [
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/qk6cz4ba571znqrsyhma192y8h50yi05-gcc-16.2.0-libgcc",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8",
+        "/nix/store/wy5ixv93173fm93c84lniyili7gc18ms-tree-sitter-caddy-0.0.0+rev=2686186"
+      ]
+    },
+    {
+      "path": "/nix/store/xcb6fn3k86w5r9pcb882mkj5vadc0ccj-libcanberra-0.30",
+      "narHash": "sha256-H4fEzMdZoPaWS+MaoA6FDPM2NSvKnQzFtQz4dPmQJIo=",
+      "narHashBase16": "1f87c4ccc759a0f6964be31aa00e850cf336352bca9d0cc5b50cf874f990248a",
+      "narHashNix32": "12i4j3wp9y0cnp2hr7fa5cskdwqchl7a06p39fbgd82rqz6c91qz",
+      "narSize": 359408,
+      "references": [
+        "/nix/store/4anfh4wyg0bckkj4h29lda6n5v7kq6hh-alsa-lib-1.2.16.1",
+        "/nix/store/5j2w6s0j5jnjdb07qcgka29lblnrszrf-systemd-minimal-libs-262",
+        "/nix/store/bgrrk1crwbmc7phgzkipmrzc9x257i88-gdk-pixbuf-2.44.8",
+        "/nix/store/c0p36bscf8c22s8g122kkhdffn6z6ryf-gstreamer-1.28.8",
+        "/nix/store/fwl3lwrldy9m3cdsych8jsm86njpvd31-libvorbis-1.3.7",
+        "/nix/store/kp68n1q6r8lzpf5mxjmfasn3zq2pql4x-zlib-1.3.2",
+        "/nix/store/l4cxxsx2zpmwm275wck1pmcl4g98dsy2-harfbuzz-14.5.1",
+        "/nix/store/lymi4f7x5f54mwc8hhj5cpg0n8z82jaz-gtk+3-3.24.52",
+        "/nix/store/nz6yl26svfj0qap9qnpvd26yp2gxn3xl-libx11-1.8.14",
+        "/nix/store/p460c4cb861xsvvbwymhpbkj3iivqzi3-libtool-2.6.2-lib",
+        "/nix/store/qz6h0r7f1jwa8dv10jz6n7wjwk9s4v9k-pango-1.58.2",
+        "/nix/store/r020s04y8608q03ayybg2kssia1jc9z2-cairo-1.18.6",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/r645g67lgfmnzxkx46dllaw526r4a72v-libpulseaudio-17.0",
+        "/nix/store/rj0sh9bqfc62j2jvh6zahd0a9rpnwgw9-glib-2.90.0",
+        "/nix/store/wjwvwflfn09jks2gq6w470cf4qn6cbx1-at-spi2-core-2.62.0",
+        "/nix/store/xcb6fn3k86w5r9pcb882mkj5vadc0ccj-libcanberra-0.30"
+      ],
+      "deriver": "/nix/store/nmlzgaq034cha64krdiirmzayk4dxs7m-libcanberra-0.30.drv",
+      "signatures": [
+        "cache.nixos.org-1:OJtAVZ6wNiONWoizWIgKf8DLpbso1izIoaCEFF7GDXD1dp3egZHe2tmxN+rv4d1WuvNooR8LN+12izfyXw7hBw=="
+      ],
+      "ca": null,
+      "closureSize": 134,
+      "closureSha256": "9c31873472d7b038703cd6d940985399fb8f8417b7a3ebd24ced898c487e82e2"
+    },
+    {
+      "path": "/nix/store/y2y1d4dbf9a9a72vziz466yy5cgrg19x-unit-sshguard.service",
+      "narHash": "sha256-n2WuTAoKZCQB0Od751vYP1MA182CDKILOBdwxaiNj94=",
+      "narHashBase16": "9f65ae4c0a0a642401d0e77be75bd83f5300d7cd820ca20b381770c5a88d8fde",
+      "narHashNix32": "1plginlcaw0p705s4342rpbh0lrzv1dyfyz7s00j8r0a196awrcz",
+      "narSize": 2448,
+      "references": [
+        "/nix/store/246yp3sjchxxn6g4klfbiakdwdba00lg-unit-script-sshguard-pre-start",
+        "/nix/store/2ikdjjq4qhhpj639g8xbpfy34mhc00yh-X-Restart-Triggers-sshguard",
+        "/nix/store/5sgjjiqn90zmvlvlgadw7ss00nn3hpjb-gnugrep-3.12",
+        "/nix/store/5zsc280i2i7bqgjn7kln87w1ss6li22f-findutils-4.11.0",
+        "/nix/store/a50ml7za6h61m4mv4cdbvkl33c6sx5yn-coreutils-9.12",
+        "/nix/store/cgnjb8fw5l36hxx18mzwwfv000xlibzl-ipset-7.24",
+        "/nix/store/dknrm8yzqy9dgs9wlbr16gn5pmbl9gc1-iptables-1.8.13",
+        "/nix/store/kh0kk4mi6hr0cdvsc8rzd0jvr2c2vhwk-systemd-262",
+        "/nix/store/lx0adghcyhwc9h3cj8laxjd5sbjniy3c-glibc-locales-2.44-57",
+        "/nix/store/mhfdnmbfn0q2jdpzzwzrd1pm89hxdxcx-sshguard-2.5.1",
+        "/nix/store/nhgbil8p3jfz96kfbqnzmasla495100a-unit-script-sshguard-post-stop",
+        "/nix/store/s92hlmg73b3zlw38dfgm13v9cah2bm80-tzdata-2026f",
+        "/nix/store/wc6ky2sqq8shrmaf14x7spbdpqi6ls9w-iproute2-7.2.0",
+        "/nix/store/x275j18p7dx6kv7vfj45saapbhbljia4-gnused-4.10",
+        "/nix/store/zggzlya34znb4dmz2hg9lwyb41fqrwdj-systemd-262"
+      ],
+      "deriver": "/nix/store/2rvv546lwmpv4vfkb0chjjlaphhgjlk9-unit-sshguard.service.drv",
+      "signatures": [],
+      "ca": null,
+      "closureSize": 97,
+      "closureSha256": "03949f58f8acbb45201b8cca78c98a0911ee38c97ee82a5a8d87594764b9246c"
+    },
+    {
+      "path": "/nix/store/ybqx5q1f71zf35161957y48gm03biasi-tree-sitter-disassembly-0.0.0+rev=0229c02",
+      "narHash": "sha256-f2KlZ8DEQKnOdA9N2Djio3VtITDLFQH82+jHdxZh6iU=",
+      "narHashBase16": "7f62a567c0c440a9ce740f4dd838e2a3756d2130cb1501fcdbe8c7771661ea25",
+      "narHashNix32": "09gac4b7giz8vgy025fb60hnsxd3w8wdhk8gfk7ajh64q1ksaqkz",
+      "narSize": 25728,
+      "references": [
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+      ],
+      "deriver": "/nix/store/a2fknbbgj2b1pmdvlhi5jnp8sgwyz93w-tree-sitter-disassembly-0.0.0+rev=0229c02.drv",
+      "signatures": [
+        "cache.nixos.org-1:50hr4ofvTxhM+OMV8ABZY/uiN9RujZe4woF70dbgBqKsszypHdpkVON4AEHWlZGYaQ2t0s/aGUS2FOpasVO3Ag=="
+      ],
+      "ca": null,
+      "closureSize": 7,
+      "closureSha256": "39e2d0357d4a1e95ad7b8f3e4e6b27de49868cf1b0e87498bfe8f5eaca329731",
+      "closure": [
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/myhwfdgqm39yms5clinafii9i1nmq43h-gcc-16.2.0-lib",
+        "/nix/store/qk6cz4ba571znqrsyhma192y8h50yi05-gcc-16.2.0-libgcc",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8",
+        "/nix/store/ybqx5q1f71zf35161957y48gm03biasi-tree-sitter-disassembly-0.0.0+rev=0229c02"
+      ]
+    },
+    {
+      "path": "/nix/store/z5sjm82y79pz83i2rrlhca98fqbwfmjz-libyaml-0.2.5",
+      "narHash": "sha256-ZHzTj9SpesDwqWGFOe5X69uXRXcujpNQwd5NFg/KKdY=",
+      "narHashBase16": "647cd38fd4a97ac0f0a9618539ee57ebdb9745772e8e9350c1de4d160fca29d6",
+      "narHashNix32": "1mi9r87ickfyq58973iffx2rgnzbazp3k1b1m7qc0ym9sj7x6z34",
+      "narSize": 155600,
+      "references": [
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/z5sjm82y79pz83i2rrlhca98fqbwfmjz-libyaml-0.2.5"
+      ],
+      "deriver": "/nix/store/w6mj4j0qa8kdfp9anwjw3vpb084iq85n-libyaml-0.2.5.drv",
+      "signatures": [
+        "cache.nixos.org-1:lGANXp7A51YvE3PB3MF3sSat/kf86Erd8H93c5nEhaQUQ7+KHwSyru8+t/+tT95uu9+iHKtF1sMIwNHjsTqwAg=="
+      ],
+      "ca": null,
+      "closureSize": 5,
+      "closureSha256": "e2d1e3f138201bd6cdb5157798038a88db5f5e6e8c59d208c80e3199240c816a",
+      "closure": [
+        "/nix/store/4r0d1hm8458zz59xrh22ga2p0nkwvbpy-libunistring-1.4.2",
+        "/nix/store/80v5n8kdscr9r2ls8h72s8ppwmccwrgm-xgcc-16.2.0-libgcc",
+        "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57",
+        "/nix/store/rwq5g35321vg407qwg7ynsqfz77iyrrp-libidn2-2.3.8",
+        "/nix/store/z5sjm82y79pz83i2rrlhca98fqbwfmjz-libyaml-0.2.5"
+      ]
+    }
+  ]
+}

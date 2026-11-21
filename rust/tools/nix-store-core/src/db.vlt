@@ -1,0 +1,203 @@
+-- The local store's database, read-only. Nix keeps every valid path in
+-- `ValidPaths` and the reference graph in `Refs`; a path is found by an
+-- indexed lookup (by full path, or by hash part as a range scan of one row),
+-- without the daemon and without root (the database and its WAL are
+-- world-readable, and SQLite reads a WAL database read-only).
+--
+-- These are blocking reads over a `Connection`. A caller in an effect runs
+-- them inside `suspend` on a pooled connection, as vcache's `store` does; a
+-- connection is `Send` but not `Sync`, so it is one fiber's at a time.
+
+import std::collections::BTreeSet
+import rusqlite::Connection
+import rusqlite::OpenFlags
+import crate::narinfo::NarInfo
+import crate::nixbase32::narinfo_hash
+
+export const DEFAULT_DB : &str = "/nix/var/nix/db/db.sqlite"
+
+-- `path` is the primary key's index, so this is a range scan of one row.
+const BY_HASH : &str = "SELECT id, path, hash, narSize, deriver, sigs, ca FROM ValidPaths WHERE path >= ?1 AND path < ?2 LIMIT 1"
+
+const BY_PATH : &str = "SELECT id, path, hash, narSize, deriver, sigs, ca FROM ValidPaths WHERE path = ?1"
+
+const ID_OF : &str = "SELECT id FROM ValidPaths WHERE path = ?1"
+
+const REFS : &str = "SELECT v.path FROM Refs r JOIN ValidPaths v ON r.reference = v.id WHERE r.referrer = ?1 ORDER BY v.path"
+
+-- Everything reachable from one path over Refs, the path included. UNION
+-- (not UNION ALL) drops rows already seen, so self-references and cycles end.
+const CLOSURE : &str = "WITH RECURSIVE c(id) AS (SELECT id FROM ValidPaths WHERE path = ?1 UNION SELECT r.reference FROM Refs r JOIN c ON r.referrer = c.id) SELECT v.path FROM c JOIN ValidPaths v ON v.id = c.id ORDER BY v.path"
+
+-- A read-only connection. One per worker thread: a connection is not `Sync`.
+export open : &str -> rusqlite::Result<Connection>
+open path =
+  Connection::open_with_flags path (OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX)
+
+-- Optional text that the database stores as NULL or as the empty string.
+present : Option<String> -> Option<String>
+present v = v |> .filter (\s -> !s.is_empty ())
+
+-- The referrer's references, as full store paths in sorted order.
+references_of_id : &Connection -> i64 -> rusqlite::Result<Vec<String>>
+references_of_id conn id =
+  mut stmt = (conn.prepare_cached REFS)?
+  mut rows = (stmt.query ([id]))?
+  mut out = Vec::new () : Vec<String>
+  while (rows.next ())? is Some row
+    out.push ((row.get 0)?)
+  Ok out
+
+-- The narinfo for the valid path whose hash part is `hash`, if there is one.
+export lookup : &Connection -> &str -> &str -> rusqlite::Result<Option<NarInfo>>
+lookup conn store_dir hash =
+  lower = "#{store_dir}/#{hash}-"
+  upper = "#{store_dir}/#{hash}."
+  mut stmt = (conn.prepare_cached BY_HASH)?
+  mut rows = (stmt.query ([lower.as_str (), upper.as_str ()]))?
+  first = (rows.next ())?
+  case first of
+    None -> Ok None
+    Some row -> found conn row
+
+-- The narinfo for a valid path by its full path, if it is valid: what
+-- `nix path-info --json` reports, with the hash in narinfo (nix32) form.
+export path_info : &Connection -> &str -> rusqlite::Result<Option<NarInfo>>
+path_info conn path =
+  mut stmt = (conn.prepare_cached BY_PATH)?
+  mut rows = (stmt.query ([path]))?
+  first = (rows.next ())?
+  case first of
+    None -> Ok None
+    Some row -> found conn row
+
+found : &Connection -> &rusqlite::Row -> rusqlite::Result<Option<NarInfo>>
+found conn row =
+  id = (row.get 0 : rusqlite::Result<i64>)?
+  store_path = (row.get 1 : rusqlite::Result<String>)?
+  db_hash = (row.get 2 : rusqlite::Result<String>)?
+  nar_size = (row.get 3 : rusqlite::Result<Option<u64>>)?
+  deriver = (row.get 4 : rusqlite::Result<Option<String>>)?
+  sigs = (row.get 5 : rusqlite::Result<Option<String>>)?
+  ca = (row.get 6 : rusqlite::Result<Option<String>>)?
+  refs = (references_of_id conn id)?
+  case narinfo_hash (&db_hash) of
+    None -> Ok None
+    Some nar_hash -> Ok (Some (NarInfo { store_path, nar_hash, nar_size = nar_size.unwrap_or 0, references = refs, deriver = present deriver, sigs = split_sigs sigs, ca = present ca }))
+
+split_sigs : Option<String> -> Vec<String>
+split_sigs sigs =
+  sigs |> .unwrap_or_default |> .split_whitespace |> .map (\s -> s.to_string ()) |> .collect
+
+-- Whether `path` (a full store path) is valid.
+export is_valid : &Connection -> &str -> rusqlite::Result<bool>
+is_valid conn path =
+  mut stmt = (conn.prepare_cached ID_OF)?
+  stmt.exists ([path])
+
+-- A valid path's references (`nix-store -q --references`), sorted; None when
+-- the path is not valid.
+export references : &Connection -> &str -> rusqlite::Result<Option<Vec<String>>>
+references conn path =
+  mut stmt = (conn.prepare_cached ID_OF)?
+  mut rows = (stmt.query ([path]))?
+  first = (rows.next ())?
+  case first of
+    None -> Ok None
+    Some row ->
+      id = (row.get 0 : rusqlite::Result<i64>)?
+      refs = (references_of_id conn id)?
+      Ok (Some refs)
+
+-- A valid path's closure (`nix-store -qR`), the path included, sorted by
+-- byte order; None when the path is not valid.
+export closure : &Connection -> &str -> rusqlite::Result<Option<Vec<String>>>
+closure conn path =
+  mut stmt = (conn.prepare_cached CLOSURE)?
+  mut rows = (stmt.query ([path]))?
+  mut out = Vec::new () : Vec<String>
+  while (rows.next ())? is Some row
+    out.push ((row.get 0)?)
+  if out.is_empty ()
+    Ok None
+  else
+    Ok (Some out)
+
+-- The union of several paths' closures. A path that is not valid adds nothing.
+export closure_of_all : &Connection -> &[String] -> rusqlite::Result<BTreeSet<String>>
+closure_of_all conn paths =
+  mut out = BTreeSet::new () : BTreeSet<String>
+  for p in paths
+    if (closure conn p)? is Some c
+      out.extend c
+  Ok out
+
+-- A store database in memory, for tests: Nix's schema for the two tables
+-- read here, and the rows given as (path, base-16 hash, references).
+#[cfg(test)]
+export memory_db : Vec<(&str, &str, Vec<&str>)> -> Connection
+memory_db rows =
+  conn = Connection::open_in_memory () |> .expect "an in-memory database"
+  conn.execute_batch "CREATE TABLE ValidPaths (id integer primary key autoincrement not null, path text unique not null, hash text not null, registrationTime integer not null, deriver text, narSize integer, ultimate integer, sigs text, ca text); CREATE TABLE Refs (referrer integer not null, reference integer not null, primary key (referrer, reference));" |> .expect "the schema"
+  for row in &rows
+    (path, hash, _) = row
+    added = conn.execute "INSERT INTO ValidPaths (path, hash, registrationTime, narSize) VALUES (?1, ?2, 0, 8)" ([*path, *hash]) |> .expect "a path"
+    assert_eq! \-> added \-> 1
+  for row in &rows
+    (path, _, refs) = row
+    for r in refs
+      linked = conn.execute "INSERT INTO Refs (referrer, reference) SELECT a.id, b.id FROM ValidPaths a, ValidPaths b WHERE a.path = ?1 AND b.path = ?2" ([*path, *r]) |> .expect "a reference"
+      assert_eq! \-> linked \-> 1
+  conn
+
+#[cfg(test)]
+const H : &str = "sha256:044b884fce3dd89e5cd04f725b59c2abf51f0c2b496830d3f186107269cda902"
+
+#[cfg(test)]
+const A : &str = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a"
+
+#[cfg(test)]
+const B : &str = "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b"
+
+#[cfg(test)]
+const C : &str = "/nix/store/cccccccccccccccccccccccccccccccc-c"
+
+#[cfg(test)]
+graph : Connection
+graph = memory_db (.to_vec ([(A, H, .to_vec ([A, B])), (B, H, .to_vec ([C])), (C, H, .to_vec ([C]))]))
+
+#[cfg(test)]
+const D : &str = "/nix/store/dddddddddddddddddddddddddddddddd-d"
+
+test "a closure follows references transitively, through self-references"
+  conn = graph ()
+  assert_eq! \-> closure (&conn) A |> .ok \-> Some (Some (.to_vec ([A.to_string (), B.to_string (), C.to_string ()])))
+  assert_eq! \-> closure (&conn) C |> .ok \-> Some (Some (.to_vec ([C.to_string ()])))
+  assert_eq! \-> closure (&conn) D |> .ok \-> Some None
+
+test "references are direct and sorted"
+  conn = graph ()
+  assert_eq! \-> references (&conn) A |> .ok \-> Some (Some (.to_vec ([A.to_string (), B.to_string ()])))
+  assert_eq! \-> references (&conn) D |> .ok \-> Some None
+  assert_eq! \-> is_valid (&conn) B |> .ok \-> Some true
+  assert_eq! \-> is_valid (&conn) D |> .ok \-> Some false
+
+test "path info and lookup by hash part agree"
+  conn = graph ()
+  by_path = path_info (&conn) B |> .ok |> .flatten
+  assert_eq! \-> by_path.as_ref () |> .map (\i -> i.nar_hash.clone ()) \-> Some (.to_string "sha256:00m9rmlp4446y79k0s295c61zxdbq9cmnwjgs1f9xn1xrr7qhjq4")
+  assert_eq! \-> by_path.as_ref () |> .map (\i -> i.nar_size) \-> Some 8
+  assert_eq! \-> by_path.as_ref () |> .map (\i -> i.references.clone ()) \-> Some (.to_vec ([C.to_string ()]))
+  assert_eq! \-> lookup (&conn) "/nix/store" "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" |> .ok |> .flatten \-> by_path
+
+test "the union of closures skips invalid roots"
+  conn = graph ()
+  all = closure_of_all (&conn) (&[B.to_string (), D.to_string ()])
+  assert_eq! \-> all.map (\s -> s.len ()) |> .ok \-> Some 2
+
+test "a hash part no valid path has is not found"
+  if std::path::Path::new DEFAULT_DB |> .exists
+    conn = open DEFAULT_DB
+    assert! \-> conn.is_ok ()
+    found = conn.map (\c -> lookup (&c) "/nix/store" "00000000000000000000000000000000" |> .map (\o -> o.is_none ()) |> .unwrap_or false)
+    assert! \-> found.unwrap_or false

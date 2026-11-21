@@ -1,0 +1,228 @@
+-- Store derivations: the ATerm text of a `.drv` file, as libstore's
+-- `parseDerivation` reads it.
+--
+--   Derive([("out","/nix/store/…-x","",""),…],      outputs: name, path, hashAlgo, hash
+--          [("/nix/store/…-y.drv",["out"]),…],     inputDrvs: path, output names
+--          ["/nix/store/…-src",…],                 inputSrcs
+--          "x86_64-linux","/nix/store/…/bash",     system, builder
+--          ["-e","…"],                             args
+--          [("name","x"),…])                       env
+--
+-- Strings are double-quoted with `\"`, `\\`, `\n`, `\r` and `\t` escapes.
+-- A fixed-output derivation's single output carries its hash algorithm
+-- (`sha256` flat, `r:sha256` recursive, `text:sha256`) and base-16 hash; an
+-- input-addressed output leaves both empty, a content-addressed one leaves
+-- the path empty. The dynamic-derivations form (`DrvWithVersion`) is refused.
+
+import std::collections::{BTreeMap, BTreeSet}
+
+export data Output { export path String, export hash_algo String, export hash String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Derivation
+  { export outputs BTreeMap<String, Output>
+  , export input_drvs BTreeMap<String, BTreeSet<String>>
+  , export input_srcs BTreeSet<String>
+  , export system String
+  , export builder String
+  , export args Vec<String>
+  , export env BTreeMap<String, String>
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Bytes the grammar names: ", \, ] and the comma.
+const QUOTE : u8 = 34
+const BACKSLASH : u8 = 92
+const CLOSE_LIST : u8 = 93
+const COMMA : u8 = 44
+
+data Cursor { bytes Vec<u8>, pos usize }
+
+peek : &Cursor -> Option<u8>
+peek c = c.bytes.get c.pos |> .copied
+
+expect : &mut Cursor -> &str -> Result<(), String>
+expect c token =
+  t = token.as_bytes ()
+  end = c.pos + t.len ()
+  if c.bytes.get (c.pos .. end) == Some t
+    c.pos := end
+    Ok ()
+  else
+    Err ("expected `#{token}` at byte #{c.pos}")
+
+-- What a backslash followed by `e` stands for.
+unescape : u8 -> u8
+unescape e
+  | e == 110 = 10
+  | e == 114 = 13
+  | e == 116 = 9
+  | _ = e
+
+string : &mut Cursor -> Result<String, String>
+string c =
+  (expect c "\"")?
+  mut out = Vec::new () : Vec<u8>
+  mut open = true
+  while open
+    b = (peek c |> .ok_or (.to_string "unterminated string"))?
+    c.pos += 1
+    if b == QUOTE
+      open := false
+    else if b == BACKSLASH
+      e = (peek c |> .ok_or (.to_string "unterminated escape"))?
+      c.pos += 1
+      out.push (unescape e)
+    else
+      out.push b
+  String::from_utf8 out |> .map_err (\e -> "a string is not UTF-8: #{e}")
+
+-- Inside a list: whether another element follows. Consumes the separator
+-- before it, or the closing bracket after the last one.
+another : &mut Cursor -> u8 -> bool -> Result<bool, String>
+another c close first =
+  if peek c == Some close
+    c.pos += 1
+    Ok false
+  else if first
+    Ok true
+  else if peek c == Some COMMA
+    c.pos += 1
+    Ok true
+  else
+    Err ("expected `,` or the end of a list at byte #{c.pos}")
+
+strings : &mut Cursor -> Result<Vec<String>, String>
+strings c =
+  (expect c "[")?
+  mut out = Vec::new () : Vec<String>
+  mut first = true
+  while (another c CLOSE_LIST first)?
+    first := false
+    out.push ((string c)?)
+  Ok out
+
+outputs : &mut Cursor -> Result<BTreeMap<String, Output>, String>
+outputs c =
+  (expect c "[")?
+  mut out = BTreeMap::new () : BTreeMap<String, Output>
+  mut first = true
+  while (another c CLOSE_LIST first)?
+    first := false
+    (expect c "(")?
+    name = (string c)?
+    (expect c ",")?
+    path = (string c)?
+    (expect c ",")?
+    hash_algo = (string c)?
+    (expect c ",")?
+    hash = (string c)?
+    (expect c ")")?
+    out.insert name (Output { path, hash_algo, hash })
+  Ok out
+
+input_drvs : &mut Cursor -> Result<BTreeMap<String, BTreeSet<String>>, String>
+input_drvs c =
+  (expect c "[")?
+  mut out = BTreeMap::new () : BTreeMap<String, BTreeSet<String>>
+  mut first = true
+  while (another c CLOSE_LIST first)?
+    first := false
+    (expect c "(")?
+    path = (string c)?
+    (expect c ",")?
+    names = (strings c)?
+    (expect c ")")?
+    out.insert path (BTreeSet::from_iter names)
+  Ok out
+
+env : &mut Cursor -> Result<BTreeMap<String, String>, String>
+env c =
+  (expect c "[")?
+  mut out = BTreeMap::new () : BTreeMap<String, String>
+  mut first = true
+  while (another c CLOSE_LIST first)?
+    first := false
+    (expect c "(")?
+    key = (string c)?
+    (expect c ",")?
+    value = (string c)?
+    (expect c ")")?
+    out.insert key value
+  Ok out
+
+-- Parse a `.drv` file's text.
+export parse : &str -> Result<Derivation, String>
+parse text =
+  mut c = Cursor { bytes = text.as_bytes ().to_vec (), pos = 0 }
+  (expect (&mut c) "Derive(")?
+  outs = (outputs (&mut c))?
+  (expect (&mut c) ",")?
+  drvs = (input_drvs (&mut c))?
+  (expect (&mut c) ",")?
+  srcs = (strings (&mut c))?
+  (expect (&mut c) ",")?
+  system = (string (&mut c))?
+  (expect (&mut c) ",")?
+  builder = (string (&mut c))?
+  (expect (&mut c) ",")?
+  args = (strings (&mut c))?
+  (expect (&mut c) ",")?
+  vars = (env (&mut c))?
+  (expect (&mut c) ")")?
+  if c.pos != c.bytes.len ()
+    return Err ("trailing bytes after the derivation at byte #{c.pos}")
+  Ok (Derivation { outputs = outs, input_drvs = drvs, input_srcs = BTreeSet::from_iter srcs, system, builder, args, env = vars })
+
+-- Read and parse the `.drv` file at `path`.
+export read : &std::path::Path -> Result<Derivation, String>
+read path =
+  text = (std::fs::read_to_string path |> .map_err (\e -> "#{path.display ()}: #{e}"))?
+  parse (&text)
+
+-- Whether this is a fixed-output derivation: one output, named out, with a hash.
+export is_fixed_output : &Derivation -> bool
+is_fixed_output d =
+  hashed = d.outputs.get "out" |> .map (\o -> !o.hash.is_empty ()) |> .unwrap_or false
+  d.outputs.len () == 1 && hashed
+
+-- The output paths by name, leaving out the ones not known yet (CA outputs).
+export output_paths : &Derivation -> BTreeMap<String, String>
+output_paths d =
+  mut out = BTreeMap::new () : BTreeMap<String, String>
+  for entry in &d.outputs
+    (name, o) = entry
+    if !o.path.is_empty ()
+      out.insert (name.clone ()) (o.path.clone ())
+  out
+
+#[cfg(test)]
+const SAMPLE : &str = "Derive([(\"dev\",\"/nix/store/832yrsfhq3z41zn9rqsvv0cv22mblv4c-x-dev\",\"\",\"\"),(\"out\",\"/nix/store/sfvyavxai6qvzmv9p9x6mp4wwdz4v41m-x\",\"\",\"\")],[(\"/nix/store/01ws4sgihyii9wkhdz12hp8gq5444j54-bison-3.8.2.drv\",[\"out\"]),(\"/nix/store/ggkdrv677lc6g8d7wf4hrkf4z9flwavz-bash-5.3p9.drv\",[\"dev\",\"out\"])],[\"/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh\"],\"x86_64-linux\",\"/nix/store/v8sa6r6q037ihghxfbwzjj4p59v2x0pv-bash-5.3p9/bin/bash\",[\"-e\",\"b\"],[(\"a\",\"say \\\"hi\\\"\\n\\tdone\\\\\"),(\"name\",\"x\")])"
+
+test "a two-output derivation parses into every field"
+  d = parse SAMPLE
+  assert! \-> d.is_ok ()
+  if d is Ok drv
+    assert_eq! \-> drv.outputs.len () \-> 2
+    assert_eq! \-> drv.outputs.get "out" |> .map (\o -> o.path.as_str ()) \-> Some "/nix/store/sfvyavxai6qvzmv9p9x6mp4wwdz4v41m-x"
+    assert_eq! \-> drv.input_drvs.get "/nix/store/ggkdrv677lc6g8d7wf4hrkf4z9flwavz-bash-5.3p9.drv" |> .map (\s -> s.len ()) \-> Some 2
+    assert_eq! \-> drv.input_srcs.len () \-> 1
+    assert_eq! \-> drv.system \-> "x86_64-linux"
+    assert_eq! \-> drv.args \-> .to_vec ([.to_string "-e", .to_string "b"])
+    assert_eq! \-> drv.env.get "a" |> .map (\v -> v.as_str ()) \-> Some "say \"hi\"\n\tdone\\"
+    assert! \-> !(is_fixed_output (&drv))
+    assert_eq! \-> output_paths (&drv) |> .len \-> 2
+  ()
+
+test "a fixed-output derivation is recognised"
+  d = parse "Derive([(\"out\",\"/nix/store/h24jwyqgava9fwnq8rxfk56n2gi25wgs-p.patch\",\"sha256\",\"49a5\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[])"
+  assert_eq! \-> d.as_ref () |> .map (\x -> is_fixed_output x) \-> Ok true
+
+test "malformed derivations are refused"
+  assert! \-> parse "" |> .is_err
+  assert! \-> parse "DrvWithVersion(\"xp-dyn-drv\",[],[],[],\"s\",\"b\",[],[])" |> .is_err
+  assert! \-> parse "Derive([],[],[],\"s\",\"b\",[],[])x" |> .is_err
+  assert! \-> parse "Derive([],[],[],\"s\",\"b\",[],[]" |> .is_err
+  assert! \-> parse "Derive([(\"out\" \"p\",\"\",\"\")],[],[],\"s\",\"b\",[],[])" |> .is_err
+  assert! \-> parse "Derive([],[],[\"a\" \"b\"],\"s\",\"b\",[],[])" |> .is_err
+  assert! \-> parse "Derive([],[],[],\"unterminated,\"b\",[],[])" |> .is_err
