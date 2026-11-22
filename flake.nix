@@ -413,6 +413,9 @@
       # features/cli/vswitch (GH-241): a local switch as a non-root user, health-checked,
       # rolled back when unhealthy, refused when marked bad; test and boot.
       // {vswitch-vm = import ./features/cli/vswitch/test.nix {inherit pkgs;};}
+      # features/monitoring/vexporter (GH-248): the store, gcroots and generations read under
+      # STIG base-safe; a failed source never blanks the file.
+      // {vexporter-vm = import ./features/monitoring/vexporter/test.nix {inherit pkgs;};}
       # features/nix/vci (GH-242): main and open PRs built on the cache host, substituted by
       # a client with zero local builds; switched in and out live.
       // {vci-vm = import ./features/nix/vci/test.nix {inherit pkgs;};}
