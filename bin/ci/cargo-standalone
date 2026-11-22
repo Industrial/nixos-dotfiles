@@ -161,7 +161,7 @@ package() {
   local ref
   ref="$(git_flake_ref "$ROOT")" || return 1
   echo "cargo-standalone: building $dir/default.nix with nixosConfigurations.$host.pkgs.callPackage"
-  nix build --impure --no-link -L --argstr flakeRef "$ref"--argstr crate "$1" --argstr host "$host" \
+  nix build --impure --no-link -L --argstr flakeRef "$ref" --argstr crate "$1" --argstr host "$host" \
     --expr "$PACKAGE_EXPR"
 }
 
