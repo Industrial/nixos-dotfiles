@@ -390,6 +390,8 @@
       // {vpush-vm = import ./features/nix/vpush/test.nix {inherit pkgs;};}
       # features/nix/vfetch's VM test: a substitution goes through vfetch serve.
       // {vfetch-vm = import ./features/nix/vfetch/test.nix {inherit pkgs;};}
+      # features/nix/vcache's request counters (GH-248): counted, flushed, served by node_exporter.
+      // {vcache-metrics-vm = import ./features/nix/vcache/test-metrics.nix {inherit pkgs;};}
       # features/nixos/vfiles's VM test: add, remove, adopt, fall back, report drift.
       // {vfiles-vm = import ./features/nixos/vfiles/test.nix {inherit pkgs;};}
       # features/nix/vdeploy's VM test (#159): commits faster than a build, still converges.

@@ -78,4 +78,10 @@ in
     servingHostPassesAssertions = assay.eq (failedAssertions cfg) [];
     builderWithoutAddressRefused = assay.eq (builtins.length (assertionsAs noAddress)) 1;
     nonBuilderRefused = assay.eq (builtins.length (assertionsAs notBuilder) >= 1) true;
+
+    # GH-248: the request counters go straight to node_exporter's textfile directory, as
+    # the group's member, with only that directory writable; the sandbox is unchanged.
+    countersInTheTextfileDir = assay.eq [env.VCACHE_TEXTFILE_DIR sc.SupplementaryGroups sc.ReadWritePaths] ["/var/lib/prometheus-node-exporter-text" ["prometheus-textfile"] ["/var/lib/prometheus-node-exporter-text"]];
+    noCopierUnit = assay.eq (cfg.systemd.services ? vcache-metrics) false;
+    sandboxKept = assay.eq [sc.PrivateUsers sc.UMask sc.DynamicUser] [true "0077" true];
   }

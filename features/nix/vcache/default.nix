@@ -4,8 +4,9 @@
 #
 # Sandbox: a DynamicUser with ProtectSystem=strict. The only things it reads beyond its
 # own closure are /nix/store and /nix/var/nix/db (SQLite, opened read-only); the daemon
-# socket is out of reach, so it cannot ask the daemon for anything. The only thing it
-# writes is its StateDirectory, which holds the signing key.
+# socket is out of reach, so it cannot ask the daemon for anything. It writes only its
+# StateDirectory, which holds the signing key, and its request counters (vcache.prom,
+# GH-248) in node_exporter's textfile directory.
 #
 # Signing key: generated here, at the first start, by `nix key generate-secret` into
 # the StateDirectory (/var/lib/private/vcache/secret-key, 0600, owned by the dynamic
@@ -38,6 +39,9 @@
   vcache = pkgs.callPackage ../../../rust/tools/vcache/default.nix {};
   nix = config.nix.package;
   stateDir = "/var/lib/vcache";
+  # The request counters (GH-248): written straight into node_exporter's textfile
+  # directory (setgid prometheus-textfile), as vhealth and vverify do.
+  textfileDir = "/var/lib/prometheus-node-exporter-text";
   keyName = "${settings.hostname}-vcache-1";
 
   # First start: a fresh key. Every start: the public half, to a file and the journal.
@@ -53,7 +57,7 @@
     echo "vcache: public key $(cat "$STATE_DIRECTORY/public-key")"
   '';
 in {
-  imports = [../../../common/vhealth-probes.nix];
+  imports = [../../../common/vhealth-probes.nix ../../monitoring/textfile-collector.nix];
 
   assertions = [
     {
@@ -95,6 +99,8 @@ in {
       VCACHE_STORE_DIR = "/nix/store";
       VCACHE_DB = "/nix/var/nix/db/db.sqlite";
       VCACHE_SIGN_KEY_FILE = "${stateDir}/secret-key";
+      # GH-248: the request counters, flushed every 30 s (off the request path).
+      VCACHE_TEXTFILE_DIR = textfileDir;
     };
 
     serviceConfig = {
@@ -108,9 +114,14 @@ in {
       StateDirectory = "vcache";
       StateDirectoryMode = "0700";
       UMask = "0077";
+      # The counters' file (GH-248): the textfile group, and that one directory writable.
+      # PrivateUsers=true still lets the group's access through (the VM test proves
+      # node_exporter scrapes it); the file is written 0644 whatever the UMask.
+      SupplementaryGroups = ["prometheus-textfile"];
 
       ProtectSystem = "strict";
       ReadOnlyPaths = ["/nix/store" "/nix/var/nix/db"];
+      ReadWritePaths = [textfileDir];
       InaccessiblePaths = ["-/nix/var/nix/daemon-socket"];
       ProtectHome = true;
       PrivateTmp = true;
