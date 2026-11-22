@@ -371,6 +371,11 @@ checked sys a x current =
     note = cleared (&a.state_dir) (&x)
     finished sys a x current Outcome::Already None note
   else
+    -- The generation the host runs now, and so the one a rollback returns to, is not
+    -- bad either, whatever an older apply recorded (the root rebuild's case).
+    stale = cleared (&a.state_dir) (&current)
+    if !stale.is_empty ()
+      eprintln! \-> "vdeploy: #{stale}"
     s = sys.clone ()
     sys.0.comin_active () |> .widen |> .flat_map (move \comin -> decided s a x current comin)
 
@@ -729,6 +734,21 @@ test "the running generation is never bad: a stale mark is cleared, nothing swit
   -- Later, from another generation, X is welcome again: no refusal.
   w2 = world "/nix/store/x-old"
   assert_eq! \-> applied (w2.clone ()) (a.clone ()) \-> Ok Outcome::Switched
+  fs::remove_dir_all (&a.state_dir) |> .ok
+
+test "the generation an apply starts from is never bad: its stale mark goes, and a rollback returns to it"
+  a = scratch "prev-bad"
+  -- An older apply marked the running generation bad (it was rolled back once, then
+  -- switched to by root).
+  mark_bad (&a.state_dir) "/nix/store/x-old" "unhealthy: nix-daemon down" |> .expect "mark"
+  w = Scripted { sick = .to_vec ([.to_string "/nix/store/x-new"]), ...world "/nix/store/x-old" }
+  assert_eq! \-> applied (w.clone ()) (a.clone ()) \-> Ok (Outcome::RolledBack (.to_string "unhealthy: dead-port down"))
+  -- The rollback went back to it, and it is no longer marked; the sick one is.
+  assert_eq! \-> read_of (&w.current) \-> "/nix/store/x-old"
+  assert! \-> !(is_bad (&a.state_dir) "/nix/store/x-old") && is_bad (&a.state_dir) "/nix/store/x-new"
+  -- So the old generation can be applied again later, from somewhere else.
+  w2 = world "/nix/store/x-other"
+  assert_eq! \-> applied (w2.clone ()) (Apply { toplevel = Some (.to_string "/nix/store/x-old"), ...a.clone () }) \-> Ok Outcome::Switched
   fs::remove_dir_all (&a.state_dir) |> .ok
 
 test "an apply interrupted in the health window is decided by the next one"
