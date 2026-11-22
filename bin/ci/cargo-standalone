@@ -34,6 +34,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
+# shellcheck source=bin/lib/flake-ref.sh
+source "$ROOT/bin/lib/flake-ref.sh"
 
 die() {
   echo "cargo-standalone: $*" >&2
@@ -139,9 +141,10 @@ drift_in() {
 }
 
 # The expression `package` builds: the crate's default.nix, callPackage'd with the host's
-# pkgs, from the flake's copy of the tree.
-PACKAGE_EXPR='{ root, crate, host }:
-  let flake = builtins.getFlake root;
+# pkgs, from the flake's copy of the tree. flakeRef is git_flake_ref's git+file reference,
+# never the bare directory: getFlake on a path copies .git, target/ and the rest (#266).
+PACKAGE_EXPR='{ flakeRef, crate, host }:
+  let flake = builtins.getFlake flakeRef; # flake-ref: git-tracked
   in flake.nixosConfigurations.${host}.pkgs.callPackage "${flake}/rust/tools/${crate}/default.nix" { }'
 
 package() {
@@ -155,8 +158,10 @@ package() {
     echo "cargo-standalone: $dir has no default.nix, no Nix package to build"
     return 0
   fi
+  local ref
+  ref="$(git_flake_ref "$ROOT")" || return 1
   echo "cargo-standalone: building $dir/default.nix with nixosConfigurations.$host.pkgs.callPackage"
-  nix build --impure --no-link -L --argstr root "$ROOT" --argstr crate "$1" --argstr host "$host" \
+  nix build --impure --no-link -L --argstr flakeRef "$ref" --argstr crate "$1" --argstr host "$host" \
     --expr "$PACKAGE_EXPR"
 }
 
