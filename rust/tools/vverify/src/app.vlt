@@ -17,7 +17,8 @@ import nix_store_core::db
 import nix_store_core::storepath::STORE_DIR
 import crate::cli::{Options, USAGE, parse_args}
 import crate::report::{Pass, json, last_run, metrics_path, publish}
-import crate::verify::{Candidate, Checked, check, faults, recheck, tally, valid_paths}
+import nix_store_core::db::ValidPath
+import crate::verify::{Checked, check, faults, recheck, tally}
 
 -- Why a pass, or the program, stopped.
 export errors VerifyError
@@ -37,22 +38,22 @@ now_secs : u64
 now_secs =
   SystemTime::now () |> .duration_since UNIX_EPOCH |> .map (\d -> d.as_secs ()) |> .unwrap_or 0
 
-read_listing : String -> Result<Vec<Candidate>, VerifyError>
+read_listing : String -> Result<Vec<ValidPath>, VerifyError>
 read_listing db_path =
   conn = (db::open (&db_path) |> .map_err (\e -> Database ("opening #{db_path}: #{e}")))?
-  valid_paths (&conn) |> .map_err (\e -> Database ("listing valid paths in #{db_path}: #{e}"))
+  db::valid_paths (&conn) |> .map_err (\e -> Database ("listing valid paths in #{db_path}: #{e}"))
 
 -- Every valid path, read on one connection that is closed again before the
 -- hashing starts.
-listing : String -> Effect<Vec<Candidate>, VerifyError, HNil>
+listing : String -> Effect<Vec<ValidPath>, VerifyError, HNil>
 listing db_path = suspend (move \-> lifted (read_listing db_path))
 
 -- One path: archive, hash, judge, and recheck a missing path's validity.
-checked : String -> Candidate -> Effect<Checked, VerifyError, HNil>
+checked : String -> ValidPath -> Effect<Checked, VerifyError, HNil>
 checked db_path c = suspend (move \-> succeed (recheck (&db_path) (check c)))
 
 -- Every path, `jobs` at a time.
-checked_all : String -> usize -> Vec<Candidate> -> Effect<Vec<Checked>, VerifyError, HNil>
+checked_all : String -> usize -> Vec<ValidPath> -> Effect<Vec<Checked>, VerifyError, HNil>
 checked_all db_path jobs candidates =
   for_each_par candidates (move \c -> checked (db_path.clone ()) c) (Concurrency::Bounded jobs)
 

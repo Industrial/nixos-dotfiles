@@ -132,8 +132,26 @@ closure_of_all conn paths =
       out.extend c
   Ok out
 
+------------------------------------------------------------------------
+-- Every valid path at once (vverify's listing, GH-179)
+
+-- A valid path as the database lists it. `nar_hash` is the database form,
+-- `sha256:<base16>`; a NULL narSize reads as 0.
+export data ValidPath { export path String, export nar_hash String, export nar_size u64 }
+  deriving (Clone, Debug, PartialEq, Eq)
+
+-- Every valid path, in path order.
+const ALL_VALID : &str = "SELECT path, hash, narSize FROM ValidPaths ORDER BY path"
+
+-- Every valid path with its narHash and narSize, in path order, in one query.
+export valid_paths : &Connection -> rusqlite::Result<Vec<ValidPath>>
+valid_paths conn =
+  mut stmt = (conn.prepare ALL_VALID)?
+  rows = (stmt.query_map () (\r -> Ok (ValidPath { path = (r.get 0)?, nar_hash = (r.get 1)?, nar_size = (r.get 2 : rusqlite::Result<Option<u64>>)? |> .unwrap_or 0 })))?
+  rows.collect ()
+
 #[cfg(test)]
-import crate::testdb::memory_db
+import crate::testdb::{memory_db, schema_db}
 
 #[cfg(test)]
 const H : &str = "sha256:044b884fce3dd89e5cd04f725b59c2abf51f0c2b496830d3f186107269cda902"
@@ -186,4 +204,16 @@ test "a hash part no valid path has is not found"
     assert! \-> conn.is_ok ()
     found = conn.map (\c -> lookup (&c) "/nix/store" "00000000000000000000000000000000" |> .map (\o -> o.is_none ()) |> .unwrap_or false)
     assert! \-> found.unwrap_or false
+
+#[cfg(test)]
+const H2 : &str = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+
+test "the listing reads every valid path with its registration, in path order"
+  conn = schema_db ":memory:"
+  rows = "INSERT INTO ValidPaths (path, hash, registrationTime, narSize) VALUES ('#{B}', '#{H2}', 0, 8); INSERT INTO ValidPaths (path, hash, registrationTime) VALUES ('#{A}', '#{H}', 0);"
+  conn.execute_batch (&rows) |> .expect "the rows"
+  listed = valid_paths (&conn) |> .expect "a listing"
+  want = .to_vec ([ValidPath { path = A.to_string (), nar_hash = H.to_string (), nar_size = 0 }, ValidPath { path = B.to_string (), nar_hash = H2.to_string (), nar_size = 8 }])
+  assert_eq! \-> listed \-> want
+  assert! \-> valid_paths (&schema_db ":memory:") |> .expect "an empty listing" |> .is_empty
 

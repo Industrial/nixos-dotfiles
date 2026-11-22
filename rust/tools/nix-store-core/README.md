@@ -164,6 +164,7 @@ them.
 | `references : &Connection -> &str -> rusqlite::Result<Option<Vec<String>>>` | direct references, sorted (`nix-store -q --references`) |
 | `closure : &Connection -> &str -> rusqlite::Result<Option<Vec<String>>>` | the closure including the path, sorted (`nix-store -qR`). Uses one recursive SQL query |
 | `closure_of_all : &Connection -> &[String] -> rusqlite::Result<BTreeSet<String>>` | the union of several closures. Paths that are not valid are skipped |
+| `ValidPath { path, nar_hash, nar_size: u64 }`, `valid_paths : &Connection -> rusqlite::Result<Vec<ValidPath>>` | every valid path with its narHash (database form, `sha256:<base16>`) and narSize, in path order, in one query (vverify's listing). A NULL narSize is 0 |
 
 None means "not a valid path". GC roots and the `DerivationOutputs` walk stay in vgc.
 
