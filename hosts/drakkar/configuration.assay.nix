@@ -30,6 +30,21 @@ in
     managesGenerationsWithVgen = assay.eq [(has "nixos.vgen") (has "nixos.vgc")] [true true];
     amdGraphics = assay.eq [(has "nixos.graphics.amd") (has "nixos.graphics.intel")] [true false];
     noStigBaseSafe = assay.eq (has "security.stig.profiles.base-safe") false;
+    # vdaemon-proxy answers these read ops itself, each after a clean shadow (GH-183, GH-224);
+    # the rest stay in conformance mode, forwarded and compared.
+    answersReadsNatively =
+      assay.eq [(has "nix.vdaemon-proxy") cfg.features.nix.vdaemon-proxy.conformance cfg.features.nix.vdaemon-proxy.native]
+      [true true ["IsValidPath" "QueryPathInfo" "QueryValidPaths"]];
+    vdaemonNativeRollsBack = let
+      off = features.evalSelection {
+        modules = [
+          ./configuration.nix
+          {disabledModules = [./disko.nix ./filesystems.nix ./hardware.nix];}
+          {features.nix.vdaemon-proxy.native = nixos.lib.mkForce [];}
+        ];
+      };
+    in
+      assay.eq [(builtins.elem "nix.vdaemon-proxy" (features.enabledFeatures off)) off.features.nix.vdaemon-proxy.native] [true []];
     # vdeploy observes next to comin, which still deploys (GH-159); one option removes it.
     observesWithVdeploy = assay.eq [(has "nix.vdeploy") (has "fleet.comin")] [true true];
     vdeployRollsBack = let
