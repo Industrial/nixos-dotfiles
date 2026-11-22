@@ -29,7 +29,7 @@ in
     # One id_effect version per build, pinned exactly; Voltaic pinned past 0.2.0's
     # miscompiles.
     idEffectPinned = assay.eq [manifest.dependencies.id_effect manifest.dependencies.id_effect_cli] ["=0.13.0" "=0.13.0"];
-    voltaicPinned = assay.eq [manifest.build-dependencies.voltaic-driver manifest.build-dependencies.voltaic-diag] ["=0.2.1" "=0.2.1"];
+    voltaicPinned = assay.eq [manifest.build-dependencies.voltaic-driver manifest.build-dependencies.voltaic-diag] ["=0.3.0" "=0.3.0"];
 
     # Nothing in the tree builds a C library the cargoUseSystemLibs hook could misdirect.
     noBundledCLibraries =
