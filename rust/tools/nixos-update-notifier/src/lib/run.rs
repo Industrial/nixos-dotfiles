@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::PathBuf;
 
 use tempfile::TempDir;
@@ -152,8 +153,29 @@ fn maybe_notify(
     if config.no_notify {
         return Ok(());
     }
+    deliver(notifier, payloads, &mut std::io::stderr())
+}
+
+/// Send each notice. A host with no notification server (GH-277: mimir, headless) gets
+/// the notice in the journal instead, and the run goes on; any other send error stops it.
+fn deliver(
+    notifier: &mut dyn Notifier,
+    payloads: &[NotificationPayload],
+    log: &mut dyn Write,
+) -> Result<(), NotifyError> {
     for p in payloads {
-        notifier.notify(p)?;
+        match notifier.notify(p) {
+            Err(NotifyError::NoServer(detail)) => {
+                // A notice that cannot reach stderr either has nowhere left to go.
+                let _ = writeln!(
+                    log,
+                    "nixos-update-notifier: no notification server reachable ({detail}); \
+logging the notice instead\n--- {} ---\n{}",
+                    p.summary, p.body
+                );
+            }
+            other => other?,
+        }
     }
     Ok(())
 }
@@ -182,6 +204,84 @@ mod tests {
         }
     }
 
+    /// A headless host: nothing answers on org.freedesktop.Notifications.
+    #[derive(Default)]
+    struct Headless(usize);
+
+    impl Notifier for Headless {
+        fn notify(&mut self, _: &NotificationPayload) -> Result<(), NotifyError> {
+            self.0 += 1;
+            Err(NotifyError::NoServer(
+                "org.freedesktop.DBus.Error.ServiceUnknown: no Notifications owner".into(),
+            ))
+        }
+    }
+
+    /// A notification server that is there but refuses.
+    struct Broken;
+
+    impl Notifier for Broken {
+        fn notify(&mut self, _: &NotificationPayload) -> Result<(), NotifyError> {
+            Err(NotifyError::Send(
+                "org.freedesktop.DBus.Error.AccessDenied".into(),
+            ))
+        }
+    }
+
+    /// A config whose reboot check finds a pending kernel and whose upstream check then
+    /// fails on the missing flake directory.
+    fn reboot_pending_config(t: &std::path::Path) -> Config {
+        let (old, new) = (t.join("linux-old"), t.join("linux-new"));
+        fs::write(&old, "o").unwrap();
+        fs::write(&new, "n").unwrap();
+        for (name, kernel) in [("booted", &old), ("current", &new)] {
+            fs::create_dir(t.join(name)).unwrap();
+            symlink(kernel, t.join(name).join("kernel")).unwrap();
+        }
+        Config::parse_from([
+            "nixos-update-notifier",
+            "--flake",
+            t.join("no-flake").to_str().unwrap(),
+            "--booted-system",
+            t.join("booted").to_str().unwrap(),
+            "--current-system",
+            t.join("current").to_str().unwrap(),
+        ])
+    }
+
+    // GH-277: no notification server is not a failure; every notice is logged instead.
+    #[test]
+    fn no_server_logs_every_notice_and_succeeds() {
+        let payloads = notify::payloads_for_updates(3, &["a: 1 → 2".into(), "b: 3 → 4".into()]);
+        let mut headless = Headless::default();
+        let mut log = Vec::new();
+        deliver(&mut headless, &payloads, &mut log).unwrap();
+        assert_eq!(headless.0, 2);
+        let log = String::from_utf8(log).unwrap();
+        assert_eq!(log.matches("no notification server reachable").count(), 2);
+        assert!(log.contains("NixOS updates available (3 packages, 1/2)"));
+        assert!(log.contains("b: 3 → 4"));
+    }
+
+    // ...so the run goes past the notice: what stops it (exit 1) is the real error after.
+    #[test]
+    fn no_server_does_not_stop_the_run() {
+        let t = tempdir().unwrap();
+        let config = reboot_pending_config(t.path());
+        let mut headless = Headless::default();
+        let err = run_check(&config, &mut headless).unwrap_err();
+        assert!(matches!(err, RunError::Lock(LockError::MissingFlakeDir(_))));
+        assert_eq!(headless.0, 1);
+    }
+
+    #[test]
+    fn other_send_errors_still_fail_the_run() {
+        let t = tempdir().unwrap();
+        let config = reboot_pending_config(t.path());
+        let err = run_check(&config, &mut Broken).unwrap_err();
+        assert!(matches!(err, RunError::Notify(NotifyError::Send(_))));
+    }
+
     #[test]
     fn default_flake_dir_is_the_root_flake() {
         let p = default_flake_dir("/home/tom");
@@ -201,23 +301,7 @@ mod tests {
     #[test]
     fn reboot_pending_is_notified_before_the_upstream_check() {
         let t = tempdir().unwrap();
-        let (old, new) = (t.path().join("linux-old"), t.path().join("linux-new"));
-        fs::write(&old, "o").unwrap();
-        fs::write(&new, "n").unwrap();
-        for (name, kernel) in [("booted", &old), ("current", &new)] {
-            fs::create_dir(t.path().join(name)).unwrap();
-            symlink(kernel, t.path().join(name).join("kernel")).unwrap();
-        }
-        let missing = t.path().join("no-flake");
-        let config = Config::parse_from([
-            "nixos-update-notifier",
-            "--flake",
-            missing.to_str().unwrap(),
-            "--booted-system",
-            t.path().join("booted").to_str().unwrap(),
-            "--current-system",
-            t.path().join("current").to_str().unwrap(),
-        ]);
+        let config = reboot_pending_config(t.path());
         let mut rec = Recorder::default();
         let err = run_check(&config, &mut rec).unwrap_err();
         assert!(matches!(err, RunError::Lock(LockError::MissingFlakeDir(_))));

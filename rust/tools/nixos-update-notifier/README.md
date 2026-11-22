@@ -14,6 +14,11 @@ Tells the operator what an update is waiting on (see `docs/runbooks/updates.md`)
 
 Uses the session D-Bus (`org.freedesktop.Notifications`) so GNOME shows a normal banner and tray entry — same channel as `notify-send`.
 
+On a headless host (no notification server answers, `org.freedesktop.DBus.Error.ServiceUnknown`,
+or no session bus at all) the notice goes to stderr, so the journal, after the line
+`no notification server reachable (…); logging the notice instead`, and the run still exits 0.
+Any other send error, and every eval, GitHub, build or vdiff error, exits 1.
+
 ## What it does (upstream check)
 
 1. Runs `nix flake update --output-lock-file` into a temp lock (does **not** modify your repo `flake.lock`).
