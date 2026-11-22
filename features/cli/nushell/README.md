@@ -36,9 +36,9 @@ Two things follow from it:
 
 ## Configuration Files
 
-Hand-written, linked into `~/.config/nushell/` by activation:
+Hand-written, linked into `~/.config/nushell/` by vfiles:
 
-- `default.nix` — NixOS module (package + login shell + the activation symlinks)
+- `default.nix` — NixOS module (package + login shell + the `vfiles.files` links)
 - `env.nu` — session vars (editors/XDG/PATH), rootless-docker socket, direnv hook
 - `config.nu` — interactive config: commands, keybindings, completions, zellij sessions,
   Hávamál
@@ -121,20 +121,26 @@ nu --config ~/.config/nushell/config.nu -c 'zellij-should-attach true {|| true}'
 Nothing to run by hand. `nixos-rebuild switch` (or `bin/update/system`, which calls it)
 does both halves:
 
-- `system.activationScripts.linkNushellConfig` in this feature's `default.nix` symlinks
-  `env.nu`, `config.nu` and `havamal.nu` into `~/.config/nushell/`, and links the Hávamál
-  stanzas next to them
-- `system.activationScripts.nushellVendorAutoload` in `features/cli/shell-init` points
+- `vfiles.files` in this feature's `default.nix` links `env.nu`, `config.nu` and
+  `havamal.nu` into `~/.config/nushell/` (from this checkout, with the committed copies as
+  the fallback), links the Hávamál stanzas next to them, and removes the stale `login.nu`
+  and `starship.nu` links older generations left
+- `vfiles.files` in `features/cli/shell-init` points
   `~/.local/share/nushell/vendor/autoload` at the generated store directory
+
+Both are placed by the one `vfiles` activation step (`features/nixos/vfiles`, GH-188). With
+vfiles off (`features.nixos.vfiles.enable = lib.mkForce false`) the old scripts,
+`linkNushellConfig` and `nushellVendorAutoload`, come back from `vfiles.legacy`.
 
 The symlinks mean an edit to `config.nu` in this checkout is live in the next shell, with
 no rebuild. The generated autoload files are not editable that way, by design: change the
 generator, not its output.
 
-First-run Nushell may create stock `~/.config/nushell/*.nu`; activation moves those aside
-as `*.backup` and replaces them with the symlinks.
+First-run Nushell may create stock `~/.config/nushell/*.nu`; the first time vfiles places a
+path it moves a real file there aside as `*.backup` and links in its place. After that, a
+hand-edited file is reported as drift (`/var/lib/vfiles/report.json`), never overwritten.
 
-There is no `bin/link-files-nixos` and no `setup.sh` any more — activation is the single
+There is no `bin/link-files-nixos` and no `setup.sh` any more — vfiles is the single
 writer, and the suite asserts both are absent.
 
 ## Usage Patterns

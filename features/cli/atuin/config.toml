@@ -1,7 +1,7 @@
 # Atuin client configuration — local only.
 #
-# Linked to ~/.config/atuin/config.toml by the `linkAtuinConfig` activation script in
-# ./default.nix. Keys are the atuin 18.24 client surface
+# Placed at ~/.config/atuin/config.toml by vfiles, declared in ./default.nix
+# (`vfiles.files`; `linkAtuinConfig` is only the rollback script). Keys are the atuin 18.24 client surface
 # (crates/atuin-client/src/settings.rs); every key this file does not name keeps atuin's
 # own default, so what is here is only the decisions.
 
