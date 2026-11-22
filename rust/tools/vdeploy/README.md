@@ -200,6 +200,13 @@ rewritten on every poll:
 | `vdeploy_dotfiles_state{state=…}` | 1 for the checkout's current state |
 | `vdeploy_observe_mode`, `vdeploy_deploy_mode` | 1 for the mode the daemon runs in |
 
+The `_total` counters are totals across restarts (GH-221), not since the process started.
+`<state-dir>/counters.json` holds them. It is read once when the agent starts, as a base,
+and is rewritten atomically, with base + this run, before every metrics write. A restart
+therefore neither resets a total nor counts anything twice. A file that cannot be read is
+said in the journal and counted from zero. A restarted agent plans main's tip once more (it
+does not know what it planned last), and that shows as one more plan started and finished.
+
 ## Capabilities
 
 | capability | live | tests |

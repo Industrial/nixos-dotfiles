@@ -9,10 +9,13 @@ import std::path::Path
 import serde_json::Value
 import vdiff::report::render_bytes
 import crate::dotfiles::{STATES, state_name}
-import crate::watch::Status
+import crate::watch::{Status, Totals, totals_of}
 
 -- The metrics file node_exporter's textfile collector reads (`*.prom`).
 export const METRICS_FILE : &str = "vdeploy.prom"
+
+-- The agent's totals across restarts (GH-221), in the state directory.
+export const TOTALS_FILE : &str = "counters.json"
 
 -- An empty vdiff report: what an unchanged closure shows.
 export const SAME : &str = "{\"schema\":1,\"changed\":[],\"selectionChanged\":[],\"added\":[],\"removed\":[],\"closure\":{\"pathsAdded\":0,\"pathsRemoved\":0,\"narSizeDelta\":0}}"
@@ -148,13 +151,15 @@ metrics st =
     out.push_str (&gauge "vdeploy_last_plan_timestamp_seconds" "Unix time the last plan finished." (t.to_string ()))
   out.push_str (&gauge "vdeploy_last_plan_duration_seconds" "Wall time of the last plan (evaluate, realise, diff)." ("#{st.last_duration:.3}"))
   out.push_str (&gauge "vdeploy_switch_pending" "1 when the last plan would switch this host." (flag st.pending))
-  out.push_str (&counter "vdeploy_polls_total" "Polls of main since the agent started." st.watch.polls)
-  out.push_str (&counter "vdeploy_poll_failures_total" "Polls whose fetch of main failed." st.poll_failures)
-  out.push_str (&counter "vdeploy_head_changes_total" "Times main moved, as seen by the poller." st.watch.changes)
-  out.push_str (&counter "vdeploy_plans_started_total" "Plans started." st.started)
-  out.push_str (&counter "vdeploy_plans_finished_total" "Plans finished, successfully or not. Never cancelled: equal to started, or one behind while a plan runs." st.finished)
-  out.push_str (&counter "vdeploy_plans_failed_total" "Plans that failed (evaluation, realisation, verification)." st.failed)
-  out.push_str (&counter "vdeploy_commits_skipped_total" "Commits on main never planned, because a newer one landed first (latest-wins)." st.skipped)
+  -- Totals across restarts (counters.json, GH-221), not since this process started.
+  t = totals_of st
+  out.push_str (&counter "vdeploy_polls_total" "Polls of main." t.polls)
+  out.push_str (&counter "vdeploy_poll_failures_total" "Polls whose fetch of main failed." t.poll_failures)
+  out.push_str (&counter "vdeploy_head_changes_total" "Times main moved, as seen by the poller." t.head_changes)
+  out.push_str (&counter "vdeploy_plans_started_total" "Plans started." t.started)
+  out.push_str (&counter "vdeploy_plans_finished_total" "Plans finished, successfully or not. Never cancelled: equal to started, or one behind while a plan runs." t.finished)
+  out.push_str (&counter "vdeploy_plans_failed_total" "Plans that failed (evaluation, realisation, verification)." t.failed)
+  out.push_str (&counter "vdeploy_commits_skipped_total" "Commits on main never planned, because a newer one landed first (latest-wins)." t.skipped)
   out.push_str "# HELP vdeploy_dotfiles_state The user's dotfiles checkout after the last poll (1 for the current state).\n# TYPE vdeploy_dotfiles_state gauge\n"
   current = st.dotfiles |> .as_ref |> .map (\c -> state_name c)
   for s in STATES
@@ -180,6 +185,53 @@ publish_metrics dir st =
     Some d ->
       path = Path::new (&d) |> .join METRICS_FILE
       write_atomic (&path) (&metrics st) |> .map_err (\e -> "writing #{path.display ()}: #{e}")
+
+-- The totals as counters.json (schema 1).
+export totals_text : &Totals -> String
+totals_text t = "{\"schema\":1,\"polls\":#{t.polls},\"pollFailures\":#{t.poll_failures},\"headChanges\":#{t.head_changes},\"plansStarted\":#{t.started},\"plansFinished\":#{t.finished},\"plansFailed\":#{t.failed},\"commitsSkipped\":#{t.skipped}}\n"
+
+field : &Value -> &str -> u64
+field doc key = doc.get key |> .and_then (\v -> v.as_u64 ()) |> .unwrap_or 0
+
+-- counters.json read back, or why it cannot be.
+export totals_from : &str -> Result<Totals, String>
+totals_from text =
+  doc = ((serde_json::from_str text : serde_json::Result<Value>) |> .map_err (\e -> "not JSON: #{e}"))?
+  schema = doc.get "schema" |> .and_then (\v -> v.as_u64 ())
+  if schema != Some 1
+    Err (.to_string "not schema 1")
+  else
+    Ok (Totals { polls = field (&doc) "polls", poll_failures = field (&doc) "pollFailures", head_changes = field (&doc) "headChanges", started = field (&doc) "plansStarted", finished = field (&doc) "plansFinished", failed = field (&doc) "plansFailed", skipped = field (&doc) "commitsSkipped" })
+
+-- The totals a restart starts from: counters.json, or zero when there is none
+-- yet. One that cannot be read is said and counted from zero (a reset the
+-- Prometheus rate() functions already handle), never guessed at.
+export totals_in : Option<String> -> Totals
+totals_in dir =
+  case dir of
+    None -> Totals::default ()
+    Some d ->
+      path = Path::new (&d) |> .join TOTALS_FILE
+      case fs::read_to_string (&path) of
+        Err e ->
+          if e.kind () != std::io::ErrorKind::NotFound
+            eprintln! \-> "vdeploy: reading #{path.display ()}: #{e}; the totals start from zero"
+          Totals::default ()
+        Ok text ->
+          case totals_from (&text) of
+            Ok t -> t
+            Err e ->
+              eprintln! \-> "vdeploy: #{path.display ()}: #{e}; the totals start from zero"
+              Totals::default ()
+
+-- The totals into the state directory, replaced whole.
+export publish_totals : Option<String> -> &Status -> Result<(), String>
+publish_totals dir st =
+  case dir of
+    None -> Ok ()
+    Some d ->
+      path = Path::new (&d) |> .join TOTALS_FILE
+      write_atomic (&path) (&totals_text (&totals_of st)) |> .map_err (\e -> "writing #{path.display ()}: #{e}")
 
 -- The plan into the state directory: `plan.json` (the latest, whole) and one
 -- line appended to `plans.jsonl` (the history, counts only).
@@ -245,3 +297,35 @@ test "publishing replaces the files whole and appends the history"
   assert! \-> std::fs::read_to_string (dir.join METRICS_FILE) |> .map (\t -> t.contains "vdeploy_observe_mode 1") |> .unwrap_or false
   assert! \-> !(dir.join ".vdeploy.prom.tmp" |> .exists)
   std::fs::remove_dir_all (&dir) |> .ok
+
+test "a restart carries the totals over: no reset, nothing counted twice (GH-221)"
+  dir = std::env::temp_dir () |> .join ("vdeploy-totals-#{std::process::id ()}")
+  std::fs::remove_dir_all (&dir) |> .ok
+  std::fs::create_dir_all (&dir) |> .expect "dir"
+  d = Some (dir.to_string_lossy () |> .to_string)
+  -- No file yet: from zero.
+  assert_eq! \-> totals_in (d.clone ()) \-> Totals::default ()
+  -- The first process: 3 plans started, 2 finished, 1 failed, 4 skipped, 9 polls.
+  first = Status { started = 3, finished = 2, failed = 1, skipped = 4, poll_failures = 1, watch = crate::watch::Watch { polls = 9, changes = 5, ...crate::watch::Watch::default () }, ...Status::default () }
+  assert_eq! \-> publish_totals (d.clone ()) (&first) \-> Ok ()
+  -- Written twice (every poll writes it): still the same totals, not doubled.
+  assert_eq! \-> publish_totals (d.clone ()) (&first) \-> Ok ()
+  base = totals_in (d.clone ())
+  assert_eq! \-> (base.started, base.finished, base.failed, base.skipped, base.polls, base.head_changes, base.poll_failures) \-> (3, 2, 1, 4, 9, 5, 1)
+  -- The restarted process reports the same totals before it has counted anything...
+  second = Status { base = base.clone (), ...Status::default () }
+  assert! \-> metrics (&second) |> .contains "\nvdeploy_plans_started_total 3\n"
+  -- ...and one more plan is one more, on top.
+  later = Status { started = 1, finished = 1, ...second.clone () }
+  m = metrics (&later)
+  assert! \-> m.contains "\nvdeploy_plans_started_total 4\n" && m.contains "\nvdeploy_plans_finished_total 3\n" && m.contains "\nvdeploy_polls_total 9\n"
+  assert_eq! \-> publish_totals (d.clone ()) (&later) \-> Ok ()
+  again = totals_in (d.clone ())
+  assert_eq! \-> again.started \-> 4
+  assert! \-> !(dir.join ".counters.json.tmp" |> .exists)
+  std::fs::remove_dir_all (&dir) |> .ok
+
+test "a counters.json that cannot be read starts from zero, and says so"
+  assert! \-> totals_from "{" |> .is_err
+  assert! \-> totals_from "{\"schema\":2}" |> .is_err
+  assert_eq! \-> totals_from "{\"schema\":1,\"plansStarted\":7}" |> .map (\t -> t.started) \-> Ok 7

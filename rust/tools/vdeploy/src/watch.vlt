@@ -112,8 +112,31 @@ export data Status
   , export poll_failures u64
   , export deploy bool
   , export last_apply Option<String>
+  , export base Totals
   }
   deriving (Debug, Clone, Default, PartialEq)
+
+-- The agent's counters as Prometheus totals (GH-221). `Status` counts what this
+-- process saw; `base` is what the state directory's counters.json held when it
+-- started. The metrics are base + this run, and counters.json is rewritten with
+-- the same sums, so a restart neither resets a total nor counts anything twice:
+-- the base is read once and never added to again.
+export data Totals
+  { export polls u64
+  , export poll_failures u64
+  , export head_changes u64
+  , export started u64
+  , export finished u64
+  , export failed u64
+  , export skipped u64
+  }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+-- The totals now: the base plus this run.
+export totals_of : &Status -> Totals
+totals_of st =
+  b = &st.base
+  Totals { polls = b.polls + st.watch.polls, poll_failures = b.poll_failures + st.poll_failures, head_changes = b.head_changes + st.watch.changes, started = b.started + st.started, finished = b.finished + st.finished, failed = b.failed + st.failed, skipped = b.skipped + st.skipped }
 
 -- The worker took `head` (at change count `changes`): it is done whatever
 -- the plan's outcome, so a failing commit is not retried until main moves.
