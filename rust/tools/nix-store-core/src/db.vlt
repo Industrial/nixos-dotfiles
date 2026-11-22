@@ -150,6 +150,63 @@ valid_paths conn =
   rows = (stmt.query_map () (\r -> Ok (ValidPath { path = (r.get 0)?, nar_hash = (r.get 1)?, nar_size = (r.get 2 : rusqlite::Result<Option<u64>>)? |> .unwrap_or 0 })))?
   rows.collect ()
 
+------------------------------------------------------------------------
+-- A closure as a graph (vwhy's reads, GH-179)
+
+-- A closure member: its ValidPaths id, path and narSize (NULL reads as 0).
+export type Member = (i64, String, u64)
+
+-- A reference: (referrer id, reference id).
+export type Edge = (i64, i64)
+
+-- A closure's members and the references out of them.
+export type ClosureGraph = (Vec<Member>, Vec<Edge>)
+
+-- Every member of a closure, the root included. UNION, not UNION ALL, so
+-- self-references and cycles end the recursion.
+const MEMBERS : &str = "WITH RECURSIVE c(id) AS (SELECT id FROM ValidPaths WHERE path = ?1 UNION SELECT r.reference FROM Refs r JOIN c ON r.referrer = c.id) SELECT v.id, v.path, v.narSize FROM c JOIN ValidPaths v ON v.id = c.id"
+
+-- Every reference out of a closure's members. CROSS JOIN fixes the loop order
+-- (members outside, Refs by its key inside): with a plain JOIN, SQLite's
+-- planner scans all of Refs against a Bloom filter of the members, 150 ms on
+-- drakkar's store even for a closure of one path, against 3 ms this way. The
+-- test "the reference query walks Refs by its key, never scanning it" pins it.
+export const EDGES : &str = "WITH RECURSIVE c(id) AS (SELECT id FROM ValidPaths WHERE path = ?1 UNION SELECT r.reference FROM Refs r JOIN c ON r.referrer = c.id) SELECT r.referrer, r.reference FROM c CROSS JOIN Refs r ON r.referrer = c.id"
+
+-- A closure's members, in no particular order; empty when `root` is not valid.
+export closure_members : &Connection -> &str -> rusqlite::Result<Vec<Member>>
+closure_members conn root =
+  mut stmt = (conn.prepare_cached MEMBERS)?
+  mut rows = (stmt.query ([root]))?
+  mut out = Vec::new () : Vec<Member>
+  while (rows.next ())? is Some row
+    id = (row.get 0 : rusqlite::Result<i64>)?
+    path = (row.get 1 : rusqlite::Result<String>)?
+    size = (row.get 2 : rusqlite::Result<Option<u64>>)?
+    out.push ((id, path, size.unwrap_or 0))
+  Ok out
+
+-- The references out of a closure's members, in no particular order.
+export closure_edges : &Connection -> &str -> rusqlite::Result<Vec<Edge>>
+closure_edges conn root =
+  mut stmt = (conn.prepare_cached EDGES)?
+  mut rows = (stmt.query ([root]))?
+  mut out = Vec::new () : Vec<Edge>
+  while (rows.next ())? is Some row
+    a = (row.get 0 : rusqlite::Result<i64>)?
+    b = (row.get 1 : rusqlite::Result<i64>)?
+    out.push ((a, b))
+  Ok out
+
+-- A closure's members and references in two queries, on one connection. The
+-- two are independent: a caller that wants them concurrently runs
+-- `closure_members` and `closure_edges` on two connections, as vwhy does.
+export closure_graph : &Connection -> &str -> rusqlite::Result<ClosureGraph>
+closure_graph conn root =
+  members = (closure_members conn root)?
+  edges = (closure_edges conn root)?
+  Ok ((members, edges))
+
 #[cfg(test)]
 import crate::testdb::{memory_db, schema_db}
 
@@ -216,4 +273,32 @@ test "the listing reads every valid path with its registration, in path order"
   want = .to_vec ([ValidPath { path = A.to_string (), nar_hash = H.to_string (), nar_size = 0 }, ValidPath { path = B.to_string (), nar_hash = H2.to_string (), nar_size = 8 }])
   assert_eq! \-> listed \-> want
   assert! \-> valid_paths (&schema_db ":memory:") |> .expect "an empty listing" |> .is_empty
+
+-- 1 -> {1, 2}, 2 -> {3}, 4 -> {1}; 2 has no narSize. vwhy's fixture.
+#[cfg(test)]
+graph_db : Connection
+graph_db =
+  conn = schema_db ":memory:"
+  conn.execute_batch "INSERT INTO ValidPaths (id, path, hash, registrationTime, narSize) VALUES (1, 'a', 'h', 0, 10), (2, 'b', 'h', 0, NULL), (3, 'c', 'h', 0, 30), (4, 'd', 'h', 0, 40); INSERT INTO Refs VALUES (1, 1), (1, 2), (2, 3), (4, 1);" |> .expect "the rows"
+  conn
+
+test "a closure graph: its members with their sizes, the references out of them"
+  conn = graph_db ()
+  g = closure_graph (&conn) "a" |> .expect "a closure graph"
+  mut members = g.0
+  mut edges = g.1
+  members.sort ()
+  edges.sort ()
+  assert_eq! \-> members \-> .to_vec ([(1, .to_string "a", 10), (2, .to_string "b", 0), (3, .to_string "c", 30)])
+  assert_eq! \-> edges \-> .to_vec ([(1, 1), (1, 2), (2, 3)])
+  (none, no_edges) = closure_graph (&conn) "z" |> .expect "no closure"
+  assert! \-> none.is_empty () && no_edges.is_empty ()
+
+test "the reference query walks Refs by its key, never scanning it"
+  conn = graph_db ()
+  sql = "EXPLAIN QUERY PLAN #{EDGES}"
+  mut stmt = conn.prepare (&sql) |> .expect "a plan"
+  plan = stmt.query_map (["a"]) (\row -> row.get 3) |> .expect "plan rows" |> .filter_map (\r -> r.ok ()) |> .collect : Vec<String>
+  assert! \-> !plan.is_empty ()
+  assert! \-> !(plan.iter () |> .any (\step -> step.starts_with "SCAN r"))
 
