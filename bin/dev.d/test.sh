@@ -170,7 +170,14 @@ expect "bin/update/system switches through vswitch" 0 '^  switch="vswitch switch
 has "and nixos-rebuild only without it" '^if \[ -z "\$.vswitched:-." \]; then$'
 expect "bin/fleet builds each node's profile through vmon" 0 '^  vmon -- nix build --no-link ".#deploy.nodes.\$1.profiles.system.path"$' \
     cat "$DOT/bin/fleet"
-has "and before every deploy" '^        if ! prebuild "\$h" \|\| ! deploy_cmd'
+has "and before every legacy deploy" '^ +if ! prebuild "\$h" \|\| ! deploy_cmd'
+# vdeploy wake took over `fleet deploy` (GH-246): every host woken over ssh, in parallel, and
+# deploy-rs is only the --legacy rollback, pinned to the flake's own input (#143).
+expect "bin/fleet deploys by waking vdeploy" 0 '^    vdeploy wake --wait --timeout "\$secs"$' cat "$DOT/bin/fleet"
+has "each host in the background" '^      wake_one "\$h" "\$secs" >"\$logs/\$h" 2>&1 &$'
+has "deploy-rs only as --legacy" '^    if \[\[ "\$\{1:-\}" == "--legacy" \]\]; then$'
+has "from the flake's pinned input" '^  nix run --accept-flake-config --inputs-from "\$ROOT" deploy-rs -- "\$@"$'
+lacks "never an unpinned deploy-rs" 'github:serokell/deploy-rs'
 
 # bin/with-devenv in a checkout with no .devenv link and no devenv installed.
 mkdir -p "$T/repo/bin"
