@@ -29,6 +29,14 @@ let
     ];
   };
   fullScript = (builtins.head (builtins.filter (p: (p.name or "") == "vswitch") full.environment.systemPackages)).text;
+  # GH-243: with vdeploy's eval cache option on (as on every fleet host), and rolled back.
+  cacheOpt = enable: {
+    options.features.nix.vdeploy.evalCache = {
+      enable = lib.mkOption {default = enable;};
+      caches = lib.mkOption {default = [{url = "http://cache:5100"; publicKey = "c-1:k";}];};
+    };
+  };
+  scriptWith = enable: (builtins.head (builtins.filter (p: (p.name or "") == "vswitch") (nixos.eval {modules = [./default.nix (cacheOpt enable)];}).environment.systemPackages)).text;
   has = s: f: lib.hasInfix f s;
 in
   assay.suite "cli-vswitch" {
@@ -44,4 +52,12 @@ in
     plainWithoutVmonOrVhealth = assay.eq (map (has script) ["--vmon" "--health-as"]) [false false];
     # With them: the build goes through vmon, and probes run as vhealth (never nobody).
     vmonAndVhealthWhenOn = assay.eq (map (has fullScript) ["--vmon /nix/store/" "--health-as vhealth"]) [true true];
+
+    # The eval cache (GH-243) follows features.nix.vdeploy.evalCache: its caches and keys,
+    # curl and git from the store; the rollback (and a module set without vdeploy) is
+    # --no-eval-cache.
+    evalCacheFollowsVdeploy =
+      assay.eq (map (has (scriptWith true)) ["--eval-cache http://cache:5100" "--eval-cache-key c-1:k" "--curl /nix/store/" "--git /nix/store/" "--no-eval-cache"]) [true true true true false];
+    evalCacheRollsBack = assay.eq (map (has (scriptWith false)) ["--no-eval-cache" "--eval-cache "]) [true false];
+    noCacheWithoutVdeploy = assay.eq (has script "--no-eval-cache") true;
   }

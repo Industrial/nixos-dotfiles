@@ -64,12 +64,23 @@
 # refusal and exits 1. Rollback: `features.nix.vdeploy.requireSignedCommits = lib.mkForce
 # false;` (the verdict is still recorded in every plan; nothing is refused).
 #
+# The eval cache (GH-243, on by default): before evaluating, a plan asks the fleet's caches
+# (common/fleet.nix binaryCaches) for vci's record of the same (commit, host), signed with
+# the cache's key, the one this host trusts for store paths. A hit plans with the record's
+# drv, no evaluation, after checking that the out's narinfo names that drv as its Deriver
+# and, once realised, that the realised path is the record's out. Anything else evaluates as
+# before. vdeploy_eval_cache_{hits,misses,fallbacks}_total and
+# vdeploy_eval_seconds_saved_total count it. Rollback, for vdeploy and vswitch together:
+# `features.nix.vdeploy.evalCache.enable = lib.mkForce false;` (--no-eval-cache).
+#
 # Observe-mode rollback: `features.nix.vdeploy.enable = lib.mkForce false;` removes the unit.
 #
 # Health probe (on the host, no root needed):
 #   systemctl is-active vdeploy \
 #     && grep -q '^vdeploy_last_poll_timestamp_seconds ' /var/lib/prometheus-node-exporter-text/vdeploy.prom \
 #     && journalctl -u vdeploy -o cat | grep -E 'would switch|nothing to switch' | tail -n 3
+#   eval cache: journalctl -u vdeploy -o cat | grep "eval cache" | tail -n 3; \
+#     grep "^vdeploy_eval_cache" /var/lib/prometheus-node-exporter-text/vdeploy.prom
 {
   config,
   lib,
@@ -148,6 +159,13 @@
     done
   '';
   verifies = cfg.trustedSigningKeys != [];
+  # GH-243: the eval cache's flags, for vdeploy and (through this option) vswitch.
+  evalCacheArgs =
+    if cfg.evalCache.enable && cfg.evalCache.caches != []
+    then
+      lib.concatMap (c: ["--eval-cache" c.url "--eval-cache-key" c.publicKey]) cfg.evalCache.caches
+      ++ ["--curl" "${pkgs.curl}/bin/curl"]
+    else ["--no-eval-cache"];
 in {
   imports = [../../monitoring/textfile-collector.nix];
 
@@ -226,6 +244,33 @@ in {
         Armored OpenPGP public keys whose signatures vdeploy trusts. The default is GitHub's
         web-flow key, which signs every merge made through GitHub (main takes merges only).
       '';
+    };
+    # GH-243: vci's signed evaluation records, asked for before evaluating.
+    evalCache = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Before evaluating this host's toplevel at a commit, ask the fleet's caches for vci's
+          record of the same (commit, host): `GET <cache>/veval/<key>.veval`, signed by the
+          cache's key (the one this host trusts for store paths), checked against the out's
+          narinfo and, after realising, the realised path. A hit skips the evaluation; anything
+          else evaluates as before. vswitch (features/cli/vswitch) follows this option too.
+          Rollback, for both: `lib.mkForce false` (vdeploy and vswitch get --no-eval-cache).
+        '';
+      };
+      caches = lib.mkOption {
+        type = lib.types.listOf (lib.types.submodule {
+          options = {
+            url = lib.mkOption {type = lib.types.str;};
+            publicKey = lib.mkOption {type = lib.types.str;};
+          };
+        });
+        # This host's own cache included: on the cache host, vci's records are local.
+        default = map (c: {inherit (c) url publicKey;}) fleet.binaryCaches;
+        defaultText = lib.literalExpression "(import common/fleet.nix).binaryCaches";
+        description = "The caches asked, in order, and the key each signs its records with.";
+      };
     };
     # GH-246: let an operator make vdeploy poll main now (`vdeploy wake`, `fleet deploy`).
     wake = {
@@ -332,6 +377,7 @@ in {
               "${pkgs.gnupg}/bin/gpgv"
             ]
             ++ lib.optional cfg.requireSignedCommits "--require-signed"
+            ++ evalCacheArgs
             ++ lib.optionals deploy ([
                 "--mode"
                 "deploy"

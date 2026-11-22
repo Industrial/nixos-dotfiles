@@ -24,6 +24,11 @@
 # says so; nothing is activated or marked. Only `switch` (vdeploy's apply) can mark a
 # generation bad, and a mark is per store path (that exact generation), never per commit.
 #
+# The eval cache (GH-243): in a clean checkout at a commit vci built, `vswitch` builds vci's
+# record of that (commit, host) instead of evaluating the flake (rust/tools/vswitch README).
+# It follows features.nix.vdeploy.evalCache, so that option's `lib.mkForce false` turns it
+# off here too (--no-eval-cache).
+#
 # Take-over rollback: `features.cli.vswitch.enable = lib.mkForce false;` on a host, and
 # bin/update/system falls back to nixos-rebuild; nh stays installed (profiles/cli-core.nix).
 {
@@ -40,6 +45,17 @@
   # features/nix/vhealth's static user: present exactly when the generations carry probes.
   vhealthOn = config.users.users ? vhealth;
   window = config.features.nix.vdeploy.healthWindow or "2m";
+  # GH-243: the eval cache follows vdeploy's option (one rollback for both).
+  evalCache = config.features.nix.vdeploy.evalCache or {
+    enable = false;
+    caches = [];
+  };
+  cacheFlags =
+    if evalCache.enable && evalCache.caches != []
+    then
+      lib.concatMap (c: ["--eval-cache" c.url "--eval-cache-key" c.publicKey]) evalCache.caches
+      ++ ["--curl" "${pkgs.curl}/bin/curl" "--git" "${pkgs.git}/bin/git"]
+    else ["--no-eval-cache"];
   flags =
     [
       "--nix"
@@ -60,7 +76,8 @@
       window
     ]
     ++ lib.optionals vmonOn ["--vmon" "${vmon}/bin/vmon"]
-    ++ lib.optionals vhealthOn ["--health-as" "vhealth"];
+    ++ lib.optionals vhealthOn ["--health-as" "vhealth"]
+    ++ cacheFlags;
   wrapped = pkgs.writeShellScriptBin "vswitch" ''
     exec ${vswitch}/bin/vswitch ${lib.escapeShellArgs flags} "$@"
   '';

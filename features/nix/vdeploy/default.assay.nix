@@ -60,6 +60,9 @@ let
   # GH-221: commit verification's one rollback option.
   unsignedOk = nixos.eval {modules = [./default.nix base {features.nix.vdeploy.requireSignedCommits = lib.mkForce false;}];};
   noKeys = nixos.eval {modules = [./default.nix base {features.nix.vdeploy.trustedSigningKeys = [];}];};
+  # GH-243: the eval cache's one rollback option.
+  noEvalCache = nixos.eval {modules = [./default.nix base {features.nix.vdeploy.evalCache.enable = lib.mkForce false;}];};
+  fleetFile = import ../../../common/fleet.nix;
   noVhealth = nixos.eval {modules = [./default.nix base fleet {features.nix.vdeploy.mode = "deploy";}];};
   failedAssertions = c: map (a: a.message) (builtins.filter (a: !a.assertion && lib.hasPrefix "features.nix.vdeploy" a.message) c.assertions);
   dargAfter = argAfterIn deployed;
@@ -225,4 +228,17 @@ in
       off = nixos.eval {modules = [./default.nix base fleet probes {features.nix.vdeploy.mode = "deploy";} {features.nix.vdeploy.wake.enable = false;}];};
     in
       assay.eq [(lib.hasInfix "--wake-fifo" off.systemd.services.vdeploy.serviceConfig.ExecStart) (builtins.any (lib.hasInfix "/run/vdeploy/wake") off.systemd.tmpfiles.rules)] [false false];
+
+    # The eval cache (GH-243): on by default, asking every fleet cache (common/fleet.nix
+    # binaryCaches, this host's own included) with the key it signs with, curl from the store.
+    evalCacheOnByDefault = assay.eq cfg.features.nix.vdeploy.evalCache.enable true;
+    asksEveryFleetCache =
+      assay.eq (lib.filter (x: lib.hasPrefix "http://" x) args) (map (c: c.url) fleetFile.binaryCaches);
+    trustsEachCachesKey =
+      assay.eq (map (c: lib.hasInfix "--eval-cache-key ${lib.escapeShellArg c.publicKey}" sc.ExecStart) fleetFile.binaryCaches) (map (_: true) fleetFile.binaryCaches);
+    curlPinned = assay.eq (lib.hasSuffix "/bin/curl" (argAfter "--curl")) true;
+    noNoEvalCacheByDefault = assay.eq (builtins.elem "--no-eval-cache" args) false;
+    # The rollback: --no-eval-cache, and no cache asked.
+    evalCacheRollsBack =
+      assay.eq [(builtins.elem "--no-eval-cache" (argsOf noEvalCache)) (builtins.elem "--eval-cache" (argsOf noEvalCache))] [true false];
   }
