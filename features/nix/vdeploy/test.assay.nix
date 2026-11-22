@@ -26,4 +26,8 @@ in
     noSubstituters = assay.eq machine.nix.settings.substituters [];
     builderInTheStore = assay.eq (map (d: d.pname or d.name) machine.system.extraDependencies) ["busybox"];
     exporterOn = assay.eq machine.services.prometheus.exporters.node.enable true;
+    # GH-221: the forge is local, so its commits are signed with the test key, which the node
+    # trusts instead of GitHub's; signatures are required, as on the fleet.
+    signedWithTheTestKey =
+      assay.eq [(pkgs.lib.hasSuffix "-vdeploy-test-signing-key/public.asc" (toString (builtins.head machine.features.nix.vdeploy.trustedSigningKeys))) (builtins.elem "--require-signed" args)] [true true];
   }

@@ -13,6 +13,9 @@
 --           [--nix-env PROG] [--nix-store PROG] [--systemctl PROG]
 --           [--comin-unit UNIT] [--health-as USER [--health-group GROUP] [--setpriv PROG]]
 --
+-- `--trusted-keys KEYRING` (GH-221): check each head's signature with gpgv
+-- (`--gpgv`) against that keyring, and record the verdict in the plan; with
+-- `--require-signed`, a head that does not verify is refused, never planned.
 -- `--mode observe` (the default) plans and logs, and never switches.
 -- `--mode deploy` (#160) runs each switching plan through `vdeploy apply`
 -- in a transient unit: switch (test), health check, then the boot entry or a
@@ -21,7 +24,7 @@
 
 import nix_store_core::db
 
-export const USAGE : &str = "usage: vdeploy --host NAME [--mode observe|deploy] [--once] [--url URL] [--branch NAME] [--repo DIR] [--interval DURATION] [--debounce DURATION] [--tick DURATION] [--state-dir DIR] [--textfile-dir DIR] [--db FILE] [--git PROG] [--nix PROG] [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP] [--dotfiles-home DIR]] [APPLY OPTIONS] [--systemd-run PROG] [--wake-fifo PATH]\n       vdeploy wake [--wait] [--timeout DURATION] [--fifo PATH] [--state-dir DIR]\n       vdeploy apply [--toplevel PATH] [--state-dir DIR] [--textfile-dir DIR] [APPLY OPTIONS]\nAPPLY OPTIONS: [--health-window DURATION] [--health-every DURATION] [--vhealth PROG] [--profile PATH] [--gcroot PATH] [--nix-env PROG] [--nix-store PROG] [--systemctl PROG] [--comin-unit UNIT] [--health-as USER [--health-group GROUP] [--setpriv PROG]]"
+export const USAGE : &str = "usage: vdeploy --host NAME [--mode observe|deploy] [--once] [--url URL] [--branch NAME] [--repo DIR] [--interval DURATION] [--debounce DURATION] [--tick DURATION] [--state-dir DIR] [--textfile-dir DIR] [--db FILE] [--git PROG] [--nix PROG] [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP] [--dotfiles-home DIR]] [APPLY OPTIONS] [--systemd-run PROG] [--wake-fifo PATH] [--trusted-keys KEYRING [--require-signed] [--gpgv PROG]]\n       vdeploy wake [--wait] [--timeout DURATION] [--fifo PATH] [--state-dir DIR]\n       vdeploy apply [--toplevel PATH] [--state-dir DIR] [--textfile-dir DIR] [APPLY OPTIONS]\nAPPLY OPTIONS: [--health-window DURATION] [--health-every DURATION] [--vhealth PROG] [--profile PATH] [--gcroot PATH] [--nix-env PROG] [--nix-store PROG] [--systemctl PROG] [--comin-unit UNIT] [--health-as USER [--health-group GROUP] [--setpriv PROG]]"
 
 export const DEFAULT_URL : &str = "https://github.com/Industrial/nixos-dotfiles.git"
 
@@ -61,11 +64,14 @@ export data Options
   , export health_group Option<String>
   , export setpriv String
   , export wake_fifo Option<String>
+  , export trusted_keys Option<String>
+  , export require_signed bool
+  , export gpgv String
   }
   deriving (Clone, Debug, PartialEq)
 
 export defaults : Options
-defaults = Options { host = String::new (), once = false, url = DEFAULT_URL.to_string (), branch = .to_string "main", repo = .to_string "/var/lib/vdeploy/repo", interval = 60, debounce = 0, tick = 5, state_dir = None, textfile_dir = None, db = db::DEFAULT_DB.to_string (), git = .to_string "git", nix = .to_string "nix", dotfiles = None, dotfiles_user = None, dotfiles_group = None, dotfiles_home = None, help = false, deploy = false, apply = false, toplevel = None, health_window = 120, health_every = 2, systemd_run = .to_string "systemd-run", systemctl = .to_string "systemctl", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", profile = .to_string "/nix/var/nix/profiles/system", gcroot = .to_string "/nix/var/nix/gcroots/vdeploy/candidate", vhealth = None, comin_unit = .to_string "comin.service", health_as = None, health_group = None, setpriv = .to_string "setpriv", wake_fifo = None }
+defaults = Options { host = String::new (), once = false, url = DEFAULT_URL.to_string (), branch = .to_string "main", repo = .to_string "/var/lib/vdeploy/repo", interval = 60, debounce = 0, tick = 5, state_dir = None, textfile_dir = None, db = db::DEFAULT_DB.to_string (), git = .to_string "git", nix = .to_string "nix", dotfiles = None, dotfiles_user = None, dotfiles_group = None, dotfiles_home = None, help = false, deploy = false, apply = false, toplevel = None, health_window = 120, health_every = 2, systemd_run = .to_string "systemd-run", systemctl = .to_string "systemctl", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", profile = .to_string "/nix/var/nix/profiles/system", gcroot = .to_string "/nix/var/nix/gcroots/vdeploy/candidate", vhealth = None, comin_unit = .to_string "comin.service", health_as = None, health_group = None, setpriv = .to_string "setpriv", wake_fifo = None, trusted_keys = None, require_signed = false, gpgv = .to_string "gpgv" }
 
 -- A duration in seconds: bare seconds, or a number with s/m/h/d.
 export parse_duration : &str -> Option<u64>
@@ -141,6 +147,12 @@ parse_args args =
         o.health_as := Some ((value (it.next ()) "--health-as")?)
       "--setpriv" ->
         o.setpriv := (value (it.next ()) "--setpriv")?
+      "--trusted-keys" ->
+        o.trusted_keys := Some ((value (it.next ()) "--trusted-keys")?)
+      "--require-signed" ->
+        o.require_signed := true
+      "--gpgv" ->
+        o.gpgv := (value (it.next ()) "--gpgv")?
       "--wake-fifo" ->
         o.wake_fifo := Some ((value (it.next ()) "--wake-fifo")?)
       "--health-group" ->
@@ -188,6 +200,8 @@ parse_args args =
         return Err "unknown argument: #{other}"
   if !o.help && !o.apply && o.host.is_empty ()
     return Err (.to_string "--host is required (the nixosConfigurations name of this host)")
+  if o.require_signed && o.trusted_keys.is_none ()
+    return Err (.to_string "--require-signed needs --trusted-keys (the keyring a head's signature is checked against)")
   if o.toplevel.is_some () && !o.apply
     return Err (.to_string "--toplevel is for `vdeploy apply`")
   if o.dotfiles.is_none () && (o.dotfiles_user.is_some () || o.dotfiles_group.is_some () || o.dotfiles_home.is_some ())
@@ -250,6 +264,12 @@ test "deploy mode, and the apply subcommand with its options"
   -- No host needed to apply; a toplevel outside apply is refused.
   assert! \-> parse_args (&args (&["apply"])) |> .is_ok
   assert! \-> parse_args (&args (&["--host", "h", "--toplevel", "/nix/store/x"])) |> .is_err
+
+test "signed commits: a keyring, required or not, and never required without one (GH-221)"
+  o = parse_args (&args (&["--host", "h", "--trusted-keys", "/k.gpg", "--require-signed", "--gpgv", "/bin/gpgv"])) |> .expect "options"
+  assert_eq! \-> (o.trusted_keys, o.require_signed, o.gpgv.as_str ()) \-> (Some (.to_string "/k.gpg"), true, "/bin/gpgv")
+  assert_eq! \-> parse_args (&args (&["--host", "h"])) |> .map (\d -> (d.trusted_keys, d.require_signed)) \-> Ok ((None, false))
+  assert! \-> parse_args (&args (&["--host", "h", "--require-signed"])) |> .err |> .map (\e -> e.contains "needs --trusted-keys") |> .unwrap_or false
 
 test "durations"
   assert_eq! \-> (parse_duration "0", parse_duration "90", parse_duration "2m", parse_duration "1h", parse_duration "1d", parse_duration "1w") \-> (Some 0, Some 90, Some 120, Some 3600, Some 86400, None)

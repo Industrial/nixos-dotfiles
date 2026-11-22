@@ -16,7 +16,9 @@ import crate::dotfiles::Checkout
 
 -- The tip of main as fetched: its sha, its commit time (Unix seconds), and
 -- whether GitHub signed it (a squash merge through the web UI is signed with
--- GitHub's key; vdeploy records this, it does not enforce it).
+-- GitHub's key). `signed` is what the commit object says (signedByGithub); what
+-- decides a deploy is the signature's check against the trusted keys, in the
+-- worker (signature.vlt, GH-221).
 export data Head { export sha String, export time u64, export signed bool }
   deriving (Debug, Clone, PartialEq, Eq)
 
@@ -101,6 +103,7 @@ export data Status
   , export finished u64
   , export failed u64
   , export skipped u64
+  , export unverified u64
   , export last_plan Option<u64>
   , export last_duration f64
   , export pending bool
@@ -129,6 +132,7 @@ export data Totals
   , export finished u64
   , export failed u64
   , export skipped u64
+  , export unverified u64
   }
   deriving (Debug, Clone, Default, PartialEq, Eq)
 
@@ -136,7 +140,7 @@ export data Totals
 export totals_of : &Status -> Totals
 totals_of st =
   b = &st.base
-  Totals { polls = b.polls + st.watch.polls, poll_failures = b.poll_failures + st.poll_failures, head_changes = b.head_changes + st.watch.changes, started = b.started + st.started, finished = b.finished + st.finished, failed = b.failed + st.failed, skipped = b.skipped + st.skipped }
+  Totals { polls = b.polls + st.watch.polls, poll_failures = b.poll_failures + st.poll_failures, head_changes = b.head_changes + st.watch.changes, started = b.started + st.started, finished = b.finished + st.finished, failed = b.failed + st.failed, skipped = b.skipped + st.skipped, unverified = b.unverified + st.unverified }
 
 -- The worker took `head` (at change count `changes`): it is done whatever
 -- the plan's outcome, so a failing commit is not retried until main moves.
@@ -145,6 +149,14 @@ export taken : Status -> String -> u64 -> (u64, Status)
 taken st sha changes =
   skipped = skipped_between st.done_changes changes
   (skipped, Status { done = Some sha, done_changes = Some changes, started = st.started + 1, skipped = st.skipped + skipped, ...st })
+
+-- The worker took `head` and refused it: its signature did not verify
+-- (GH-221). It is done, as a taken head is, so it is not checked again until
+-- main moves; it is no plan (started and finished stay), and no bad mark.
+export refused_with : Status -> String -> u64 -> (u64, Status)
+refused_with st sha changes =
+  skipped = skipped_between st.done_changes changes
+  (skipped, Status { done = Some sha, done_changes = Some changes, unverified = st.unverified + 1, skipped = st.skipped + skipped, ...st })
 
 -- A plan finished: whether it would switch, to what, how long it took.
 export finished_with : Status -> bool -> String -> u64 -> f64 -> Status
@@ -201,6 +213,14 @@ test "the commits between two plans are counted as skipped"
   (n, st) = taken (Status::default ()) (.to_string "a") 1
   (m, st2) = taken st (.to_string "e") 5
   assert_eq! \-> (n, m, st2.started, st2.skipped, st2.done) \-> (0, 3, 2, 3, Some (.to_string "e"))
+
+test "a refused head is done, counted as unverified, and is no plan (GH-221)"
+  (_, st) = taken (Status::default ()) (.to_string "a") 1
+  (n, st2) = refused_with st (.to_string "d") 4
+  assert_eq! \-> (n, st2.unverified, st2.started, st2.finished, st2.failed, st2.done.clone ()) \-> (2, 1, 1, 0, 0, Some (.to_string "d"))
+  w = observed (Watch::default ()) (head "d")
+  assert_eq! \-> decide (&w) (st2.done.as_deref ()) 0 \-> Decision::Idle
+  assert_eq! \-> (totals_of (&st2)).unverified \-> 1
 
 test "a finished and a failed plan are both counted as finished"
   st = finished_with (Status::default ()) true (.to_string "/nix/store/x") 9 1.5

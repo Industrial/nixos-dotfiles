@@ -40,6 +40,11 @@ in
     # The source and dotfiles tests run git in the sandbox.
     testsHaveGit = assay.eq (builtins.any (d: (d.pname or "") == "git") ((pkg.nativeCheckInputs or []) ++ (pkg.nativeBuildInputs or []))) true;
 
+    # GH-221: the signature tests run gpgv on the pinned key and a real signed commit.
+    testsHaveGnupg = assay.eq (builtins.any (d: lib.hasPrefix "gnupg" (d.pname or d.name or "")) ((pkg.nativeCheckInputs or []) ++ (pkg.nativeBuildInputs or []))) true;
+    signatureDataInSource =
+      assay.eq (map (f: builtins.pathExists "${pkg.src}/vdeploy/${f}") ["keys/github-web-flow.asc" "testdata/signed-commit" "testdata/web-flow-2017.asc" "src/signature.vlt"]) [true true true true];
+
     # The source is rooted at rust/tools, carries all three crates, and the build runs in this one.
     pathDependenciesInSource =
       assay.eq (map (f: builtins.pathExists "${pkg.src}/${f}") ["vdeploy/Cargo.lock" "vdeploy/src/agent.vlt" "vdiff/src/report.vlt" "nix-store-core/Cargo.toml" "nix-store-core/src/db.vlt"]) [true true true true true];

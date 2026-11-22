@@ -1,0 +1,41 @@
+tree bd9c06c8ce209e9e11c29ec981386d8843d5cfa7
+parent d8ace5bc05437d7b69b003528dae8ca32623e201
+author Tom Wieland <tom.wieland@gmail.com> 1795367551 +0000
+committer GitHub <noreply@github.com> 1795367551 +0000
+gpgsig -----BEGIN PGP SIGNATURE-----
+ 
+ wsFcBAABCAAQBQJrAyJ/CRC1aQ7uu5UhlAAAVuYQAHmbGD3yRTSQMYXNoDeLuKGf
+ mMnHRz3ZNgr3Hzgn3m/xxBo/ujy2k47MjmiaTTNHRd700sVayNB1KCwg++ZbMg9z
+ ttZ259wBKxGMJrsQcVOsyrnSUAS10ZrhQbgLhZNCcJisLlrxqtz2wHg3RMg2y8kM
+ HKDF+vE4Gs0uVFm+F76UNttHLfBwkyUR++wwKtT4M1ZAX2VFSmWJWs5sFfU9qtfm
+ k30JPMFuA+Ziw/SsKhZRlLtejcnmGkFll9agdiwHlR1w2va7E3IMs89owk/PoHpL
+ Fvtr2Awi3W0HzmOzwvBTCf3v2zQ9GMe2raudps8gCSr23CrmgALBFbVKq56FNso1
+ qL3nxbJ4R1bfPCBqszxvCSBSNd0viB+mQMSGLvaKAQ/jaZxqUSETWMMbYlCLYK4D
+ wwECrZn3xzToygxYl5mMsDE4ap99mSFn8mszQv6o9EFE4OnULJPLUF1g6En6lS/k
+ MfXHW70AyajQU/4n2SNqanYbNTQstG2bmrtmXXHrxEfVIZkbK/Q1abkI6rZZEBCE
+ 2w5DiFkNKxk0P2qHheORAMa5nUOG8+7simgtq8pZTjTvQBQ4ydtn78537395jGh5
+ jgctsMjpFWs2egegh3RDZpZrLiO3bLZ5pSg7R6ShrSZ9DtbIHFlC61KzTFx842TE
+ uQgVHDIUvJfwU0B6jc+i
+ =hfgW
+ -----END PGP SIGNATURE-----
+ 
+
+feat(vdeploy): the _total counters survive a restart, never counted twice (GH-221) (#265)
+
+vdeploy_plans_{started,finished,failed}_total, commits_skipped, polls,
+poll_failures and head_changes reset whenever a deploy restarted the unit.
+They are now totals across restarts. <state-dir>/counters.json is read once
+at start as a base and rewritten atomically (temp file, fsync, rename) with
+base + this run before every metrics write. The base is never added to again,
+so a restart neither resets a total nor double-counts; an unreadable file is
+logged and counted from zero.
+
+Tests: a restart carries the totals over (written twice, read back, one more
+plan on top); an unreadable counters.json starts from zero. vdeploy-vm
+restarts the unit twice and sees exactly one more plan per restart (the
+restarted agent re-plans main's tip), skipped unchanged, counters.json in
+step. vdeploy-rollback-vm, vdeploy-takeover-vm and vdeploy-wake-vm green.
+
+Refs #221
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>

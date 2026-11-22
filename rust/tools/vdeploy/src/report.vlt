@@ -22,12 +22,16 @@ export const SAME : &str = "{\"schema\":1,\"changed\":[],\"selectionChanged\":[]
 
 -- One plan: the commit, what this host runs, what it would run, and the
 -- diff between them. `switch` is whether it would switch; observe mode never
--- does.
+-- does. `verified`: the commit's signature verified against the trusted keys
+-- (GH-221). A `refused` record is a head that was not planned because it did
+-- not (no derivation, no output; `note` says why).
 export data Plan
   { export host String
   , export commit String
   , export commit_time u64
   , export signed bool
+  , export verified bool
+  , export refused bool
   , export skipped u64
   , export running_rev Option<String>
   , export running String
@@ -94,7 +98,9 @@ line_of p =
     " (#{p.skipped} newer commit(s) skipped since the last plan)"
   else
     String::new ()
-  if p.switch && p.deploy
+  if p.refused
+    "vdeploy: not deploying #{short (&p.commit)} to #{p.host}: its signature does not verify (#{p.note}). No bad mark; the next verified commit on main is deployed as usual."
+  else if p.switch && p.deploy
     "vdeploy: switching #{p.host} from #{from} to #{short (&p.commit)}#{skipped}: #{p.out} (#{p.realised}); #{diff_words p}. Deploy mode: applying, with a health check."
   else if p.switch
     "vdeploy: would switch #{p.host} from #{from} to #{short (&p.commit)}#{skipped}: #{p.out} (#{p.realised}); #{diff_words p}. Observe mode: not switching."
@@ -111,7 +117,9 @@ counts_json d =
 -- is in it (`plan.json`); without, only its counts (`plans.jsonl`).
 export json_of : &Plan -> bool -> String
 json_of p full =
-  action = if p.switch
+  action = if p.refused
+    "refused"
+  else if p.switch
     "switch"
   else
     "none"
@@ -123,7 +131,7 @@ json_of p full =
     "deploy"
   else
     "observe"
-  "{\"schema\":1,\"mode\":\"#{mode}\",\"host\":#{quote (&p.host)},\"commit\":#{quote (&p.commit)},\"commitTime\":#{p.commit_time},\"signedByGithub\":#{p.signed},\"skipped\":#{p.skipped},\"running\":{\"rev\":#{quote_opt (&p.running_rev)},\"toplevel\":#{quote (&p.running)}},\"drv\":#{quote (&p.drv)},\"out\":#{quote (&p.out)},\"realised\":#{quote (&p.realised)},\"action\":\"#{action}\",\"wouldRun\":#{quote (&"#{p.out}/bin/switch-to-configuration switch")},\"diff\":#{diff},\"note\":#{quote (&p.note)},\"plannedAt\":#{p.planned_at}}"
+  "{\"schema\":1,\"mode\":\"#{mode}\",\"host\":#{quote (&p.host)},\"commit\":#{quote (&p.commit)},\"commitTime\":#{p.commit_time},\"signedByGithub\":#{p.signed},\"signatureVerified\":#{p.verified},\"skipped\":#{p.skipped},\"running\":{\"rev\":#{quote_opt (&p.running_rev)},\"toplevel\":#{quote (&p.running)}},\"drv\":#{quote (&p.drv)},\"out\":#{quote (&p.out)},\"realised\":#{quote (&p.realised)},\"action\":\"#{action}\",\"wouldRun\":#{quote (&"#{p.out}/bin/switch-to-configuration switch")},\"diff\":#{diff},\"note\":#{quote (&p.note)},\"plannedAt\":#{p.planned_at}}"
 
 gauge : &str -> &str -> String -> String
 gauge name help value = "# HELP #{name} #{help}\n# TYPE #{name} gauge\n#{name} #{value}\n"
@@ -160,6 +168,7 @@ metrics st =
   out.push_str (&counter "vdeploy_plans_finished_total" "Plans finished, successfully or not. Never cancelled: equal to started, or one behind while a plan runs." t.finished)
   out.push_str (&counter "vdeploy_plans_failed_total" "Plans that failed (evaluation, realisation, verification)." t.failed)
   out.push_str (&counter "vdeploy_commits_skipped_total" "Commits on main never planned, because a newer one landed first (latest-wins)." t.skipped)
+  out.push_str (&counter "vdeploy_commits_unverified_total" "Heads of main refused, never planned, because their signature did not verify against the trusted keys." t.unverified)
   out.push_str "# HELP vdeploy_dotfiles_state The user's dotfiles checkout after the last poll (1 for the current state).\n# TYPE vdeploy_dotfiles_state gauge\n"
   current = st.dotfiles |> .as_ref |> .map (\c -> state_name c)
   for s in STATES
@@ -188,7 +197,7 @@ publish_metrics dir st =
 
 -- The totals as counters.json (schema 1).
 export totals_text : &Totals -> String
-totals_text t = "{\"schema\":1,\"polls\":#{t.polls},\"pollFailures\":#{t.poll_failures},\"headChanges\":#{t.head_changes},\"plansStarted\":#{t.started},\"plansFinished\":#{t.finished},\"plansFailed\":#{t.failed},\"commitsSkipped\":#{t.skipped}}\n"
+totals_text t = "{\"schema\":1,\"polls\":#{t.polls},\"pollFailures\":#{t.poll_failures},\"headChanges\":#{t.head_changes},\"plansStarted\":#{t.started},\"plansFinished\":#{t.finished},\"plansFailed\":#{t.failed},\"commitsSkipped\":#{t.skipped},\"commitsUnverified\":#{t.unverified}}\n"
 
 field : &Value -> &str -> u64
 field doc key = doc.get key |> .and_then (\v -> v.as_u64 ()) |> .unwrap_or 0
@@ -201,7 +210,7 @@ totals_from text =
   if schema != Some 1
     Err (.to_string "not schema 1")
   else
-    Ok (Totals { polls = field (&doc) "polls", poll_failures = field (&doc) "pollFailures", head_changes = field (&doc) "headChanges", started = field (&doc) "plansStarted", finished = field (&doc) "plansFinished", failed = field (&doc) "plansFailed", skipped = field (&doc) "commitsSkipped" })
+    Ok (Totals { polls = field (&doc) "polls", poll_failures = field (&doc) "pollFailures", head_changes = field (&doc) "headChanges", started = field (&doc) "plansStarted", finished = field (&doc) "plansFinished", failed = field (&doc) "plansFailed", skipped = field (&doc) "commitsSkipped", unverified = field (&doc) "commitsUnverified" })
 
 -- The totals a restart starts from: counters.json, or zero when there is none
 -- yet. One that cannot be read is said and counted from zero (a reset the
@@ -248,7 +257,7 @@ publish_plan dir p =
 
 #[cfg(test)]
 sample : Plan
-sample = Plan { host = .to_string "drakkar", commit = .to_string "0123456789abcdef", commit_time = 7, signed = true, skipped = 2, running_rev = Some (.to_string "fedcba9876543210"), running = .to_string "/nix/store/old", drv = .to_string "/nix/store/new.drv", out = .to_string "/nix/store/new", realised = .to_string "fetched", switch = true, deploy = false, diff = Some (.to_string "{\"schema\":1,\"changed\":[{\"name\":\"hello\"}],\"selectionChanged\":[],\"added\":[],\"removed\":[{\"name\":\"gone\"}],\"closure\":{\"pathsAdded\":3,\"pathsRemoved\":2,\"narSizeDelta\":2048}}"), note = String::new (), planned_at = 9 }
+sample = Plan { host = .to_string "drakkar", commit = .to_string "0123456789abcdef", commit_time = 7, signed = true, verified = true, refused = false, skipped = 2, running_rev = Some (.to_string "fedcba9876543210"), running = .to_string "/nix/store/old", drv = .to_string "/nix/store/new.drv", out = .to_string "/nix/store/new", realised = .to_string "fetched", switch = true, deploy = false, diff = Some (.to_string "{\"schema\":1,\"changed\":[{\"name\":\"hello\"}],\"selectionChanged\":[],\"added\":[],\"removed\":[{\"name\":\"gone\"}],\"closure\":{\"pathsAdded\":3,\"pathsRemoved\":2,\"narSizeDelta\":2048}}"), note = String::new (), planned_at = 9 }
 
 test "a plan that would switch says so, with the diff, and that it does not"
   l = line_of (&sample ())
@@ -270,6 +279,19 @@ test "the plan's JSON is one parseable line, whole or with counts only"
   parsed = (serde_json::from_str (&json_of (&none) false) : serde_json::Result<Value>) |> .expect "json"
   assert! \-> parsed.get "diff" |> .map (\v -> v.is_null ()) |> .unwrap_or false
   assert! \-> !(json_of (&sample ()) true |> .contains '\n')
+
+test "a refused head is one line saying why, and a record with signatureVerified false (GH-221)"
+  assert_eq! \-> (serde_json::from_str (&json_of (&sample ()) false) : serde_json::Result<Value>) |> .ok |> .and_then (\v -> v.get "signatureVerified" |> .and_then (\b -> b.as_bool ())) \-> Some true
+  no = Plan { verified = false, refused = true, switch = false, drv = String::new (), out = String::new (), diff = None, note = .to_string "the commit is not signed", ...sample () }
+  l = line_of (&no)
+  assert! \-> l.contains "not deploying 012345678 to drakkar" && l.contains "(the commit is not signed)" && l.contains "No bad mark"
+  v = (serde_json::from_str (&json_of (&no) true) : serde_json::Result<Value>) |> .expect "json"
+  assert_eq! \-> (v.get "action" |> .and_then (\x -> x.as_str ()), v.get "signatureVerified" |> .and_then (\x -> x.as_bool ())) \-> (Some "refused", Some false)
+  m = metrics (&Status { unverified = 2, ...Status::default () })
+  assert! \-> m.contains "\nvdeploy_commits_unverified_total 2\n"
+  assert_eq! \-> totals_from (&totals_text (&Totals { unverified = 3, ...Totals::default () })) |> .map (\t -> t.unverified) \-> Ok 3
+  -- A counters.json from before GH-221 reads as none refused.
+  assert_eq! \-> totals_from "{\"schema\":1,\"plansStarted\":7}" |> .map (\t -> t.unverified) \-> Ok 0
 
 test "another vdiff schema, or not JSON, is not read"
   assert! \-> counts_of "{\"schema\":2}" |> .is_err

@@ -113,7 +113,9 @@ Rollback: `features.nix.vdeploy.wake.enable = false;` (no flag, no FIFO, no grou
    exponential Schedule (10 s, then 20 s).
 2. **Verify**: the commit must be on `refs/remotes/origin/main`, as last fetched over TLS
    from the pinned URL (`git merge-base --is-ancestor`). A commit that is not there is
-   refused (`Unverified`). See "Signatures" below.
+   refused (`Unverified`), a failed plan. Before that, the worker checks the head's
+   signature (see "Signatures" below): with `--require-signed`, a head that does not
+   verify is refused and never planned.
 3. **Evaluate**: `nix eval --raw git+file://<repo>?rev=<sha>#nixosConfigurations."<host>".config.system.build.toplevel.drvPath`.
    The flake is the commit, never a work tree.
 4. **Realise**: first through the `Fetcher`, which only substitutes, then through the `Builder`
@@ -176,13 +178,38 @@ is made.
 
 ## Signatures
 
-The repository does not sign its commits. Of the last 300 first-parent commits on main on
-2026-11-21, 257 are unsigned direct commits. The other 43 are PR squash merges, which GitHub
-signs with its own web-flow key. A signature check would refuse most of the history, and
-checking GitHub's key needs gpg and a pinned key. So verification is ancestry on
-`origin/main`, fetched over TLS from the pinned URL. Main only takes PR merges. Whether
-GitHub signed a commit is recorded in each plan (`signedByGithub`) but not enforced. #160
-can turn that into a requirement once every commit on main is a signed merge.
+```
+vdeploy … --trusted-keys KEYRING [--require-signed] [--gpgv PROG]
+```
+
+vdeploy deploys a head of main only when its commit signature verifies against the trusted
+keys (GH-221). Since the `main` ruleset of 2026-11-20 every commit on main is a GitHub
+squash merge, and GitHub signs each one with its web-flow key: the last 87 first-parent
+commits all verify against it, and the 213 before them are direct pushes from before the
+ruleset (the measurement is on #221). The key is pinned in `keys/github-web-flow.asc`, with
+its fingerprint; `features/nix/vdeploy` builds a keyring from it at Nix build time
+(`trustedSigningKeys`) and passes `--trusted-keys` and `--require-signed`
+(`requireSignedCommits`, default true).
+
+The check (`src/signature.vlt`) is `gpgv`, not `git verify-commit`: one keyring, no trust
+database, no agent, no key server, no network. The commit object is split as git splits it
+(the `gpgsig` header is the signature, the object without it is what was signed), both go
+into a scratch directory, and gpgv's status lines decide: verified only on exit 0 with
+`GOODSIG` and `VALIDSIG`. A key not in the keyring, a bad signature, an expired or revoked
+key, no signature at all: unverified.
+
+An unverified head, while signatures are required, is **refused**: not evaluated, built or
+switched, and so never marked bad. One journal line says why (`not deploying <sha> to
+<host>: its signature does not verify (<why>). No bad mark; …`), the record in `plan.json`
+and `plans.jsonl` has `"action": "refused"` and `"signatureVerified": false`,
+`vdeploy_commits_unverified_total` counts it, and `vdeploy wake --wait` reports it and exits
+1. It is done, like a planned head, so it is not checked again until main moves; the next
+verified head is planned and deployed as usual. Every plan records `signatureVerified`
+(and, as before, `signedByGithub`: whether the committer is GitHub with a `gpgsig`
+header, which is not a check).
+
+Rollback: `features.nix.vdeploy.requireSignedCommits = lib.mkForce false;`. The verdict is
+still checked and recorded in every plan; nothing is refused.
 
 ## Metrics
 
@@ -195,6 +222,7 @@ rewritten on every poll:
 | `vdeploy_switch_pending` | 1 when the last plan would switch |
 | `vdeploy_plans_started_total`, `…_finished_total`, `…_failed_total` | finished equals started, or is one behind while a plan runs (never cancelled) |
 | `vdeploy_commits_skipped_total` | commits never planned because a newer one landed (latest-wins) |
+| `vdeploy_commits_unverified_total` | heads refused because their signature did not verify (GH-221) |
 | `vdeploy_last_poll_timestamp_seconds`, `vdeploy_poll_failures_total`, `vdeploy_polls_total`, `vdeploy_head_changes_total` | the poller |
 | `vdeploy_last_plan_timestamp_seconds`, `vdeploy_last_plan_duration_seconds` | the worker |
 | `vdeploy_dotfiles_state{state=…}` | 1 for the checkout's current state |
@@ -211,7 +239,7 @@ does not know what it planned last), and that shows as one more plan started and
 
 | capability | live | tests |
 |---|---|---|
-| `Source` (head, verify, commit_time) | `git` on vdeploy's clone | `Scripted` |
+| `Source` (head, verify, signature, commit_time) | `git` on vdeploy's clone, `gpgv` | `Scripted` (`unsigned`, `untrusted`, `off_main`) |
 | `Nix` (drv) | `nix eval` | `Scripted` |
 | `Fetcher` (fetch) | `nix build --max-jobs 0` (temporary, until vfetch) | `Scripted` |
 | `Builder` (build) | `nix build` | `Scripted` (a build takes N s on the test clock) |
@@ -222,6 +250,8 @@ does not know what it planned last), and that shows as one more plan started and
 
 ## Tests
 
-Run `cargo test`. `default.nix` runs the tests as part of the package build, with git in the
-sandbox. The NixOS VM test is `features/nix/vdeploy/test.nix`
+Run `cargo test`. `default.nix` runs the tests as part of the package build, with git and
+gnupg in the sandbox. The signature tests verify a real GitHub-signed commit of main
+(`testdata/signed-commit`, b3d359d7) with gpgv against the pinned key, and refuse it
+against GitHub's expired 2017 key (`testdata/web-flow-2017.asc`) and once it is changed. The NixOS VM test is `features/nix/vdeploy/test.nix`
 (`checks.x86_64-linux.vdeploy-vm`).

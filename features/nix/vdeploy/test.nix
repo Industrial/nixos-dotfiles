@@ -15,9 +15,15 @@
 #     agent converges on the newest commit;
 #   - alice's ~/.dotfiles checkout is fast-forwarded to main, as alice; once she has a
 #     tracked change it is refused and left alone, and the refusal is in the journal and the
-#     metrics.
+#     metrics;
+#   - commit verification (GH-221): alice signs her commits with a test key the node trusts
+#     (test-key.nix), and every plan records `signatureVerified: true`. An unsigned commit
+#     pushed to the origin is refused (one journal line, vdeploy_commits_unverified_total,
+#     a `refused` record), never planned or built; the next signed commit is planned as
+#     usual.
 {pkgs}: let
   inherit (pkgs) busybox;
+  testKey = import ./test-key.nix {inherit pkgs;};
   dir = "/var/lib/prometheus-node-exporter-text";
   flake = pkgs.writeText "flake.nix" ''
     {
@@ -42,6 +48,8 @@ in
         url = "/srv/origin";
         interval = "2s";
         dotfiles.user = "alice";
+        # The local forge's commits are signed with the test key, not GitHub's.
+        trustedSigningKeys = ["${testKey}/public.asc"];
       };
       users.users.alice = {
         isNormalUser = true;
@@ -62,7 +70,7 @@ in
         config.safe.directory = "*";
       };
       services.prometheus.exporters.node.enable = true;
-      environment.systemPackages = [pkgs.jq pkgs.curl];
+      environment.systemPackages = [pkgs.jq pkgs.curl pkgs.gnupg];
       virtualisation = {
         cores = 2;
         memorySize = 2048;
@@ -78,8 +86,9 @@ in
       def head():
           return alice("git -C /srv/origin rev-parse HEAD").strip()
 
-      def commit(n):
-          alice(f"cd /srv/origin && echo {n} > n && git add -A && git commit -qm 'commit {n}'")
+      def commit(n, signed=True):
+          sign = "" if signed else "-c commit.gpgsign=false "
+          alice(f"cd /srv/origin && echo {n} > n && git add -A && git {sign}commit -qm 'commit {n}'")
           return head()
 
       def plan():
@@ -102,6 +111,9 @@ in
 
       machine.succeed("install -d -o alice -g users /srv/origin")
       alice("git config --global user.name alice && git config --global user.email alice@example.org")
+      # alice signs with the test key the node trusts (GH-221).
+      alice("gpg --batch --import ${testKey}/secret.asc")
+      alice("git config --global user.signingkey $(cat ${testKey}/fingerprint) && git config --global commit.gpgsign true && git config --global gpg.program ${pkgs.gnupg}/bin/gpg")
       alice("cd /srv/origin && git init -q -b main")
       machine.succeed("cp ${flake} /srv/origin/flake.nix && cp ${lock} /srv/origin/flake.lock && chown alice /srv/origin/flake.*")
       first = commit(0)
@@ -116,6 +128,8 @@ in
           p = plan()
           assert p["mode"] == "observe" and p["host"] == "machine", p
           assert p["action"] == "switch" and p["realised"] == "built", p
+          assert p["signatureVerified"] is True, p
+          machine.succeed("journalctl -u vdeploy -o cat | grep -q 'signed by trusted key'")
           assert p["running"]["toplevel"] == system, p
           assert p["diff"]["schema"] == 1, p
           assert machine.succeed(f"cat {p['out']}/rev").strip() == first
@@ -190,6 +204,31 @@ in
               assert metric("vdeploy_polls_total") > before["vdeploy_polls_total"]
               saved = json.loads(machine.succeed("cat /var/lib/vdeploy/counters.json"))
               assert saved["plansFinished"] == want, (saved, want)
+
+      with subtest("an unsigned commit is refused, never planned; the next signed one is (GH-221)"):
+          time.sleep(6)
+          started = metric("vdeploy_plans_started_total")
+          assert metric("vdeploy_commits_unverified_total") == 0
+          unsigned = commit("unsigned", signed=False)
+          machine.wait_until_succeeds(planned(unsigned), timeout=120)
+          p = plan()
+          assert p["action"] == "refused" and p["signatureVerified"] is False, p
+          assert p["note"] == "the commit is not signed" and p["drv"] == "" and p["out"] == "", p
+          eventually("vdeploy_commits_unverified_total 1")
+          machine.succeed(f"journalctl -u vdeploy -o cat | grep -q 'not deploying {unsigned[:9]} to machine: its signature does not verify (the commit is not signed). No bad mark'")
+          # Never planned: no plan started for it, nothing evaluated or built, no failure.
+          assert metric("vdeploy_plans_started_total") == started
+          assert metric("vdeploy_plans_failed_total") == 0
+          machine.fail(f"journalctl -u vdeploy -o cat | grep -q 'planning {unsigned[:9]}'")
+          last_record = json.loads(machine.succeed("tail -n 1 /var/lib/vdeploy/plans.jsonl"))
+          assert last_record["commit"] == unsigned and last_record["action"] == "refused", last_record
+          signed = commit("signed again")
+          machine.wait_until_succeeds(planned(signed), timeout=300)
+          p = plan()
+          assert p["action"] == "switch" and p["signatureVerified"] is True, p
+          eventually(f"vdeploy_plans_started_total {int(started) + 1}")
+          assert metric("vdeploy_commits_unverified_total") == 1
+          assert machine.succeed("readlink -f /run/current-system").strip() == system
 
       with subtest("node_exporter serves the metrics"):
           machine.wait_for_open_port(9100)

@@ -6,7 +6,8 @@
 //!
 //! The source is Voltaic (`src/*.vlt`); `build.rs` compiles it into `OUT_DIR`
 //! and these `include!`s are the only Rust in the library: `common` (errors,
-//! commands), `watch` (the pure decision core: latest-wins, debounce),
+//! commands), `signature` (a head's signature, checked with gpgv against the
+//! trusted keys: GH-221), `watch` (the pure decision core: latest-wins, debounce),
 //! `dotfiles` (the user's checkout, fast-forwarded), `caps` (the
 //! capabilities and their live implementations), `report` (the plan and the
 //! metrics), `agent` (the poller and the worker), `cli` and `app`.
@@ -37,6 +38,7 @@ macro_rules! voltaic {
 }
 
 voltaic!(common);
+voltaic!(signature);
 voltaic!(watch);
 voltaic!(wake);
 voltaic!(dotfiles);

@@ -17,12 +17,13 @@
 
 import std::time::{Duration, Instant}
 import id_effect::{Effect, HNil, Never, Ref, Schedule, effect, fail, succeed}
-import crate::caps::{BuilderTool, Caps, DifferTool, SourceTool}
+import crate::caps::{BuilderTool, Caps, DifferTool, Running, SourceTool}
+import crate::signature::Signature
 import crate::common::{DeployError, now_secs}
 import crate::dotfiles::{Checkout, state_name}
 import crate::report::{Plan, SAME, json_of, line_of, publish_metrics, publish_plan, publish_totals, totals_in}
 import crate::wake::{Wakes, publish_status, reader, waited, wakes}
-import crate::watch::{Decision, Head, Status, decide, failed_with, finished_with, observed, taken, unobserved, woke_still}
+import crate::watch::{Decision, Head, Status, decide, failed_with, finished_with, observed, refused_with, taken, unobserved, woke_still}
 
 -- How the agent runs.
 export data Settings
@@ -34,6 +35,7 @@ export data Settings
   , export state_dir Option<String>
   , export dotfiles String
   , export deploy bool
+  , export require_signed bool
   }
   deriving (Debug, Clone, PartialEq, Eq)
 
@@ -172,15 +174,15 @@ diffed differ old new =
     differ.0.json old new |> .map (\j -> (Some j, String::new ())) |> .catch (\e -> succeed ((None, e.to_string ())))
 
 -- One plan for `head`: everything but the switch.
-export planned : Caps -> Settings -> Head -> u64 -> Effect<Plan, DeployError, HNil>
-planned caps s head skipped =
+export planned : Caps -> Settings -> Head -> u64 -> bool -> Effect<Plan, DeployError, HNil>
+planned caps s head skipped verified =
   effect!
     ~caps.source.0.verify(head.sha.clone());
     let running = ~caps.host.0.running();
     let drv = ~caps.nix.0.drv(head.sha.clone());
     let (out, how) = ~realised(caps.clone(), drv.clone());
     let (diff, note) = ~diffed(caps.differ.clone(), running.toplevel.clone(), out.clone());
-    Plan { host: s.host.clone(), commit: head.sha.clone(), commit_time: head.time, signed: head.signed, skipped, running_rev: running.rev.clone(), running: running.toplevel.clone(), drv, switch: out != running.toplevel, out, realised: how, diff, note, planned_at: now_secs(), deploy: s.deploy }
+    Plan { host: s.host.clone(), commit: head.sha.clone(), commit_time: head.time, signed: head.signed, verified, refused: false, skipped, running_rev: running.rev.clone(), running: running.toplevel.clone(), drv, switch: out != running.toplevel, out, realised: how, diff, note, planned_at: now_secs(), deploy: s.deploy }
 
 -- A plan's failure as a value: one bad commit never stops the agent.
 settled : Effect<Plan, DeployError, HNil> -> Effect<Result<Plan, DeployError>, Never, HNil>
@@ -194,15 +196,53 @@ reported s p =
     eprintln! \-> "vdeploy: #{e}"
   succeed (())
 
--- Plan `head`, to its end, and record the outcome.
+-- The head the worker takes: its signature first (GH-221). Unverified while
+-- signatures are required, it is refused: not planned, not deployed, and no
+-- bad mark (nothing was built or switched). Otherwise it is planned, and the
+-- verdict goes into the plan record either way.
 export cycle : Caps -> Settings -> Ref<Status> -> Head -> u64 -> Effect<(), Never, HNil>
 cycle caps s state head changes =
+  source = caps.source.clone ()
+  sha = head.sha.clone ()
+  source.0.signature sha |> .flat_map (move \sig -> signed_cycle caps s state head changes sig)
+
+signed_cycle : Caps -> Settings -> Ref<Status> -> Head -> u64 -> Signature -> Effect<(), Never, HNil>
+signed_cycle caps s state head changes sig =
+  if s.require_signed && !sig.verified
+    refused caps s state head changes sig
+  else
+    plan_cycle caps s state head changes sig
+
+-- What the system runs, for a refusal's record; unknown is empty, not a failure.
+running_or_unknown : Caps -> Effect<Running, Never, HNil>
+running_or_unknown caps =
+  caps.host.0.running () |> .catch (\_ -> succeed (Running { rev = None, toplevel = String::new () }))
+
+-- The record of a refused head: no derivation, no output, the reason.
+export refusal : &Settings -> &Head -> &Signature -> Running -> u64 -> Plan
+refusal s head sig running skipped = Plan { host = s.host.clone (), commit = head.sha.clone (), commit_time = head.time, signed = head.signed, verified = false, refused = true, skipped, running_rev = running.rev, running = running.toplevel, drv = String::new (), out = String::new (), realised = String::new (), switch = false, diff = None, note = sig.why.clone (), planned_at = now_secs (), deploy = s.deploy }
+
+-- Refuse `head`: one journal line saying why, the record, the counter.
+refused : Caps -> Settings -> Ref<Status> -> Head -> u64 -> Signature -> Effect<(), Never, HNil>
+refused caps s state head changes sig =
+  effect!
+    let sha = head.sha.clone();
+    let skipped = ~state.modify::<u64, Never, HNil>(move |st| refused_with(st, sha, changes));
+    let running = ~running_or_unknown(caps.clone());
+    ~reported(s.clone(), refusal(&s, &head, &sig, running, skipped));
+    // The counter now, not at the next poll (a deploy host may poll hourly).
+    let st = ~state.get::<Never, HNil>();
+    ~metered(s, st)
+
+-- Plan `head`, to its end, and record the outcome.
+plan_cycle : Caps -> Settings -> Ref<Status> -> Head -> u64 -> Signature -> Effect<(), Never, HNil>
+plan_cycle caps s state head changes sig =
   effect!
     let sha = head.sha.clone();
     let skipped = ~state.modify::<u64, Never, HNil>(move |st| taken(st, sha, changes));
-    eprintln!("vdeploy: planning {} for {}", short(&head.sha), s.host);
+    eprintln!("vdeploy: planning {} for {} ({})", short(&head.sha), s.host, sig.why);
     let began = Instant::now();
-    let result = ~settled(planned(caps.clone(), s.clone(), head.clone(), skipped));
+    let result = ~settled(planned(caps.clone(), s.clone(), head.clone(), skipped, sig.verified));
     let secs = began.elapsed().as_secs_f64();
     let at = now_secs();
     match result {
@@ -320,6 +360,8 @@ judged : Status -> Effect<(), DeployError, HNil>
 judged st =
   if st.failed > 0
     fail (DeployError::Eval (.to_string "the plan failed (see above)"))
+  else if st.unverified > 0
+    fail (DeployError::Unverified (.to_string "main's head is not signed by a trusted key (see above)"))
   else if st.watch.head.is_none ()
     fail (DeployError::Fetch (.to_string "main could not be fetched (see above)"))
   else
@@ -342,7 +384,7 @@ heads n = (1 .. n + 1) |> .map (\i -> "c#{i}") |> .collect
 
 #[cfg(test)]
 settings : u64 -> Settings
-settings quiet = Settings { host = .to_string "machine", interval = 1, quiet_polls = quiet, tick = 1, textfile_dir = None, state_dir = None, dotfiles = .to_string "~/.dotfiles", deploy = false }
+settings quiet = Settings { host = .to_string "machine", interval = 1, quiet_polls = quiet, tick = 1, textfile_dir = None, state_dir = None, dotfiles = .to_string "~/.dotfiles", deploy = false, require_signed = false }
 
 #[cfg(test)]
 seconds : u64 -> Schedule<u64, ()>
@@ -498,3 +540,59 @@ test "a wake every second never starts a debounced plan; the interval's polls st
   ran = id_effect::testing::run_test (woken_agent (crate::caps::scripted (plain.clone ())) (Settings { interval = 1, ...settings 2 }) (Ref::new (Status::default ())) (seconds 10) (wakes ()))
   assert! \-> ran |> .into_result |> .is_ok
   assert! \-> !(logged (&plain.started) |> .is_empty)
+
+-- GH-221: commit verification. Deploy mode, signatures required.
+#[cfg(test)]
+signed_deploy : Settings
+signed_deploy = Settings { deploy = true, require_signed = true, ...settings 0 }
+
+#[cfg(test)]
+verified_run : crate::caps::Scripted -> Status
+verified_run world =
+  state = Ref::new (Status { deploy = true, ...Status::default () })
+  exit = id_effect::testing::run_test (agent (crate::caps::scripted (world.clone ())) (signed_deploy ()) (state.clone ()) (seconds 20) (Schedule::spaced (Duration::from_secs 1)))
+  assert! \-> exit |> .into_result |> .is_ok
+  status_of state
+
+test "a head signed by a trusted key is planned and deployed"
+  world = crate::caps::Scripted { heads = heads 1, build_secs = 1, ...crate::caps::Scripted::default () }
+  st = verified_run (world.clone ())
+  assert_eq! \-> logged (&world.started) \-> .to_vec ([.to_string "c1"])
+  assert_eq! \-> logged (&world.deployer.log) \-> .to_vec ([.to_string "apply /nix/store/out-c1"])
+  assert_eq! \-> (st.started, st.failed, st.unverified) \-> (1, 0, 0)
+
+test "an unsigned head is refused: not built, not applied, no failure; the next signed head deploys"
+  world = crate::caps::Scripted { heads = heads 2, build_secs = 1, unsigned = .to_vec ([.to_string "c1"]), ...crate::caps::Scripted::default () }
+  st = verified_run (world.clone ())
+  -- c1 was never planned (so it was never built, applied, or marked bad); c2 was.
+  assert_eq! \-> logged (&world.started) \-> .to_vec ([.to_string "c2"])
+  assert_eq! \-> logged (&world.deployer.log) \-> .to_vec ([.to_string "apply /nix/store/out-c2"])
+  assert_eq! \-> (st.unverified, st.started, st.finished, st.failed, st.done.clone ()) \-> (1, 1, 1, 0, Some (.to_string "c2"))
+  assert! \-> crate::report::metrics (&st) |> .contains "\nvdeploy_commits_unverified_total 1\n"
+
+test "a head signed by a key that is not trusted is refused the same way"
+  world = crate::caps::Scripted { heads = heads 1, build_secs = 1, untrusted = .to_vec ([.to_string "c1"]), ...crate::caps::Scripted::default () }
+  st = verified_run (world.clone ())
+  assert! \-> logged (&world.started) |> .is_empty
+  assert! \-> logged (&world.deployer.log) |> .is_empty
+  assert_eq! \-> (st.unverified, st.started, st.failed, st.done.clone ()) \-> (1, 0, 0, Some (.to_string "c1"))
+  -- --once says so with a failure.
+  assert! \-> id_effect::testing::run_test (once (crate::caps::scripted world) (signed_deploy ())) |> .into_result |> .is_err
+
+test "a signed head that is not on main is refused as before: a failed plan, never applied"
+  world = crate::caps::Scripted { heads = heads 1, build_secs = 1, off_main = .to_vec ([.to_string "c1"]), ...crate::caps::Scripted::default () }
+  st = verified_run (world.clone ())
+  assert! \-> logged (&world.started) |> .is_empty
+  assert! \-> logged (&world.deployer.log) |> .is_empty
+  assert_eq! \-> (st.unverified, st.started, st.failed) \-> (0, 1, 1)
+
+test "with signatures not required (the rollback), an unsigned head is planned, and its record says so"
+  world = crate::caps::Scripted { heads = heads 1, build_secs = 1, unsigned = .to_vec ([.to_string "c1"]), ...crate::caps::Scripted::default () }
+  state = Ref::new (Status::default ())
+  exit = id_effect::testing::run_test (agent (crate::caps::scripted (world.clone ())) (settings 0) (state.clone ()) (seconds 10) (Schedule::spaced (Duration::from_secs 1)))
+  assert! \-> exit |> .into_result |> .is_ok
+  assert_eq! \-> logged (&world.started) \-> .to_vec ([.to_string "c1"])
+  assert_eq! \-> (status_of state).unverified \-> 0
+  h = Head { sha = .to_string "c1", time = 1, signed = false }
+  r = refusal (&settings 0) (&h) (&crate::signature::unverified "the commit is not signed") (crate::caps::Running { rev = None, toplevel = .to_string "/nix/store/old" }) 0
+  assert! \-> json_of (&r) false |> .contains "\"signatureVerified\":false"
