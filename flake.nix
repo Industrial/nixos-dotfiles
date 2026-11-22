@@ -403,6 +403,9 @@
       # ... and the wake (GH-246): switched in and out live under STIG base-safe, woken by
       # the operator over ssh, refused to others, never killed, recovering a deleted FIFO.
       // {vdeploy-wake-vm = import ./features/nix/vdeploy/test-wake.nix {inherit pkgs;};}
+      # ... and a crash in the health window boots the previous generation, through EFI and
+      # systemd-boot (GH-225).
+      // {vdeploy-crash-vm = import ./features/nix/vdeploy/test-crash.nix {inherit pkgs;};}
       # GH-185: drakkar's /etc under setup-etc.pl vs system.etc.overlay (measurement).
       // lib.listToAttrs (map (variant: lib.nameValuePair "etc-overlay-${variant}" (import ./features/nixos/etc-overlay/test.nix {inherit pkgs inputs variant;})) ["stock" "on"])
       # features/nixos/etc-overlay: switched into and out of, live and cold, state kept.
