@@ -91,6 +91,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
+# shellcheck source=bin/lib/flake-ref.sh
+source "$ROOT/bin/lib/flake-ref.sh"
 
 # ---------------------------------------------------------------------------------------
 # The budgets. One declared place; everything below reads them and nothing restates them.
@@ -188,11 +190,11 @@ fi
 # files given directly. That is how you price a completer before adding it to the feature,
 # and how you check that this gate still bites: copy the built directory, drop another
 # completer from the nu_scripts input into the copy, and point this at it.
-realise() { # <flake ref> <out file>: the autoload directory's path into <out file>
+realise() { # <git+file flake ref> <out file>: the autoload directory's path into <out file>
   local ref
   ref="$(nix build --no-link --print-out-paths --impure --expr "
     let
-      flake = builtins.getFlake \"$1\";
+      flake = builtins.getFlake \"$1\"; # flake-ref: git-tracked (both callers pass git+file)
       lib = flake.inputs.nixpkgs.lib;
       host = flake.nixosConfigurations.${HOST};
       # A sessionVariables value is a string or a list of them; NixOS joins the list with
@@ -232,7 +234,10 @@ if [[ -n "${SHELL_BUDGET_AUTOLOAD:-}" ]]; then
   printf '%s\n' "$SHELL_BUDGET_AUTOLOAD" >"$work/head.path"
 else
   echo "shell-budget: realising nixosConfigurations.${HOST}'s vendor/autoload for this tree..."
-  realise "$ROOT" "$work/head.path" &
+  # This tree's tracked files, uncommitted edits included, never the bare directory: getFlake
+  # on a path copies .git, .tmp and target/ too (#266; in a worktree, 1.1-1.8 GB a run).
+  head_ref="$(git_flake_ref "$ROOT")" || exit 1
+  realise "$head_ref" "$work/head.path" &
   pids+=("$!")
 fi
 if [[ "$base" != none ]]; then

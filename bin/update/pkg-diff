@@ -20,6 +20,8 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=bin/lib/flake-ref.sh
+source "$here/../lib/flake-ref.sh"
 lib="$here/lib/pkg-diff.nix"
 
 usage() {
@@ -36,7 +38,7 @@ abs() {
 }
 
 nix_eval() {
-  # --impure: getFlake on a local, unlocked path, and builtins.getEnv. Arguments travel
+  # --impure: getFlake on a local, unlocked git+file reference, and builtins.getEnv. Arguments travel
   # in PKG_DIFF_* environment variables, so no path is ever spliced into Nix source.
   nix --extra-experimental-features "nix-command flakes" eval --raw --impure "$@"
 }
@@ -61,19 +63,23 @@ case "$cmd" in
     new="$(abs "$3")"
     host="$4"
     limit="${5:-150}"
+    # The trees' git-tracked files, never the bare directories: getFlake on a path copies
+    # .git, .tmp and target/ as well (#266). For `.` in the main checkout, 25-34 GB.
+    old_ref="$(git_flake_ref "$old")"
+    new_ref="$(git_flake_ref "$new")"
     case "$limit" in
       '' | *[!0-9]*)
         echo "pkg-diff: row-limit must be a number, got '$limit'" >&2
         exit 2
         ;;
     esac
-    PKG_DIFF_LIB="$lib" PKG_DIFF_OLD="$old" PKG_DIFF_NEW="$new" \
+    PKG_DIFF_LIB="$lib" PKG_DIFF_OLD="$old_ref" PKG_DIFF_NEW="$new_ref" \
       PKG_DIFF_HOST="$host" PKG_DIFF_LIMIT="$limit" nix_eval --expr '
       let
         env = builtins.getEnv;
         d = import (/. + env "PKG_DIFF_LIB");
         host = env "PKG_DIFF_HOST";
-        config = var: (builtins.getFlake (env var)).nixosConfigurations.${host}.config;
+        config = var: (builtins.getFlake (env var)).nixosConfigurations.${host}.config; # flake-ref: git-tracked
       in
         d.renderHost host (builtins.fromJSON (env "PKG_DIFF_LIMIT"))
         (d.compare (d.facts (config "PKG_DIFF_OLD")) (d.facts (config "PKG_DIFF_NEW")))'
