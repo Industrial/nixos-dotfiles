@@ -21,6 +21,12 @@
 #                  start and never leaves it; the public half is copied here so
 #                  clients trust it at eval time. null/absent = the host serves no
 #                  cache (yet), and clients leave it out.
+#   online       — false for a host that is out of reach for the long term. It keeps
+#                  its roles and its own config, but clients stop using it as a
+#                  remote builder or cache (`builders`, `binaryCaches`): Nix's build
+#                  hook can pick a dead builder and wait out the TCP timeout for a
+#                  derivation (GH-252). Absent = true. Bringing a host back is
+#                  deleting its `online = false;` line.
 #
 # Host names double as MagicDNS short names on the tailnet.
 let
@@ -42,6 +48,8 @@ let
       };
     };
     huginn = {
+      # Out of reach since 2026-11 (no WiFi, router full): no longer a builder for clients (GH-252).
+      online = false;
       description = "tablet (Intel N200)";
       roles = ["tablet" "builder" "nfs-client"];
       tailscaleIp = "100.70.136.13";
@@ -70,6 +78,8 @@ let
       operatorKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHaaBOy2a1WnlGy5B6WwEmVlf7s5VUgVIbsjdGZrsmK+ tom@mimir";
     };
     muninn = {
+      # Out of reach since 2026-11 (no WiFi, router full): no longer a builder for clients (GH-252).
+      online = false;
       description = "work laptop; monitoring standby when mimir is down";
       # Never "nfs-client": a work machine holds no personal files, so it neither
       # mounts mimir's /data nor appears in its export list.
@@ -91,6 +101,10 @@ let
   nfsClientOrder = ["drakkar" "huginn"];
 
   hasRole = role: name: builtins.elem role hosts.${name}.roles;
+  isOnline = name: hosts.${name}.online or true;
+
+  # The builders clients actually use: builderOrder minus the hosts marked offline.
+  onlineBuilderOrder = builtins.filter isOnline builderOrder;
   withRole = role: builtins.filter (hasRole role) order;
 
   # vcache's TCP port, on every serving host's tailnet address.
@@ -114,7 +128,7 @@ let
   in
     builtins.elem "builder" (h.roles or []) && !(isCacheIn hs name) && otherCaches != [];
 in {
-  inherit hosts order hasRole withRole cachePort isCacheIn pushesToCacheIn;
+  inherit hosts order hasRole isOnline withRole cachePort isCacheIn pushesToCacheIn;
 
   pushesToCache = pushesToCacheIn hosts;
 
@@ -122,19 +136,20 @@ in {
   cachePushers = builtins.filter (pushesToCacheIn hosts) order;
 
   # The fleet's binary caches (features/nix/vcache), in builder preference order:
-  # builder-role hosts with a tailnet address and a published cacheKey.
+  # online builder-role hosts with a tailnet address and a published cacheKey.
   binaryCaches =
     map (name: {
       inherit name;
       url = "http://${hosts.${name}.tailscaleIp}:${toString cachePort}";
       publicKey = hosts.${name}.cacheKey;
     })
-    (builtins.filter (name: hasRole "builder" name && hosts.${name} ? tailscaleIp && (hosts.${name}.cacheKey or null) != null) builderOrder);
+    (builtins.filter (name: hasRole "builder" name && hosts.${name} ? tailscaleIp && (hosts.${name}.cacheKey or null) != null) onlineBuilderOrder);
 
   # Alphabetical, like builtins.attrNames.
   names = builtins.attrNames hosts;
 
-  builders = map (name: {inherit name;} // hosts.${name}.builder) builderOrder;
+  # Remote builders for clients, in preference order; offline hosts are left out.
+  builders = map (name: {inherit name;} // hosts.${name}.builder) onlineBuilderOrder;
 
   nfsClients = builtins.filter (hasRole "nfs-client") nfsClientOrder;
 

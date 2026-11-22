@@ -42,8 +42,23 @@ in
 
     nfsClientsHaveAddress = assay.eq (lib.all (name: fleet.hosts.${name} ? tailscaleIp) fleet.nfsClients) true;
 
-    # Builders advertised to clients are exactly the builder-role hosts.
-    buildersAreBuilderRole = assay.eq (lib.sort lib.lessThan (map (b: b.name) fleet.builders)) (lib.sort lib.lessThan (fleet.withRole "builder"));
+    # Builders advertised to clients are exactly the online builder-role hosts.
+    buildersAreBuilderRole = assay.eq (lib.sort lib.lessThan (map (b: b.name) fleet.builders)) (lib.sort lib.lessThan (lib.filter fleet.isOnline (fleet.withRole "builder")));
+
+    # huginn and muninn are out of reach (GH-252): clients neither build on them nor ask
+    # them for paths, drakkar stays, and the hosts keep their roles (their own configs
+    # still evaluate and run the builder server). Hosts without the field are online.
+    offlineHosts = assay.eq (lib.filter (n: !(fleet.isOnline n)) fleet.order) ["huginn" "muninn"];
+    offlineHostsAreNotBuilders = assay.eq (lib.filter (b: !(fleet.isOnline b.name)) fleet.builders) [];
+    offlineHostsServeNoCache = assay.eq (lib.filter (c: !(fleet.isOnline c.name)) fleet.binaryCaches) [];
+    drakkarIsABuilder = assay.eq (builtins.elem "drakkar" (map (b: b.name) fleet.builders)) true;
+    offlineHostsKeepTheirRoles = assay.eq (map (fleet.hasRole "builder") ["huginn" "muninn"]) [true true];
+    onlineByDefault = assay.eq (map fleet.isOnline ["drakkar" "mimir"]) [true true];
+
+    # drakkar and mimir get their builders only from nix-remote-builder-client (whose
+    # list is fleet.builders, its own suite): mimir runs it, drakkar does not, so
+    # drakkar's nix.buildMachines is empty and mimir's is the online builders.
+    builderClients = assay.eq (lib.filter (n: builtins.elem n ["drakkar" "mimir"]) (runs "fleet.nix-remote-builder-client")) ["mimir"];
 
     # vcache: served only by builders with a tailnet address, and a host advertises a
     # cache key only if it runs the server.
