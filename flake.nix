@@ -396,8 +396,8 @@
       // {vgen-vm = import ./features/nixos/vgen/test.nix {inherit pkgs;};}
       # features/nix/vhealth's VM test: a service active per systemd with its port closed is down.
       // {vhealth-vm = import ./features/nix/vhealth/test.nix {inherit pkgs;};}
-      # vdeploy deploy mode (#160): a forced-failing health check rolls back; and the LIVE
-      # take-over from comin (comin applies the change that retires it) and back.
+      # vdeploy deploy mode (#160): a forced-failing health check rolls back; and the take-over's
+      # end state (GH-225: comin's tombstone dropped), switched in and out live by vdeploy.
       // {vdeploy-rollback-vm = import ./features/nix/vdeploy/test-rollback.nix {inherit pkgs;};}
       // {vdeploy-takeover-vm = import ./features/nix/vdeploy/test-takeover.nix {inherit pkgs;};}
       # ... and the wake (GH-246): switched in and out live under STIG base-safe, woken by

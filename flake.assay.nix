@@ -90,6 +90,13 @@ in
     # (features/fleet/operator-ssh.nix).
     activatesAsRootOverTomsSsh =
       assay.eq [node.profiles.system.user node.profiles.system.sshUser node.profiles.system.interactiveSudo] ["root" "tom" false];
+    # vdeploy's one rollback (GH-225, comin gone): `fleet deploy <host> --legacy`, deploy-rs.
+    # Every host vdeploy deploys keeps a deploy-rs node with a system profile to activate.
+    vdeployHostsKeepTheLegacyRollback = let
+      fleet = import ./common/fleet.nix;
+      vdeployHosts = builtins.filter (fleet.hasRole "vdeploy") hosts;
+    in
+      assay.eq (map (h: [h (outputs.deploy.nodes.${h}.profiles ? system)]) vdeployHosts) [["drakkar" true] ["mimir" true]];
     # The dbus monitor behind magic rollback can time out while systemd restarts mid-switch.
     rollbackFeaturesAreOff =
       assay.eq [node.profiles.system.magicRollback node.profiles.system.autoRollback] [false false];

@@ -1,6 +1,6 @@
 # Colocated suite for features/nix/vdeploy/default.nix — the observe-mode deploy agent:
 # its service, what it is told (and never told: to switch), the dotfiles checkout, the
-# textfile metrics, and that it sits next to comin rather than replacing it.
+# textfile metrics, and deploy mode (comin gone, GH-225).
 let
   assay = import ../../../common/assay/default.nix;
   nixos = import ../../../common/assay/nixos.nix;
@@ -42,28 +42,19 @@ let
   noDotfiles = nixos.eval {modules = [./default.nix base {features.nix.vdeploy.dotfiles.enable = false;}];};
   slow = nixos.eval {modules = [./default.nix base {features.nix.vdeploy.debounce = "15m";}];};
 
-  # Deploy mode (#160). The host's own `features.fleet.comin.enable = true` stands in for
-  # lib/features.nix's switch; vhealth's probes file for features/nix/vhealth.
+  # Deploy mode (#160). `services.comin.enable` stands in for comin's module, which hosts
+  # import (features/fleet/comin), off as on drakkar and mimir since GH-225; vhealth's
+  # probes file for features/nix/vhealth.
   fleet = {
-    options.features.fleet.comin.enable = lib.mkOption {
+    options.services.comin.enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
     };
-    config.features.fleet.comin.enable = true;
   };
   probes = {environment.etc."vhealth/probes.json".text = ''{"probes": []}'';};
   deployed = nixos.eval {modules = [./default.nix base fleet probes {features.nix.vdeploy.mode = "deploy";}];};
-  # The take-over's rollback option, on top of a host that set deploy mode.
-  rolledBack = nixos.eval {
-    modules = [
-      ./default.nix
-      base
-      fleet
-      probes
-      {features.nix.vdeploy.mode = "deploy";}
-      {features.nix.vdeploy.mode = lib.mkForce "observe";}
-    ];
-  };
+  # A deploy-mode host that left comin on: two deployers.
+  withComin = nixos.eval {modules = [./default.nix base fleet probes {features.nix.vdeploy.mode = "deploy";} {services.comin.enable = true;}];};
   # The fleet's `vdeploy` role picks deploy mode: a host without it observes.
   byRole = host: (nixos.eval {modules = [./default.nix base fleet probes {features.nix.vdeploy.host = host;}];}).features.nix.vdeploy.mode;
   # GH-221: commit verification's one rollback option.
@@ -71,7 +62,6 @@ let
   noKeys = nixos.eval {modules = [./default.nix base {features.nix.vdeploy.trustedSigningKeys = [];}];};
   noVhealth = nixos.eval {modules = [./default.nix base fleet {features.nix.vdeploy.mode = "deploy";}];};
   failedAssertions = c: map (a: a.message) (builtins.filter (a: !a.assertion && lib.hasPrefix "features.nix.vdeploy" a.message) c.assertions);
-  tomb = deployed.systemd.services.comin;
   dargAfter = argAfterIn deployed;
 
   service = cfg.systemd.services.vdeploy;
@@ -180,14 +170,12 @@ in
       assay.eq [(dargAfter "--health-as") (lib.hasSuffix "/bin/setpriv" (dargAfter "--setpriv"))] ["vhealth" true];
     # The by-hand apply, the same transient unit the daemon uses; deploy mode only.
     applyWrapper = assay.eq [(nixos.hasPackage deployed "vdeploy-apply") (nixos.hasPackage cfg "vdeploy-apply")] [true false];
-    # comin is demoted: forced off, whatever the host says.
-    cominForcedOff = assay.eq deployed.features.fleet.comin.enable false;
-    # The tombstone that lets comin finish the switch that retires it.
-    cominTombstone = assay.eq [tomb.restartIfChanged tomb.wantedBy tomb.serviceConfig.Restart (lib.hasSuffix "/bin/true" tomb.serviceConfig.ExecStart)] [false [] "no" true];
-    # The one rollback option: deploy mode forced back to observe, and comin is the host's
-    # again, with no tombstone.
-    rollbackRestoresComin =
-      assay.eq [rolledBack.features.fleet.comin.enable (builtins.elem "--mode" (argsOf rolledBack)) (rolledBack.systemd.services ? comin)] [true false false];
+    # comin is gone (GH-225): no tombstone unit, and nothing forces comin off any more.
+    noCominTombstone = assay.eq [(deployed.systemd.services ? comin) deployed.services.comin.enable] [false false];
+    # Deploy mode with comin still on is refused at evaluation, not papered over.
+    deployRefusesComin = assay.eq (builtins.any (lib.hasInfix "turn comin off") (failedAssertions withComin)) true;
+    # The one rollback is `fleet deploy <host> --legacy` (deploy-rs): flake.assay.nix's
+    # vdeployHostsKeepTheLegacyRollback, and bin/dev.d/test.sh for bin/fleet's flag.
     # keep-or-rollback needs vhealth's probes.
     deployNeedsVhealth = assay.eq [(failedAssertions deployed) (builtins.length (failedAssertions noVhealth))] [[] 1];
 
