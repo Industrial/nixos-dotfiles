@@ -7,8 +7,13 @@ Whether to build one (with the copy-before-first-boot step below) is still open 
 
 `features/nixos/etc-overlay/test.nix`, with its colocated suite `test.assay.nix`:
 
-    nix build .#checks.x86_64-linux.etc-overlay-stock   # setup-etc.pl
-    nix build .#checks.x86_64-linux.etc-overlay-on      # system.etc.overlay, mutable
+    nix build .#checks.x86_64-linux.etc-overlay-stock         # setup-etc.pl
+    nix build .#checks.x86_64-linux.etc-overlay-on            # system.etc.overlay, mutable
+    nix build .#checks.x86_64-linux.etc-overlay-live-switch   # setup-etc.pl -> overlay, live
+
+Each check evaluates drakkar twice: the node and one specialisation. All of them share
+drakkar's own package set. That keeps each check inside flake-checks' 8 GiB eval budget,
+at about 7.2 GiB peak under nix-eval-jobs.
 
 CI does not build VM tests on PRs. Run them locally through the serialized VM wrapper.
 
@@ -17,8 +22,8 @@ feature (userborn included). It differs from the host in three ways:
 - `disko.nix` is disabled, because its LUKS/btrfs layout cannot exist in a VM.
 - `services.timesyncd.enable` and `DefaultTimeoutStartSec` are forced, because they
   conflict with qemu-vm.
-- The test adds an `alt` specialisation, one /etc file apart, to switch between, and in
-  the stock variant an `overlay` specialisation.
+- `stock` and `on` add an `alt` specialisation, one /etc file apart, to switch between.
+  `live-switch` adds an `overlay` specialisation instead.
 
 A wrapper around the `etc` activation snippet logs `gh185-etc-step ns=<n>` to the journal.
 
@@ -29,7 +34,8 @@ These are from main at 3131c7f9, VM with 4 vCPU and 6 GiB, 10 switches per varia
 | | setup-etc.pl | overlay (mutable) |
 |---|---|---|
 | `/etc` step per switch, median (min to max) | 173.4 ms (115 to 245) | 147.1 ms (129 to 243) |
-| whole `switch-to-configuration test`, median | 5.09 s | 4.88 s |
+| the same, second run (final test layout) | 152.5 ms (108 to 206) | 152.2 ms (118 to 179) |
+| whole `switch-to-configuration test`, median | 5.09 s; second run 5.13 s | 4.88 s; second run 4.58 s |
 | `/etc` step at boot | 167 ms in `initrd-nixos-activation` | 2.5 ms (skipped); the initrd mounts the erofs metadata image (~34 ms) and runs `rw-etc` (~31 ms) |
 | boot (systemd-analyze) | 11.1 s | 10.8 s |
 
@@ -41,8 +47,8 @@ Every switch in both variants returned rc=4, and in both the only failed unit is
 `vcache.service`, which has no tailnet in a VM.
 
 Reading: setup-etc.pl is not a bottleneck at drakkar's size (174 `environment.etc`
-entries). The overlay saves tens of milliseconds per switch, so a Rust rewrite of
-setup-etc.pl would buy about the same.
+entries). The overlay saves at most a few tens of milliseconds per switch (none at all
+in the second run), so a Rust rewrite of setup-etc.pl would buy no more.
 
 ## Who writes /etc at runtime
 
@@ -73,7 +79,8 @@ resolvconf and mullvad all write to /etc, and `mutableUsers` is still on.
 
 **A live switch from setup-etc.pl to the overlay loses state.** The overlay is mounted
 over the old /etc and hides it. Nothing is deleted, but nothing is migrated either. The
-stock test's last subtest switches into the `overlay` specialisation, with these results:
+`live-switch` check boots setup-etc.pl and switches into the `overlay` specialisation,
+with these results:
 - `machine-id` is absent afterwards.
 - The NM connection is absent.
 - `tom` has no entry in `/etc/shadow`.

@@ -11,14 +11,23 @@ let
   inputs = nixos.flakeInputs;
   pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
 
-  testFor = overlay: import ./test.nix {inherit pkgs inputs overlay;};
-  stockTest = testFor false;
-  onTest = testFor true;
+  testFor = variant: import ./test.nix {inherit pkgs inputs variant;};
+  stockTest = testFor "stock";
+  onTest = testFor "on";
+  liveTest = testFor "live-switch";
   stock = stockTest.nodes.machine;
   on = onTest.nodes.machine;
+  live = liveTest.nodes.machine;
 in
   assay.suite "etc-overlay-vm-test" {
-    named = assay.eq [stockTest.name onTest.name] ["vm-test-run-etc-overlay-stock" "vm-test-run-etc-overlay-on"];
+    named =
+      assay.eq [stockTest.name onTest.name liveTest.name]
+      ["vm-test-run-etc-overlay-stock" "vm-test-run-etc-overlay-on" "vm-test-run-etc-overlay-live-switch"];
+    # One specialisation each: two evaluations of drakkar per check, inside CI's eval budget.
+    oneSpecialisationEach =
+      assay.eq (map (m: builtins.attrNames m.specialisation) [stock on live]) [["alt"] ["alt"] ["overlay"]];
+    # The node and its specialisations share drakkar's package set, instantiated once.
+    sharesDrakkarPkgs = assay.eq (on.nixpkgs.config == {} && on.nixpkgs.overlays == []) true;
     isDrakkar = assay.eq stock.networking.hostName "drakkar";
     # Only disko is left out: its LUKS root has no place in a VM.
     noLuksFromDisko = assay.eq stock.boot.initrd.luks.devices {};
@@ -29,8 +38,8 @@ in
     # The switches go base <-> alt, which differ by one /etc file, so the overlay remounts.
     altAddsTheMarker = assay.eq (on.specialisation.alt.configuration.environment.etc ? "gh185-marker") true;
     baseHasNoMarker = assay.eq (on.environment.etc ? "gh185-marker") false;
-    # Stock only: the live switch into the overlay that shows what the old /etc held.
-    stockCanSwitchIntoTheOverlay =
-      assay.eq stock.specialisation.overlay.configuration.system.etc.overlay.enable true;
-    onHasNoOverlaySpecialisation = assay.eq (on.specialisation ? overlay) false;
+    # live-switch boots setup-etc.pl and switches into the overlay, which shows what the old /etc held.
+    liveSwitchBootsStock = assay.eq live.system.etc.overlay.enable false;
+    liveSwitchTargetsTheOverlay =
+      assay.eq live.specialisation.overlay.configuration.system.etc.overlay.enable true;
   }
