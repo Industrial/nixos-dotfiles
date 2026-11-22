@@ -406,6 +406,10 @@
       # ... and a crash in the health window boots the previous generation, through EFI and
       # systemd-boot (GH-225).
       // {vdeploy-crash-vm = import ./features/nix/vdeploy/test-crash.nix {inherit pkgs;};}
+      # ... and the eval cache (GH-243): a commit vci built is planned with its signed record
+      # and no local evaluation; tampered and unsigned records fall back; switched in and out
+      # live under STIG base-safe.
+      // {vdeploy-evalcache-vm = import ./features/nix/vdeploy/test-evalcache.nix {inherit pkgs;};}
       # GH-185: drakkar's /etc under setup-etc.pl vs system.etc.overlay (measurement).
       // lib.listToAttrs (map (variant: lib.nameValuePair "etc-overlay-${variant}" (import ./features/nixos/etc-overlay/test.nix {inherit pkgs inputs variant;})) ["stock" "on"])
       # features/nixos/etc-overlay: switched into and out of, live and cold, state kept.
