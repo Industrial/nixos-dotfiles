@@ -6,9 +6,11 @@ let
   assay = import ../../../common/assay/default.nix;
   nixos = import ../../../common/assay/nixos.nix;
   pkgs = nixos.flakeInputs.nixpkgs.legacyPackages.x86_64-linux;
+  inherit (pkgs) lib;
 
   rollback = import ./test-rollback.nix {inherit pkgs;};
-  r = rollback.nodes.machine;
+  r = rollback.nodes.drakkar;
+  stig = rollback.nodes.mimir;
   spec = name: r.specialisation.${name}.configuration;
   probesOf = c: builtins.attrNames c.features.nix.vhealth.probes;
 in
@@ -21,4 +23,9 @@ in
     stuckNeverComesUp = assay.eq (builtins.elem "never-up" (probesOf (spec "stuck"))) true;
     shortHealthWindow = assay.eq r.features.nix.vdeploy.healthWindow "10s";
     byHandApply = assay.eq (nixos.hasPackage r "vdeploy-apply") true;
+    # drakkar's and mimir's restriction: wheel and vhealth may use the daemon, nobody may not.
+    restrictedLikeTheFleet =
+      assay.eq (map (n: lib.sort lib.lessThan n.nix.settings.allowed-users) [r stig]) [["@wheel" "vhealth"] ["@wheel" "vhealth"]];
+    # mimir's node carries the STIG base-safe profile (audit is one of its controls).
+    mimirIsBaseSafe = assay.eq [stig.security.auditd.enable (r.security.auditd.enable or false)] [true false];
   }
