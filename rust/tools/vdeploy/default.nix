@@ -10,6 +10,7 @@
   lib,
   rustPlatform,
   git,
+  gnupg,
 }:
 rustPlatform.buildRustPackage {
   pname = "vdeploy";
@@ -22,6 +23,10 @@ rustPlatform.buildRustPackage {
       ./Cargo.lock
       ./build.rs
       ./src
+      # GH-221: the pinned GitHub key (features/nix/vdeploy's trustedSigningKeys), and the
+      # signature tests' data (a real GitHub-signed commit of main, another GitHub key).
+      ./keys
+      ./testdata
       ../vdiff/Cargo.toml
       ../vdiff/build.rs
       ../vdiff/src
@@ -42,8 +47,9 @@ rustPlatform.buildRustPackage {
   dontCargoUseSystemLibs = true;
 
   # The source and dotfiles tests run real git on scratch repositories under
-  # $TMPDIR; git wants a HOME it can read.
-  nativeCheckInputs = [git];
+  # $TMPDIR; git wants a HOME it can read. The signature tests run gpgv (and gpg --dearmor
+  # to make their keyrings, as features/nix/vdeploy does).
+  nativeCheckInputs = [git gnupg];
   preCheck = ''
     export HOME="$TMPDIR"
   '';

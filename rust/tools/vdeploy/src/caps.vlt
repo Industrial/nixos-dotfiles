@@ -31,6 +31,7 @@ import crate::common::{DeployError, cmd, exec, first_line, lifted, run, asked, s
 import crate::common::DeployError::{Diff, Eval, Fetch, Realise, System, Unverified}
 import crate::dotfiles::{Checkout, Dotfiles, fast_forward}
 import crate::watch::Head
+import crate::signature::{NOT_SIGNED, Signature, checked, scratch_for, unverified}
 import crate::takeover::{DeployerTool, LiveDeployer}
 
 -- The system this host runs: its toplevel store path, and the commit it was
@@ -41,6 +42,7 @@ export data Running { export rev Option<String>, export toplevel String }
 export class Source
   head : &self -> Effect<Head, DeployError, HNil>
   verify : &self -> String -> Effect<(), DeployError, HNil>
+  signature : &self -> String -> Effect<Signature, Never, HNil>
   commit_time : &self -> String -> Effect<Option<u64>, Never, HNil>
 
 export class Nix
@@ -103,8 +105,10 @@ export data Caps
   deriving (Clone)
 
 -- Live Source: vdeploy's own clone at `repo` (created on first use; never
--- the user's checkout), fetched from `url`.
-export data LiveSource { export git String, export repo String, export url String, export branch String }
+-- the user's checkout), fetched from `url`. A head's signature is checked
+-- with `gpgv` against `keyring` (GH-221), when there is one.
+export data LiveSource { export git String, export repo String, export url String, export branch String, export gpgv String, export keyring Option<String> }
+  deriving (Debug, Clone)
 
 git_in : &LiveSource -> &[&str] -> Result<String, String>
 git_in s args =
@@ -153,6 +157,17 @@ verify_on_main s sha =
   else
     Err (Unverified ("#{sha} is not on #{remote_ref (&s)}"))
 
+-- The verdict on a commit's signature (GH-221): the commit object, checked
+-- with gpgv against the trusted keyring. No keyring: nothing is trusted.
+signature_of : LiveSource -> String -> Signature
+signature_of s sha =
+  case &s.keyring of
+    None -> unverified "no trusted signing keys are configured"
+    Some ring ->
+      case git_in (&s) (&["cat-file", "commit", sha.as_str ()]) of
+        Err e -> unverified (&"reading the commit: #{e}")
+        Ok raw -> checked (&s.gpgv) ring (&raw) (&scratch_for (&sha))
+
 time_of : LiveSource -> String -> Option<u64>
 time_of s rev =
   git_in (&s) (&["show", "-s", "--format=%ct", rev.as_str ()]) |> .ok |> .and_then (\t -> first_line (&t) |> .parse |> .ok)
@@ -166,6 +181,10 @@ instance Source LiveSource
   verify self sha =
     s = self.clone ()
     suspend (move \-> lifted (verify_on_main s sha))
+  signature : &self -> String -> Effect<Signature, Never, HNil>
+  signature self sha =
+    s = self.clone ()
+    suspend (move \-> succeed (signature_of s sha))
   commit_time : &self -> String -> Effect<Option<u64>, Never, HNil>
   commit_time self rev =
     s = self.clone ()
@@ -278,12 +297,12 @@ instance Host LiveHost
     suspend (move \-> checked_out d head)
 
 -- The live capabilities.
-export data Wiring { export git String, export nix String, export repo String, export url String, export branch String, export host String, export db String, export checkout Option<Dotfiles>, export deployer LiveDeployer }
+export data Wiring { export git String, export gpgv String, export keyring Option<String>, export nix String, export repo String, export url String, export branch String, export host String, export db String, export checkout Option<Dotfiles>, export deployer LiveDeployer }
   deriving (Debug, Clone)
 
 export live : Wiring -> Caps
 live w =
-  source = SourceTool (Arc::new (LiveSource { git = w.git.clone (), repo = w.repo.clone (), url = w.url.clone (), branch = w.branch.clone () }))
+  source = SourceTool (Arc::new (LiveSource { git = w.git.clone (), repo = w.repo.clone (), url = w.url.clone (), branch = w.branch.clone (), gpgv = w.gpgv.clone (), keyring = w.keyring.clone () }))
   nix = NixTool (Arc::new (LiveNix { nix = w.nix.clone (), repo = w.repo.clone (), host = w.host.clone () }))
   fetcher = FetcherTool (Arc::new (NixFetcher { nix = w.nix.clone () }))
   builder = BuilderTool (Arc::new (NixBuilder { nix = w.nix.clone () }))
@@ -296,7 +315,9 @@ live w =
 -- last head once the list runs out: commits that arrive one per poll, then
 -- stop. Every build takes `build_secs` on the executor's clock and is
 -- recorded when it starts and when it finishes; a build of a derivation
--- naming one of `failing` fails.
+-- naming one of `failing` fails. A head in `unsigned` carries no signature,
+-- one in `untrusted` is signed by a key that is not trusted, and one in
+-- `off_main` is not on main; every other head is signed by a trusted key.
 export data Scripted
   { export heads Vec<String>
   , export polls Arc<AtomicU64>
@@ -304,6 +325,9 @@ export data Scripted
   , export started Arc<Mutex<Vec<String>>>
   , export finished Arc<Mutex<Vec<String>>>
   , export failing Vec<String>
+  , export unsigned Vec<String>
+  , export untrusted Vec<String>
+  , export off_main Vec<String>
   , export deployer crate::takeover::Scripted
   }
   deriving (Clone, Default)
@@ -335,7 +359,19 @@ instance Source Scripted
       Some sha -> succeed (Head { sha = sha.clone (), time = n, signed = false })
       None -> fail (Fetch (.to_string "no heads scripted"))
   verify : &self -> String -> Effect<(), DeployError, HNil>
-  verify self _sha = succeed (())
+  verify self sha =
+    if self.off_main.contains (&sha)
+      fail (Unverified ("#{sha} is not on refs/remotes/origin/main"))
+    else
+      succeed (())
+  signature : &self -> String -> Effect<Signature, Never, HNil>
+  signature self sha =
+    if self.unsigned.contains (&sha)
+      succeed (unverified NOT_SIGNED)
+    else if self.untrusted.contains (&sha)
+      succeed (unverified "signed by key 00000000DEADBEEF, which is not a trusted signing key")
+    else
+      succeed (Signature { verified = true, why = .to_string "signed by trusted key SCRIPTED" })
   commit_time : &self -> String -> Effect<Option<u64>, Never, HNil>
   commit_time self _rev = succeed (Some 0)
 
@@ -393,7 +429,7 @@ test "the live source fetches main into its own clone and verifies commits on it
   for kv in [("GIT_AUTHOR_NAME", "t"), ("GIT_AUTHOR_EMAIL", "t@t"), ("GIT_COMMITTER_NAME", "t"), ("GIT_COMMITTER_EMAIL", "t@t")]
     c.env.push ((kv.0.to_string (), kv.1.to_string ()))
   run (&c) |> .expect "origin"
-  s = LiveSource { git = .to_string "git", repo = "#{root}/clone", url = "#{root}/origin", branch = .to_string "main" }
+  s = LiveSource { git = .to_string "git", repo = "#{root}/clone", url = "#{root}/origin", branch = .to_string "main", gpgv = .to_string "gpgv", keyring = None }
   h = fetch_head (s.clone ()) |> .expect "fetched"
   assert_eq! \-> h.sha.len () \-> 40
   assert! \-> h.time > 0 && !h.signed
@@ -404,5 +440,9 @@ test "the live source fetches main into its own clone and verifies commits on it
   -- The side branch's commit is not in the clone at all, let alone on main.
   assert! \-> verify_on_main (s.clone ()) (first_line (&side)) |> .is_err
   assert_eq! \-> time_of (s.clone ()) (h.sha.clone ()) \-> Some (h.time)
+  -- No trusted keys: nothing verifies (GH-221); with a keyring, an unsigned commit is refused.
+  assert! \-> !(signature_of (s.clone ()) (h.sha.clone ())).verified
+  ringed = LiveSource { keyring = Some ("#{root}/no-such-keyring"), ...s.clone () }
+  assert_eq! \-> signature_of ringed (h.sha.clone ()) \-> unverified NOT_SIGNED
   assert_eq! \-> fetch_head (s) |> .ok |> .map (\again -> again.sha) \-> Some (h.sha)
   std::fs::remove_dir_all (&root) |> .ok

@@ -270,7 +270,10 @@ progress_of since status plan last =
         if planned.as_deref () == Some (head.as_str ())
           action = text_of plan "action" |> .unwrap_or_default
           mode = text_of plan "mode" |> .unwrap_or_default
-          if action == "none"
+          if action == "refused"
+            why = text_of plan "note" |> .unwrap_or_default
+            Settled "not deploying main #{short (&head)}: its signature does not verify (#{why}); no bad mark, the next verified commit deploys" false
+          else if action == "none"
             Settled "already runs main #{short (&head)}: nothing to switch" true
           else if mode == "observe"
             Settled "would switch to main #{short (&head)} (observe mode: vdeploy does not switch here)" true
@@ -363,6 +366,12 @@ test "debounce, observe mode, a failed plan, a failed fetch"
   assert! \-> case progress_of 100 (&nofetch) (&None) (&None) of
     Settled w ok -> !ok && w.contains "could not fetch"
     _ -> false
+
+test "a head refused for its signature settles the wake as not kept (GH-221)"
+  head = sha40 ()
+  status = json (&"{\"polledAt\":100,\"head\":\"#{head}\",\"done\":\"#{head}\",\"planning\":false}")
+  plan = json (&"{\"commit\":\"#{head}\",\"action\":\"refused\",\"mode\":\"deploy\",\"note\":\"the commit is not signed\"}")
+  assert_eq! \-> progress_of 100 (&status) (&plan) (&None) \-> Settled (.to_string "not deploying main aaaaaaaaa: its signature does not verify (the commit is not signed); no bad mark, the next verified commit deploys") false
 
 test "the writer's refusals say who may wake, and when to retry"
   assert_eq! \-> (refusal_of (std::io::Error::from_raw_os_error 6) "/run/vdeploy/wake").code \-> 75

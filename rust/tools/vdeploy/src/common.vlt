@@ -133,6 +133,17 @@ asked c =
     Some 1 -> Ok false
     _ -> Err "#{shown c} failed (#{out.status}):\n#{tail_lines (&String::from_utf8_lossy (&out.stderr)) 20}"
 
+-- Run `c` to completion whatever its exit: whether it exited 0, and what it
+-- printed (gpgv's status lines are on stdout either way). Not starting is the
+-- only error.
+export outcome : &Cmd -> Result<(bool, Ran), String>
+outcome c =
+  mut command = build c
+  out = (command.output () |> .map_err (\e -> "running #{shown c}: #{e}"))?
+  stdout = String::from_utf8_lossy (&out.stdout) |> .to_string
+  stderr = String::from_utf8_lossy (&out.stderr) |> .to_string
+  Ok ((out.status.success (), Ran { stdout, stderr }))
+
 -- The first line of a command's output, trimmed: a sha, a branch, a time.
 export first_line : &str -> String
 first_line s = s.lines () |> .next |> .unwrap_or "" |> .trim |> .to_string
@@ -158,3 +169,8 @@ test "a command's environment and directory"
   ran = run (&c) |> .expect "ran"
   assert_eq! \-> ran.stdout \-> "seen\n/\n"
   assert_eq! \-> first_line "  abc \nnext" \-> "abc"
+
+test "a command's outcome: its exit and its output, failing or not"
+  assert_eq! \-> outcome (&cmd "sh" (strs (&["-c", "echo seen; exit 2"]))) |> .map (\r -> (r.0, r.1.stdout)) \-> Ok ((false, .to_string "seen\n"))
+  assert_eq! \-> outcome (&cmd "sh" (strs (&["-c", "echo ok"]))) |> .map (\r -> r.0) \-> Ok true
+  assert! \-> outcome (&cmd "/nonexistent/vdeploy-program" (Vec::new ())) |> .is_err

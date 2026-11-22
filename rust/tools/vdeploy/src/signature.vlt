@@ -1,0 +1,197 @@
+-- Commit verification (GH-221): vdeploy deploys a head of main only when its
+-- signature verifies against the trusted signing keys (by default GitHub's
+-- web-flow key, pinned in keys/github-web-flow.asc; features/nix/vdeploy
+-- builds the keyring at Nix build time).
+--
+-- The check is `gpgv`, not `git verify-commit`: gpgv verifies against the one
+-- keyring it is given, with no trust database, no agent, no key server and no
+-- network, and it writes nothing of its own. vdeploy splits the commit object
+-- the way git does (the `gpgsig` header is the signature; the object without
+-- it is what was signed), writes both into a scratch directory, runs gpgv
+-- through the command runner, and reads gpgv's status lines.
+--
+-- What is decided here is pure (`split_signed`, `verdict_of`), so it is tested
+-- without gpgv; `checked` is the one step that runs it.
+
+import std::path::Path
+import crate::common::{cmd, outcome, strs}
+
+-- The verdict on a commit: whether its signature verified against a trusted
+-- key, and why (the key that made it, or why not), for the journal.
+export data Signature { export verified bool, export why String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export const NOT_SIGNED : &str = "the commit is not signed"
+
+export unverified : &str -> Signature
+unverified why = Signature { verified = false, why = why.to_string () }
+
+-- A commit object split as git splits it for `verify-commit`: the object
+-- without its `gpgsig` header (what was signed) and the signature (the
+-- header's value, continuation lines unindented). None when it has no
+-- signature. Only the header is searched: a `gpgsig` line in the message is
+-- the message's.
+export split_signed : &str -> Option<(String, String)>
+split_signed raw =
+  (header, body) = case raw.split_once "\n\n" of
+    Some (h, b) -> (h, Some b)
+    None -> (raw, None)
+  mut payload = String::new ()
+  mut sig = String::new ()
+  mut in_sig = false
+  mut found = false
+  for line in header.split '\n'
+    if line.strip_prefix "gpgsig " is Some rest
+      in_sig := true
+      found := true
+      sig.push_str rest
+      sig.push '\n'
+    else
+      more = if in_sig
+        line.strip_prefix " "
+      else
+        None
+      case more of
+        Some rest ->
+          sig.push_str rest
+          sig.push '\n'
+        None ->
+          in_sig := false
+          payload.push_str line
+          payload.push '\n'
+  if &body is Some b
+    payload.push '\n'
+    payload.push_str b
+  if found
+    Some ((payload, sig))
+  else
+    None
+
+-- The first word after `[GNUPG:] TAG ` in gpgv's status lines.
+export status_arg : &str -> &str -> Option<String>
+status_arg status tag =
+  prefix = "[GNUPG:] #{tag} "
+  status.lines () |> .find_map (\l -> l.strip_prefix (prefix.as_str ()) |> .map (\rest -> rest.split_whitespace () |> .next |> .unwrap_or "" |> .to_string))
+
+-- gpgv's verdict, from its exit and its status lines: verified only on a zero
+-- exit with GOODSIG and VALIDSIG (the key's full fingerprint). An expired or
+-- revoked key, a key not in the keyring, a bad signature: all unverified.
+export verdict_of : bool -> &str -> Signature
+verdict_of ok status =
+  good = status_arg status "GOODSIG"
+  valid = status_arg status "VALIDSIG"
+  if ok && good.is_some () && valid.is_some ()
+    Signature { verified = true, why = "signed by trusted key #{valid.unwrap_or_default ()}" }
+  else if status_arg status "NO_PUBKEY" is Some id
+    unverified (&"signed by key #{id}, which is not a trusted signing key")
+  else if status_arg status "BADSIG" is Some id
+    unverified (&"a bad signature by key #{id}: the commit is not what was signed")
+  else if status_arg status "EXPKEYSIG" is Some id
+    unverified (&"signed by key #{id}, which has expired")
+  else if status_arg status "REVKEYSIG" is Some id
+    unverified (&"signed by key #{id}, which is revoked")
+  else
+    unverified "the signature does not verify"
+
+-- The scratch directory for one check: a commit's own, in the (private)
+-- temporary directory.
+export scratch_for : &str -> String
+scratch_for sha = std::env::temp_dir () |> .join ("vdeploy-verify-#{std::process::id ()}-#{sha}") |> .to_string_lossy |> .to_string
+
+written : &str -> &str -> &str -> Result<(), String>
+written dir payload sig =
+  d = Path::new dir
+  std::fs::remove_dir_all d |> .ok
+  (std::fs::create_dir_all d |> .map_err (\e -> "creating #{dir}: #{e}"))?
+  (std::fs::write (d.join "payload") payload |> .map_err (\e -> "writing the payload: #{e}"))?
+  std::fs::write (d.join "sig") sig |> .map_err (\e -> "writing the signature: #{e}")
+
+-- Verify the raw commit object `raw` with `gpgv` against `keyring`, in
+-- `scratch` (created and removed here).
+export checked : &str -> &str -> &str -> &str -> Signature
+checked gpgv keyring raw scratch =
+  case split_signed raw of
+    None -> unverified NOT_SIGNED
+    Some (payload, sig) ->
+      verdict = case written scratch (&payload) (&sig) of
+        Err e -> unverified (&"could not check the signature: #{e}")
+        Ok () ->
+          sig_file = Path::new scratch |> .join "sig" |> .to_string_lossy |> .to_string
+          data_file = Path::new scratch |> .join "payload" |> .to_string_lossy |> .to_string
+          c = cmd gpgv (strs (&["--status-fd", "1", "--keyring", keyring, sig_file.as_str (), data_file.as_str ()]))
+          case outcome (&c) of
+            Ok (ok, ran) -> verdict_of ok (&ran.stdout)
+            Err e -> unverified (&"could not check the signature: #{e}")
+      std::fs::remove_dir_all scratch |> .ok
+      verdict
+
+rust """
+  /// A file of the crate's test data (testdata/), read at test time.
+  #[cfg(test)]
+  pub fn fixture(name: &str) -> String {
+      let path = format!("{}/testdata/{}", env!("CARGO_MANIFEST_DIR"), name);
+      std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"))
+  }
+
+  /// The pinned key file, as features/nix/vdeploy pins it.
+  #[cfg(test)]
+  pub fn pinned_key() -> String {
+      let path = format!("{}/keys/github-web-flow.asc", env!("CARGO_MANIFEST_DIR"));
+      std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"))
+  }
+"""
+
+-- A keyring of the armored `key`, made as features/nix/vdeploy makes it
+-- (`gpg --dearmor`), in `dir`.
+#[cfg(test)]
+keyring_of : &str -> &str -> &str -> String
+keyring_of dir name key =
+  std::fs::create_dir_all dir |> .expect "scratch"
+  armored = "#{dir}/#{name}.asc"
+  ring = "#{dir}/#{name}.gpg"
+  std::fs::write (&armored) key |> .expect "key"
+  home = "#{dir}/gnupg"
+  std::fs::create_dir_all (&home) |> .expect "gnupg home"
+  crate::common::run (&cmd "gpg" (strs (&["--homedir", home.as_str (), "--batch", "--yes", "--output", ring.as_str (), "--dearmor", armored.as_str ()]))) |> .expect "gpg --dearmor"
+  ring
+
+test "a commit object splits into what was signed and the signature, as git splits it"
+  raw = "tree t\nparent p\ncommitter GitHub <noreply@github.com> 1 +0000\ngpgsig -----BEGIN PGP SIGNATURE-----\n \n wsF\n -----END PGP SIGNATURE-----\n \n\nfeat: x\n\ngpgsig in the message"
+  (payload, sig) = split_signed raw |> .expect "signed"
+  assert_eq! \-> payload \-> "tree t\nparent p\ncommitter GitHub <noreply@github.com> 1 +0000\n\nfeat: x\n\ngpgsig in the message"
+  assert_eq! \-> sig \-> "-----BEGIN PGP SIGNATURE-----\n\nwsF\n-----END PGP SIGNATURE-----\n\n"
+  assert_eq! \-> split_signed "tree t\nauthor a\n\ngpgsig -----BEGIN in the message\n" \-> None
+
+test "gpgv's status lines decide: good and valid, unknown key, bad, expired"
+  good = "[GNUPG:] NEWSIG\n[GNUPG:] GOODSIG B5690EEEBB952194 GitHub <noreply@github.com>\n[GNUPG:] VALIDSIG 968479A1AFF927E37D1A566BB5690EEEBB952194 2026-11-22 1795367551 0 4 0 1 8 00 968479A1AFF927E37D1A566BB5690EEEBB952194\n"
+  assert_eq! \-> verdict_of true good \-> Signature { verified = true, why = .to_string "signed by trusted key 968479A1AFF927E37D1A566BB5690EEEBB952194" }
+  -- A good-looking status is still refused when gpgv did not exit 0.
+  assert! \-> !(verdict_of false good).verified
+  unknown = verdict_of false "[GNUPG:] ERRSIG B5690EEEBB952194 1 8 00 1795367551 9 -\n[GNUPG:] NO_PUBKEY B5690EEEBB952194\n"
+  assert_eq! \-> unknown \-> unverified "signed by key B5690EEEBB952194, which is not a trusted signing key"
+  assert! \-> (verdict_of false "[GNUPG:] BADSIG B5690EEEBB952194 GitHub\n").why.contains "bad signature"
+  assert! \-> !(verdict_of true "[GNUPG:] EXPKEYSIG 4AEE18F83AFDEB23 GitHub\n[GNUPG:] VALIDSIG 5DE3E0509C47EA3CF04A42D34AEE18F83AFDEB23\n").verified
+  assert! \-> !(verdict_of true "").verified
+
+-- The live check on a real commit of main (b3d359d7, a squash merge GitHub
+-- signed) with real gpgv: the pinned key verifies it; GitHub's expired 2017 key
+-- (a key, but not the one that signed) does not; a changed commit does not; an
+-- unsigned commit is refused without running gpgv.
+test "gpgv against the pinned key: GitHub's merge verifies, another key or a changed commit does not"
+  dir = std::env::temp_dir () |> .join ("vdeploy-signature-#{std::process::id ()}") |> .to_string_lossy |> .to_string
+  std::fs::remove_dir_all (&dir) |> .ok
+  pinned = keyring_of (&dir) "pinned" (&pinned_key ())
+  other = keyring_of (&dir) "other" (&fixture "web-flow-2017.asc")
+  raw = fixture "signed-commit"
+  gpgv = std::env::var "VDEPLOY_TEST_GPGV" |> .unwrap_or_else (\_ -> .to_string "gpgv")
+  ok = checked (&gpgv) (&pinned) (&raw) (&"#{dir}/check")
+  assert_eq! \-> ok \-> Signature { verified = true, why = .to_string "signed by trusted key 968479A1AFF927E37D1A566BB5690EEEBB952194" }
+  assert! \-> !(Path::new (&"#{dir}/check") |> .exists)
+  foreign = checked (&gpgv) (&other) (&raw) (&"#{dir}/check")
+  assert_eq! \-> foreign \-> unverified "signed by key B5690EEEBB952194, which is not a trusted signing key"
+  changed = raw.replacen "the _total counters" "the counters" 1
+  assert! \-> (checked (&gpgv) (&pinned) (&changed) (&"#{dir}/check")).why.contains "bad signature"
+  plain = "tree t\nauthor Tom <t@x> 1 +0000\ncommitter Tom <t@x> 1 +0000\n\nfeat: x\n"
+  assert_eq! \-> checked (&gpgv) (&pinned) plain (&"#{dir}/check") \-> unverified NOT_SIGNED
+  assert! \-> !(checked "/nonexistent/gpgv" (&pinned) (&raw) (&"#{dir}/check")).verified
+  std::fs::remove_dir_all (&dir) |> .ok

@@ -60,10 +60,10 @@ export deployer_of : &Options -> LiveDeployer
 deployer_of o = LiveDeployer { systemd_run = o.systemd_run.clone (), systemctl = o.systemctl.clone (), program = self_exe (), args = apply_args_of o, state_dir = state_dir_of o, comin_unit = o.comin_unit.clone (), unit = .to_string "vdeploy-apply" }
 
 export caps_of : &Options -> Caps
-caps_of o = live (Wiring { git = o.git.clone (), nix = o.nix.clone (), repo = o.repo.clone (), url = o.url.clone (), branch = o.branch.clone (), host = o.host.clone (), db = o.db.clone (), checkout = checkout_of o, deployer = deployer_of o })
+caps_of o = live (Wiring { git = o.git.clone (), gpgv = o.gpgv.clone (), keyring = o.trusted_keys.clone (), nix = o.nix.clone (), repo = o.repo.clone (), url = o.url.clone (), branch = o.branch.clone (), host = o.host.clone (), db = o.db.clone (), checkout = checkout_of o, deployer = deployer_of o })
 
 export settings_of : &Options -> Settings
-settings_of o = Settings { host = o.host.clone (), interval = o.interval, quiet_polls = quiet_polls_of o.debounce o.interval, tick = o.tick, textfile_dir = o.textfile_dir.clone (), state_dir = o.state_dir.clone (), dotfiles = o.dotfiles.clone () |> .unwrap_or_default, deploy = o.deploy }
+settings_of o = Settings { host = o.host.clone (), interval = o.interval, quiet_polls = quiet_polls_of o.debounce o.interval, tick = o.tick, textfile_dir = o.textfile_dir.clone (), state_dir = o.state_dir.clone (), dotfiles = o.dotfiles.clone () |> .unwrap_or_default, deploy = o.deploy, require_signed = o.require_signed }
 
 -- The live host for `vdeploy apply`.
 export system_of : &Options -> LiveSystem
