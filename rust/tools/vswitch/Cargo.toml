@@ -1,0 +1,39 @@
+[package]
+name = "vswitch"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Local NixOS rebuild from the Layer A pieces: build (through vmon), closure diff (vdiff), then vdeploy's health-checked apply transaction with rollback (replaces nixos-rebuild and nh)"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly, like
+# vdeploy and every other consumer.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# The switch pipeline is vdeploy's, linked as a library and not copied: its
+# apply transaction (switch-to-configuration test, vhealth, keep or roll back),
+# its option parser for that transaction, and its LiveSystem. vdeploy itself is
+# unchanged. default.nix roots its source at rust/tools.
+vdeploy = { path = "../vdeploy" }
+# The closure diff, printed before a switch (vdiff's own text report).
+vdiff = { path = "../vdiff" }
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly (never 0.2.0: it miscompiles).
+[build-dependencies]
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
+
+[lib]
+name = "vswitch"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vswitch"
+path = "src/main.rs"

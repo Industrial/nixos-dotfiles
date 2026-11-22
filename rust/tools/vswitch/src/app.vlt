@@ -1,0 +1,310 @@
+-- The program. One run:
+--
+--   1. the toplevel: `--toplevel`, else built from the flake (through vmon);
+--   2. the running system and the boot default, and vdiff's diff of the
+--      running system against the new toplevel;
+--   3. which activation the verb needs (plan.vlt); none: say so and stop;
+--   4. `--ask`: confirm;
+--   5. the activation, elevated, in vdeploy's transient unit: `vswitch apply`
+--      (vdeploy's transaction: test, vhealth, keep or roll back) for switch,
+--      `vswitch activate boot|test` for the others.
+--
+-- `main` runs it under id_effect_cli's `run_main`: exit 0, 1 on a usage error,
+-- a failed build or an activation that did not keep the host where it was
+-- asked to be, 101 on a bug, 130 on Ctrl-C.
+
+import std::sync::Arc
+import id_effect::{Effect, HNil, effect, fail, succeed, suspend}
+import crate::cli::{Command, Options, USAGE, parse_args}
+import crate::common::SwitchError
+import crate::common::SwitchError::{Activate, Declined, Usage}
+import crate::plan::{Activation, Tools, Verb, absolute, activation_command, activation_of, build_command, dry_command, euid_of, idle_line, toplevel_of, verb_name}
+import crate::world::{WorldTool, live}
+import vdeploy::apply::{LiveSystem, System}
+
+-- Everything one run needs, resolved at the edge.
+export data Run
+  { export verb Verb
+  , export installable String
+  , export toplevel Option<String>
+  , export out_link String
+  , export tools Tools
+  , export program String
+  , export state_dir String
+  , export health_window String
+  , export health_as Option<String>
+  , export ask bool
+  , export root bool
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Step 5.
+activated : WorldTool -> Run -> Verb -> String -> Effect<(), SwitchError, HNil>
+activated w r v x =
+  a = Activation { verb = v, toplevel = x, program = r.program.clone (), state_dir = r.state_dir.clone (), health_window = r.health_window.clone (), health_as = r.health_as.clone () }
+  w.0.run (activation_command (&r.tools) (&a) r.root)
+
+confirmed : WorldTool -> Run -> Verb -> String -> bool -> Effect<(), SwitchError, HNil>
+confirmed w r v x yes =
+  if yes
+    activated w r v x
+  else
+    fail (Declined (.to_string "not confirmed: nothing was activated"))
+
+-- Steps 3 and 4.
+decided : WorldTool -> Run -> String -> String -> String -> Effect<(), SwitchError, HNil>
+decided w r x current profile =
+  case activation_of r.verb (&x) (&current) (&profile) of
+    None -> w.0.say (idle_line r.verb (&x)) |> .widen
+    Some v ->
+      if r.ask
+        w2 = w.clone ()
+        question = "vswitch: #{verb_name v} to #{x}?"
+        w.0.ask question |> .widen |> .flat_map (move \yes -> confirmed w2 r v x yes)
+      else
+        activated w r v x
+
+-- Step 2.
+diffed : WorldTool -> Run -> String -> String -> String -> Effect<(), SwitchError, HNil>
+diffed w r x current profile =
+  w2 = w.clone ()
+  w.0.show_diff (current.clone ()) (x.clone ()) |> .widen |> .flat_map (move \_ -> decided w2 r x current profile)
+
+located : WorldTool -> Run -> String -> Effect<(), SwitchError, HNil>
+located w r x =
+  w2 = w.clone ()
+  w.0.state () |> .flat_map (move \st -> diffed w2 r x st.0 st.1)
+
+-- Step 1.
+toplevel_for : WorldTool -> Run -> Effect<String, SwitchError, HNil>
+toplevel_for w r =
+  case r.toplevel.clone () of
+    Some x -> w.0.resolve x
+    None -> w.0.build (build_command (&r.tools) (&r.installable) (&r.out_link)) (r.out_link.clone ())
+
+-- One run against a world.
+export switched : WorldTool -> Run -> Effect<(), SwitchError, HNil>
+switched w r =
+  if r.verb == Verb::Dry
+    w.0.run (dry_command (&r.tools) (&r.installable))
+  else
+    w2 = w.clone ()
+    r2 = r.clone ()
+    toplevel_for w r |> .flat_map (move \x -> located w2 r2 x)
+
+-- The edge: who we are, which host, where the build's link goes.
+hostname : String
+hostname = std::fs::read_to_string "/proc/sys/kernel/hostname" |> .map (\h -> h.trim () |> .to_string) |> .unwrap_or_default
+
+is_root : bool
+is_root = std::fs::read_to_string "/proc/self/status" |> .ok |> .and_then (\s -> euid_of (&s)) |> .map (\u -> u == 0) |> .unwrap_or false
+
+self_exe : String
+self_exe = std::env::current_exe () |> .map (\p -> p.to_string_lossy () |> .to_string) |> .unwrap_or_else (\_ -> .to_string "vswitch")
+
+-- `build` leaves `./result`, as nixos-rebuild does; the activating verbs keep
+-- their link (and so the GC root) in the user's runtime directory. Never a
+-- shared /tmp: whoever owns the link's directory chooses what is activated.
+export link_of : Verb -> Option<String> -> Option<String> -> String
+link_of verb asked runtime =
+  case asked of
+    Some l -> l
+    None -> case runtime of
+      Some dir -> if verb == Verb::Build
+        .to_string "result"
+      else
+        "#{dir}/vswitch/result"
+      None -> .to_string "result"
+
+export run_of : Options -> Run
+run_of o =
+  host = o.host.clone () |> .unwrap_or_else (\-> hostname ())
+  path = std::env::var "PATH" |> .unwrap_or_default
+  runtime = std::env::var "XDG_RUNTIME_DIR" |> .ok
+  Run { verb = o.verb, installable = toplevel_of (&o.flake) (&host), toplevel = o.toplevel.clone (), out_link = link_of o.verb (o.out_link.clone ()) runtime, tools = absolute (&o.tools) (&path), program = self_exe (), state_dir = o.state_dir.clone (), health_window = o.health_window.clone (), health_as = o.health_as.clone (), ask = o.ask, root = is_root () }
+
+-- `vswitch apply …`: vdeploy's apply transaction, its own parser and all.
+applied : Vec<String> -> Effect<(), SwitchError, HNil>
+applied rest =
+  mut argv = .to_vec ([.to_string "apply"]) : Vec<String>
+  argv.extend rest
+  vdeploy::app::program (vdeploy::cli::parse_args (&argv)) |> .map_err (\e -> Activate (e.to_string ()))
+
+-- `vswitch activate boot|test TOPLEVEL [--nix-env PROG] [--profile PATH]`,
+-- through vdeploy's LiveSystem: nix-env --set then switch-to-configuration
+-- boot, or switch-to-configuration test.
+export data Activate_ { export verb Verb, export toplevel String, export nix_env String, export profile String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+activate_verb : Option<&String> -> Result<Verb, String>
+activate_verb word =
+  case word |> .map (\s -> s.as_str ()) of
+    Some "boot" -> Ok Verb::Boot
+    Some "test" -> Ok Verb::Test
+    _ -> Err (.to_string "vswitch activate boot|test TOPLEVEL [--nix-env PROG] [--profile PATH]")
+
+export activate_of : &[String] -> Result<Activate_, String>
+activate_of args =
+  mut it = args.iter ()
+  verb = (activate_verb (it.next ()))?
+  toplevel = (it.next () |> .cloned |> .ok_or (.to_string "vswitch activate: a toplevel is required"))?
+  mut a = Activate_ { verb, toplevel, nix_env = .to_string "nix-env", profile = .to_string "/nix/var/nix/profiles/system" }
+  while it.next () is Some flag
+    case flag.as_str () of
+      "--nix-env" ->
+        a.nix_env := (it.next () |> .cloned |> .ok_or (.to_string "--nix-env needs a value"))?
+      "--profile" ->
+        a.profile := (it.next () |> .cloned |> .ok_or (.to_string "--profile needs a value"))?
+      other ->
+        return Err "vswitch activate: unknown argument: #{other}"
+  Ok a
+
+system_for : &Activate_ -> LiveSystem
+system_for a =
+  d = vdeploy::cli::defaults ()
+  LiveSystem { current = .to_string "/run/current-system", profile = a.profile.clone (), gcroot = d.gcroot, nix_env = a.nix_env.clone (), nix_store = d.nix_store, systemctl = d.systemctl, comin_unit = d.comin_unit, vhealth = None, window = d.health_window, every = d.health_every, health_as = None, health_group = None, setpriv = d.setpriv }
+
+activated_now : Activate_ -> Effect<(), SwitchError, HNil>
+activated_now a =
+  sys = system_for (&a)
+  x = a.toplevel.clone ()
+  case a.verb of
+    Verb::Boot ->
+      sys2 = sys.clone ()
+      x2 = x.clone ()
+      sys.set_profile x |> .flat_map (move \_ -> sys2.activate x2 (.to_string "boot")) |> .map_err (\e -> Activate (e))
+    _ -> sys.activate x (.to_string "test") |> .map_err (\e -> Activate (e))
+
+-- The program for a parsed command line (or the usage error).
+export program : Result<Command, String> -> Effect<(), SwitchError, HNil>
+program parsed =
+  case parsed of
+    Err why -> fail (Usage ("#{why}\n#{USAGE}"))
+    Ok (Command::Help) -> succeed (())
+    Ok (Command::Apply rest) -> applied rest
+    Ok (Command::Activate rest) -> case activate_of (&rest) of
+      Err why -> fail (Usage why)
+      Ok a -> activated_now a
+    Ok (Command::Run o) ->
+      db = o.db.clone ()
+      r = suspend (move \-> succeed (run_of o))
+      r |> .flat_map (move \run -> switched (WorldTool (Arc::new (live db))) run)
+
+-- On a fiber of the runtime's executor (as rust/tools/vdeploy's app.vlt):
+-- `run_main` polls its root outside the executor's context.
+supervised : Effect<(), SwitchError, HNil> -> Effect<(), SwitchError, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  parsed = parse_args (&args)
+  if parsed == Ok (Command::Help)
+    println! \-> "#{USAGE}"
+    std::process::ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (supervised (program parsed)) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+import crate::world::{Scripted, log_of}
+#[cfg(test)]
+import std::sync::Mutex
+
+#[cfg(test)]
+tools : Tools
+tools = Tools { nix = .to_string "/n/nix", vmon = Some (.to_string "/m/vmon"), systemd_run = .to_string "/s/systemd-run", systemctl = .to_string "/s/systemctl", nix_env = .to_string "/n/nix-env", nix_store = .to_string "/n/nix-store", setpriv = .to_string "/u/setpriv", elevate = .to_string "/w/sudo" }
+
+#[cfg(test)]
+run_for : Verb -> Run
+run_for verb = Run { verb, installable = .to_string "/f#nixosConfigurations.\"h\".config.system.build.toplevel", toplevel = None, out_link = .to_string "/r/result", tools = tools (), program = .to_string "/v/vswitch", state_dir = .to_string "/var/lib/vdeploy", health_window = .to_string "2m", health_as = Some (.to_string "vhealth"), ask = false, root = false }
+
+#[cfg(test)]
+world : &str -> &str -> Option<&str> -> Scripted
+world current profile built = Scripted { built = built |> .map (\b -> b.to_string ()), current = current.to_string (), profile = profile.to_string (), log = Arc::new (Mutex::new (Vec::new ())), ...Scripted::default () }
+
+#[cfg(test)]
+ran_in : Scripted -> Run -> Result<(), String>
+ran_in w r = id_effect::testing::run_test (switched (WorldTool (Arc::new w)) r) |> .into_result |> .map_err (\c -> "#{c:?}")
+
+#[cfg(test)]
+runs : &Scripted -> Vec<String>
+runs w = log_of w |> .into_iter |> .filter (\l -> l.starts_with "run ") |> .collect
+
+test "switch: build, diff, then vdeploy's apply in vdeploy's unit, elevated"
+  w = world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new")
+  assert! \-> ran_in (w.clone ()) (run_for Verb::Switch) |> .is_ok
+  log = log_of (&w)
+  assert! \-> log[0].starts_with "build /m/vmon -- /n/nix build"
+  assert_eq! \-> log[1].as_str () \-> "diff /nix/store/old /nix/store/new"
+  r = runs (&w)
+  assert_eq! \-> r.len () \-> 1
+  assert! \-> r[0].starts_with "run /w/sudo /s/systemd-run --unit=vdeploy-apply"
+  assert! \-> r[0].contains "/v/vswitch apply --toplevel /nix/store/new --state-dir /var/lib/vdeploy"
+  assert! \-> r[0].contains "--health-as vhealth --setpriv /u/setpriv"
+
+test "build and dry never activate"
+  w = world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new")
+  assert! \-> ran_in (w.clone ()) (run_for Verb::Build) |> .is_ok
+  assert! \-> runs (&w) |> .is_empty
+  assert! \-> log_of (&w) |> .last |> .map (\l -> l.contains "built /nix/store/new") |> .unwrap_or false
+  d = world "/nix/store/old" "/nix/store/old" None
+  assert! \-> ran_in (d.clone ()) (run_for Verb::Dry) |> .is_ok
+  assert_eq! \-> runs (&d) |> .len \-> 1
+  first_run = runs (&d)
+  assert! \-> first_run[0].contains "--dry-run"
+  assert! \-> !(log_of (&d) |> .iter |> .any (\l -> l.starts_with "build "))
+
+test "a failed build activates nothing, and fails the run"
+  w = world "/nix/store/old" "/nix/store/old" None
+  assert! \-> ran_in (w.clone ()) (run_for Verb::Switch) |> .is_err
+  assert! \-> runs (&w) |> .is_empty
+
+test "the running generation is not switched to again; a moved boot default is fixed with boot"
+  same = world "/nix/store/new" "/nix/store/new" (Some "/nix/store/new")
+  assert! \-> ran_in (same.clone ()) (run_for Verb::Switch) |> .is_ok
+  assert! \-> runs (&same) |> .is_empty
+  assert! \-> log_of (&same) |> .iter |> .any (\l -> l.contains "already running /nix/store/new")
+  moved = world "/nix/store/new" "/nix/store/old" (Some "/nix/store/new")
+  assert! \-> ran_in (moved.clone ()) (run_for Verb::Switch) |> .is_ok
+  first_run = runs (&moved)
+  assert! \-> first_run[0].contains "/v/vswitch activate boot /nix/store/new"
+
+test "--ask: a no activates nothing and fails; a yes activates"
+  no = world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new")
+  asking = Run { ask = true, ...run_for Verb::Test }
+  assert! \-> ran_in (no.clone ()) (asking.clone ()) |> .err |> .map (\e -> e.contains "not confirmed") |> .unwrap_or false
+  assert! \-> runs (&no) |> .is_empty
+  yes = Scripted { answer = true, ...world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new") }
+  assert! \-> ran_in (yes.clone ()) asking |> .is_ok
+  first_run = runs (&yes)
+  assert! \-> first_run[0].contains "/v/vswitch activate test /nix/store/new"
+
+test "a rolled-back apply fails the run; a given toplevel is not built"
+  w = Scripted { failing = .to_vec ([.to_string "apply"]), ...world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new") }
+  pinned = Run { toplevel = Some (.to_string "/nix/store/given"), ...run_for Verb::Switch }
+  assert! \-> ran_in (w.clone ()) pinned |> .is_err
+  assert! \-> !(log_of (&w) |> .iter |> .any (\l -> l.starts_with "build "))
+  first_run = runs (&w)
+  assert! \-> first_run[0].contains "--toplevel /nix/store/given"
+
+test "the activate subcommand's arguments"
+  a = activate_of (&.to_vec ([.to_string "boot", .to_string "/x", .to_string "--nix-env", .to_string "/n/nix-env"])) |> .expect "activate"
+  assert_eq! \-> (a.verb, a.toplevel.as_str (), a.nix_env.as_str (), a.profile.as_str ()) \-> (Verb::Boot, "/x", "/n/nix-env", "/nix/var/nix/profiles/system")
+  assert! \-> activate_of (&.to_vec ([.to_string "switch", .to_string "/x"])) |> .is_err
+  assert! \-> activate_of (&.to_vec ([.to_string "test"])) |> .is_err
+  assert! \-> activate_of (&.to_vec ([.to_string "test", .to_string "/x", .to_string "--frob"])) |> .is_err
+
+test "the build's link: ./result for build, the runtime directory otherwise"
+  assert_eq! \-> link_of Verb::Build None (Some (.to_string "/run/user/1000")) \-> "result"
+  assert_eq! \-> link_of Verb::Switch None (Some (.to_string "/run/user/1000")) \-> "/run/user/1000/vswitch/result"
+  assert_eq! \-> link_of Verb::Test None None \-> "result"
+  assert_eq! \-> link_of Verb::Switch (Some (.to_string "/l")) None \-> "/l"
+
+test "a usage error carries the usage line"
+  exit = id_effect::testing::run_test (program (Err (.to_string "unknown argument: -x")))
+  err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
+  assert! \-> err |> .map (\e -> e.contains USAGE && e.contains "-x") |> .unwrap_or false

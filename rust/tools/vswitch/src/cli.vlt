@@ -1,0 +1,157 @@
+-- The command line.
+--
+--   vswitch switch|boot|test|build|dry [--flake DIR] [--host NAME] [--toplevel PATH]
+--           [--out-link PATH] [--ask] [--health-window DURATION] [--health-as USER]
+--           [--state-dir DIR] [TOOLS]
+--
+-- Options may come before the verb as well as after it: the NixOS feature's
+-- wrapper puts the host's absolute tool paths first. Two subcommands are the
+-- activation unit's, not the operator's: `vswitch apply …` hands everything
+-- after it to vdeploy's apply transaction (vdeploy's own parser), and
+-- `vswitch activate boot|test TOPLEVEL [--nix-env PROG] [--profile PATH]`.
+
+import crate::plan::{Tools, Verb, verb_of}
+import vdeploy::cli::parse_duration
+
+export const USAGE : &str = "usage: vswitch switch|boot|test|build|dry [--flake DIR] [--host NAME] [--toplevel PATH] [--out-link PATH] [--ask] [--health-window DURATION] [--health-as USER] [--state-dir DIR] [--db FILE] [TOOLS]\nTOOLS: [--nix PROG] [--vmon PROG | --no-vmon] [--systemd-run PROG] [--systemctl PROG] [--nix-env PROG] [--nix-store PROG] [--setpriv PROG] [--elevate PROG]\n  switch  build, diff, then vdeploy's apply: switch-to-configuration test, vhealth, keep (boot default) or roll back\n  boot    build, diff, make it the boot default; nothing is activated\n  test    build, diff, activate it; the boot default is not touched\n  build   build and diff only\n  dry     what would be built and fetched"
+
+-- What the command line asked for.
+export data Command
+  = Help
+  | Run Options
+  | Apply (Vec<String>)
+  | Activate (Vec<String>)
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Options
+  { export verb Verb
+  , export flake String
+  , export host Option<String>
+  , export toplevel Option<String>
+  , export out_link Option<String>
+  , export ask bool
+  , export health_window String
+  , export health_as Option<String>
+  , export state_dir String
+  , export db String
+  , export tools Tools
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export default_tools : Tools
+default_tools = Tools { nix = .to_string "nix", vmon = None, systemd_run = .to_string "systemd-run", systemctl = .to_string "systemctl", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", setpriv = .to_string "setpriv", elevate = .to_string "sudo" }
+
+export defaults : Verb -> Options
+defaults verb = Options { verb, flake = .to_string ".", host = None, toplevel = None, out_link = None, ask = false, health_window = .to_string "2m", health_as = None, state_dir = .to_string "/var/lib/vdeploy", db = (vdeploy::cli::defaults ()).db, tools = default_tools () }
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+-- The parsed command line (argv without the program name).
+export parse_args : &[String] -> Result<Command, String>
+parse_args args =
+  mut o = defaults Verb::Switch
+  mut verb = None : Option<Verb>
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "apply" ->
+        if verb.is_none ()
+          return Ok (Command::Apply (it.cloned () |> .collect))
+        return Err (.to_string "unknown argument: apply")
+      "activate" ->
+        if verb.is_none ()
+          return Ok (Command::Activate (it.cloned () |> .collect))
+        return Err (.to_string "unknown argument: activate")
+      "-h" ->
+        return Ok (Command::Help)
+      "--help" ->
+        return Ok (Command::Help)
+      "--flake" ->
+        o.flake := (value (it.next ()) "--flake")?
+      "--host" ->
+        o.host := Some ((value (it.next ()) "--host")?)
+      "--toplevel" ->
+        o.toplevel := Some ((value (it.next ()) "--toplevel")?)
+      "--out-link" ->
+        o.out_link := Some ((value (it.next ()) "--out-link")?)
+      "--ask" ->
+        o.ask := true
+      "--health-window" ->
+        w = (value (it.next ()) "--health-window")?
+        if parse_duration (&w) |> .filter (\n -> *n > 0) |> .is_none
+          return Err "--health-window: not a positive duration: #{w}"
+        o.health_window := w
+      "--health-as" ->
+        o.health_as := Some ((value (it.next ()) "--health-as")?)
+      "--state-dir" ->
+        o.state_dir := (value (it.next ()) "--state-dir")?
+      "--db" ->
+        o.db := (value (it.next ()) "--db")?
+      "--nix" ->
+        o.tools.nix := (value (it.next ()) "--nix")?
+      "--vmon" ->
+        o.tools.vmon := Some ((value (it.next ()) "--vmon")?)
+      "--no-vmon" ->
+        o.tools.vmon := None
+      "--systemd-run" ->
+        o.tools.systemd_run := (value (it.next ()) "--systemd-run")?
+      "--systemctl" ->
+        o.tools.systemctl := (value (it.next ()) "--systemctl")?
+      "--nix-env" ->
+        o.tools.nix_env := (value (it.next ()) "--nix-env")?
+      "--nix-store" ->
+        o.tools.nix_store := (value (it.next ()) "--nix-store")?
+      "--setpriv" ->
+        o.tools.setpriv := (value (it.next ()) "--setpriv")?
+      "--elevate" ->
+        o.tools.elevate := (value (it.next ()) "--elevate")?
+      other ->
+        if other.starts_with '-' || verb.is_some ()
+          return Err "unknown argument: #{other}"
+        case verb_of other of
+          Some v -> verb := Some v
+          None ->
+            return Err "unknown verb: #{other} (switch, boot, test, build or dry)"
+  case verb of
+    None -> Err (.to_string "a verb is required: switch, boot, test, build or dry")
+    Some v ->
+      o.verb := v
+      Ok (Command::Run o)
+
+#[cfg(test)]
+args : &[&str] -> Vec<String>
+args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+#[cfg(test)]
+run_of : &[&str] -> Options
+run_of xs =
+  case parse_args (&args xs) of
+    Ok (Command::Run o) -> o
+    other -> panic! "not a run: #{other:?}"
+
+test "a verb is all it needs; the rest has defaults"
+  o = run_of (&["switch"])
+  assert_eq! \-> o \-> defaults Verb::Switch
+  assert_eq! \-> (o.flake.as_str (), o.state_dir.as_str (), o.health_window.as_str (), o.tools.elevate.as_str ()) \-> (".", "/var/lib/vdeploy", "2m", "sudo")
+
+test "options before the verb (the wrapper's) and after it are both read; later wins"
+  o = run_of (&["--nix", "/n/nix", "--vmon", "/m/vmon", "--health-window", "2m", "test", "--flake", "/f", "--host", "drakkar", "--health-window", "10s", "--ask", "--no-vmon"])
+  assert_eq! \-> (o.verb, o.flake.as_str (), o.host.clone (), o.health_window.as_str (), o.ask, o.tools.nix.as_str (), o.tools.vmon.clone ()) \-> (Verb::Test, "/f", Some (.to_string "drakkar"), "10s", true, "/n/nix", None)
+
+test "apply and activate hand everything after them on"
+  assert_eq! \-> parse_args (&args (&["--nix", "/n", "apply", "--toplevel", "/x", "--state-dir", "/s"])) \-> Ok (Command::Apply (args (&["--toplevel", "/x", "--state-dir", "/s"])))
+  assert_eq! \-> parse_args (&args (&["activate", "boot", "/x"])) \-> Ok (Command::Activate (args (&["boot", "/x"])))
+  assert_eq! \-> parse_args (&args (&["--help"])) \-> Ok (Command::Help)
+
+test "bad command lines are refused with the reason"
+  assert! \-> parse_args (&args (&[])) |> .err |> .map (\e -> e.contains "a verb is required") |> .unwrap_or false
+  assert! \-> parse_args (&args (&["rebuild"])) |> .err |> .map (\e -> e.contains "unknown verb: rebuild") |> .unwrap_or false
+  assert_eq! \-> parse_args (&args (&["switch", "boot"])) \-> Err (.to_string "unknown argument: boot")
+  assert_eq! \-> parse_args (&args (&["switch", "--frobnicate"])) \-> Err (.to_string "unknown argument: --frobnicate")
+  assert_eq! \-> parse_args (&args (&["switch", "--health-window", "0"])) \-> Err (.to_string "--health-window: not a positive duration: 0")
+  assert_eq! \-> parse_args (&args (&["switch", "--flake"])) \-> Err (.to_string "--flake needs a value")
+  assert_eq! \-> parse_args (&args (&["switch", "apply"])) \-> Err (.to_string "unknown argument: apply")

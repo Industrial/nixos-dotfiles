@@ -1,0 +1,174 @@
+-- The one capability vswitch needs from the outside, `World`, with the live
+-- host and a scripted one for tests:
+--
+--   build      run the build command, and the store path its out-link names
+--   resolve    a given toplevel, canonicalised (a `result` link, a profile)
+--   run        a command with this terminal's stdio (dry run, activation)
+--   state      the running system and the boot default
+--   show_diff  vdiff's closure diff of the two, printed (a note when it fails)
+--   ask        a yes/no on the terminal (`--ask`)
+--   say        one line to stderr
+--
+-- Every live step is one blocking command inside `suspend`: vswitch is one
+-- operator's command, with no fiber beside it to starve.
+
+import std::fs
+import std::io::BufRead
+import std::io::Write
+import std::path::Path
+import std::process::Command
+import std::sync::{Arc, Mutex}
+import id_effect::{Effect, HNil, Never, fail, succeed, suspend}
+import crate::common::SwitchError
+import crate::common::SwitchError::{Activate, Build}
+import crate::common::lifted
+import vdiff::closure::{both, resolve}
+import vdiff::report::{diff, render_text}
+
+export class World
+  build : &self -> Vec<String> -> String -> Effect<String, SwitchError, HNil>
+  resolve : &self -> String -> Effect<String, SwitchError, HNil>
+  run : &self -> Vec<String> -> Effect<(), SwitchError, HNil>
+  state : &self -> Effect<(String, String), SwitchError, HNil>
+  show_diff : &self -> String -> String -> Effect<(), Never, HNil>
+  ask : &self -> String -> Effect<bool, Never, HNil>
+  say : &self -> String -> Effect<(), Never, HNil>
+
+export newtype WorldTool = WorldTool (export Arc<dyn World + Send + Sync>)
+
+instance Clone WorldTool
+  clone : &self -> Self
+  clone self = WorldTool (Arc::clone (&self.0))
+
+-- The live host: the running system's link, the boot profile and the store database.
+export data Live { export current String, export profile String, export db String }
+  deriving (Debug, Clone)
+
+export live : String -> Live
+live db = Live { current = .to_string "/run/current-system", profile = .to_string "/nix/var/nix/profiles/system", db }
+
+-- Run a command with our stdio; its failure as a message.
+ran : &[String] -> Result<(), String>
+ran cmd =
+  case cmd.split_first () of
+    None -> Err (.to_string "an empty command")
+    Some (program, args) ->
+      status = (Command::new program |> .args args |> .status () |> .map_err (\e -> "running #{program}: #{e}"))?
+      if status.success ()
+        Ok ()
+      else
+        Err "#{cmd.join " "} failed (#{status})"
+
+canonical : &str -> Result<String, String>
+canonical link =
+  path = (fs::canonicalize link |> .map_err (\e -> "#{link}: #{e}"))?
+  Ok (path.to_string_lossy () |> .to_string)
+
+built : Vec<String> -> String -> Result<String, SwitchError>
+built cmd link =
+  target = Path::new (&link)
+  if target.parent () is Some p
+    if !(p.as_os_str ().is_empty ())
+      (fs::create_dir_all p |> .map_err (\e -> Build ("creating #{p.display ()}: #{e}")))?
+  eprintln! \-> "vswitch: #{cmd.join " "}"
+  (ran (&cmd) |> .map_err (\e -> Build (e)))?
+  canonical (&link) |> .map_err (\e -> Build (e))
+
+-- The closure diff as vdiff prints it, or why there is none.
+diff_text : String -> String -> String -> Effect<String, Never, HNil>
+diff_text db old new =
+  case resolve (&old) |> .and_then (\a -> resolve (&new) |> .map (\b -> (a, b))) of
+    Err e -> succeed ("vswitch: no closure diff: #{e}")
+    Ok (a, b) -> both db a b |> .map (\pair -> render_text (&diff (&pair.0) (&pair.1))) |> .catch (\e -> succeed ("vswitch: no closure diff: #{e}"))
+
+asked : String -> bool
+asked question =
+  eprint! \-> "#{question} [y/N] "
+  std::io::stderr () |> .flush |> .ok
+  mut line = String::new ()
+  std::io::stdin () |> .lock |> .read_line (&mut line) |> .ok
+  answer = line.trim () |> .to_lowercase
+  answer == "y" || answer == "yes"
+
+instance World Live
+  build : &self -> Vec<String> -> String -> Effect<String, SwitchError, HNil>
+  build self cmd link =
+    suspend (move \-> lifted (built cmd link))
+  resolve : &self -> String -> Effect<String, SwitchError, HNil>
+  resolve self toplevel =
+    suspend (move \-> lifted (canonical (&toplevel) |> .map_err (\e -> Build (e))))
+  run : &self -> Vec<String> -> Effect<(), SwitchError, HNil>
+  run self cmd =
+    suspend (move \-> lifted (ran (&cmd) |> .map_err (\e -> Activate (e))))
+  state : &self -> Effect<(String, String), SwitchError, HNil>
+  state self =
+    current = self.current.clone ()
+    profile = self.profile.clone ()
+    suspend (move \-> lifted (canonical (&current) |> .and_then (\c -> canonical (&profile) |> .map (\p -> (c, p))) |> .map_err (\e -> Activate ("the running system: #{e}"))))
+  show_diff : &self -> String -> String -> Effect<(), Never, HNil>
+  show_diff self old new =
+    db = self.db.clone ()
+    suspend (move \-> diff_text db old new) |> .map (\text -> eprint! \-> "#{text}")
+  ask : &self -> String -> Effect<bool, Never, HNil>
+  ask self question =
+    suspend (move \-> succeed (asked question))
+  say : &self -> String -> Effect<(), Never, HNil>
+  say self line =
+    suspend (move \-> succeed (eprintln! \-> "#{line}"))
+
+-- A scripted host, for tests: the build yields `built` (or fails when it is
+-- None), a run of a command containing a word in `failing` fails, `answer` is
+-- every --ask's answer, and every call is logged.
+export data Scripted
+  { export built Option<String>
+  , export current String
+  , export profile String
+  , export failing Vec<String>
+  , export answer bool
+  , export log Arc<Mutex<Vec<String>>>
+  }
+  deriving (Clone, Default)
+
+noted : &Arc<Mutex<Vec<String>>> -> String -> ()
+noted log line =
+  if log.lock () is Ok held
+    mut v = held
+    v.push line
+  ()
+
+export log_of : &Scripted -> Vec<String>
+log_of w = w.log.lock () |> .map (\v -> v.clone ()) |> .unwrap_or_default
+
+instance World Scripted
+  build : &self -> Vec<String> -> String -> Effect<String, SwitchError, HNil>
+  build self cmd link =
+    noted (&self.log) ("build #{cmd.join " "} -> #{link}")
+    case self.built.clone () of
+      Some x -> succeed x
+      None -> fail (Build (.to_string "scripted build failure"))
+  resolve : &self -> String -> Effect<String, SwitchError, HNil>
+  resolve self toplevel =
+    noted (&self.log) ("resolve #{toplevel}")
+    succeed toplevel
+  run : &self -> Vec<String> -> Effect<(), SwitchError, HNil>
+  run self cmd =
+    line = cmd.join " "
+    noted (&self.log) ("run #{line}")
+    if self.failing.iter () |> .any (\w -> cmd.contains w)
+      fail (Activate (.to_string "scripted failure"))
+    else
+      succeed (())
+  state : &self -> Effect<(String, String), SwitchError, HNil>
+  state self = succeed ((self.current.clone (), self.profile.clone ()))
+  show_diff : &self -> String -> String -> Effect<(), Never, HNil>
+  show_diff self old new =
+    noted (&self.log) ("diff #{old} #{new}")
+    succeed (())
+  ask : &self -> String -> Effect<bool, Never, HNil>
+  ask self question =
+    noted (&self.log) ("ask #{question}")
+    succeed self.answer
+  say : &self -> String -> Effect<(), Never, HNil>
+  say self line =
+    noted (&self.log) ("say #{line}")
+    succeed (())
