@@ -148,14 +148,37 @@
       (builtins.readDir ../profiles))
   );
 
+  # A feature's own option, as a selection-only evaluation sees it: the feature body (and
+  # so the real option type) is not there, so its definitions are merged the way NixOS
+  # merges the usual types. Attribute sets merge key by key (lazily, and nested mkIf,
+  # mkForce and mkDefault work as usual), lists concatenate, and anything else is set
+  # once, or equal everywhere it is set. Priorities (a host's mkForce over a profile, say)
+  # are resolved before this runs. Values are forced only when read, so a host may still
+  # name pkgs in one (GH-225: `types.raw` here took ONE definition per key, so a key set
+  # from two modules, wake.enable in one and wake.operators in another, failed).
+  selectionValue = lib.mkOptionType {
+    name = "selectionValue";
+    description = "a feature option's value (selection-only evaluation)";
+    merge = loc: defs: let
+      values = map (d: d.value) defs;
+    in
+      if lib.all lib.isList values
+      then lib.concatLists values
+      else if lib.all (v: lib.isAttrs v && !lib.isStringLike v) values
+      then (lib.types.lazyAttrsOf selectionValue).merge loc defs
+      else if lib.length defs == 1
+      then lib.head values
+      else lib.mergeEqualOption loc defs;
+  };
+
   # Just the switches: one `features.<path>.enable` per catalog entry, no bodies. A
   # feature's own options (features.nix.vdaemon-proxy.native, say) land in the stub's
-  # freeform part, one key each, so a host may set several of them.
+  # freeform part, one key each, so a host may set several of them, from several modules.
   optionStubs =
     map (p: {
       options = lib.setAttrByPath (optionPath p) (lib.mkOption {
         type = lib.types.submodule {
-          freeformType = lib.types.lazyAttrsOf lib.types.raw;
+          freeformType = lib.types.lazyAttrsOf selectionValue;
           options.enable = lib.mkEnableOption (lib.concatStringsSep "." (namePath p));
         };
         default = {};
