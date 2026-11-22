@@ -241,6 +241,7 @@ test "the effective uid, and names resolved on PATH"
   std::fs::write (dir.join "systemd-run") "" |> .ok
   d = dir.to_string_lossy () |> .to_string
   t = absolute (&Tools { systemd_run = .to_string "systemd-run", ...tools () }) (&d)
-  assert_eq! \-> t.systemd_run \-> "#{d}/systemd-run"
+  want = "#{d}/systemd-run"
+  assert_eq! \-> t.systemd_run \-> want
   assert_eq! \-> t.nix \-> .to_string "/n/nix"
   std::fs::remove_dir_all (&dir) |> .ok
