@@ -28,4 +28,17 @@ in
     rootCarriesTheLock = assay.eq [userborn.users.users.root.hashedPassword userborn.users.users.root.hashedPasswordFile] ["!" null];
     operatorLogsIntoNushell = assay.eq (pkgs.lib.getName userborn.users.users.tom.shell) "nushell";
     mutableUsersStaysFleetDefault = assay.eq userborn.users.mutableUsers true;
+
+    # GH-206: the population the rollback must return to, derived from the base node.
+    rollbackLoginUsers = assay.eq (testFor "migrate").population.login ["root" "tom"];
+    rollbackActiveUsers = assay.eq (testFor "migrate").population.active ["tom"];
+    rollbackNormalUsers = assay.eq (testFor "migrate").population.normal ["tom"];
+    rollbackGroupsAreTheDeclaredOnes =
+      assay.eq (testFor "migrate").population.groups (pkgs.lib.sort pkgs.lib.lessThan (pkgs.lib.attrNames migrate.users.groups));
+    rollbackDropsTheStray = assay.eq [
+      (pkgs.lib.elem "extra" (testFor "migrate").population.login)
+      (pkgs.lib.elem "extragrp" (testFor "migrate").population.groups)
+    ] [false false];
+    populationIsTheSameInEveryMode =
+      assay.eq [(testFor "perl").population (testFor "userborn").population] [(testFor "migrate").population (testFor "migrate").population];
   }
