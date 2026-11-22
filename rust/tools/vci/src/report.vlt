@@ -1,0 +1,211 @@
+-- What vci records and says: one record per (commit, host) in builds.jsonl
+-- (schema 1), the node_exporter metrics, and the commit-status text.
+--
+-- The eval and build seconds per host are the measurement veval (#243)
+-- needs: how long evaluation takes, and how often a commit leaves a host's
+-- toplevel unchanged (the same `drv` as the commit before).
+
+import std::collections::BTreeMap
+import serde_json::{Map, Value}
+import crate::refs::short
+
+-- A PR generation against main's, for one host (vdiff's report, counted).
+export data Summary { export changed u64, export added u64, export removed u64, export nar_delta i64 }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- One host's result for one commit.
+export data Built
+  { export sha String
+  , export target String
+  , export host String
+  , export result String
+  , export drv Option<String>
+  , export out Option<String>
+  , export eval_secs u64
+  , export build_secs u64
+  , export error String
+  , export diff Option<Summary>
+  , export at u64
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The results, in a fixed order (the metric labels).
+export const RESULTS : [&str; 3] = ["built", "eval-failed", "build-failed"]
+
+export const SCHEMA : u64 = 1
+
+object : Vec<(&str, Value)> -> Value
+object fields =
+  mut m = Map::new ()
+  for f in fields
+    (k, v) = f
+    m.insert (k.to_string ()) v
+  Value::Object m
+
+opt : &Option<String> -> Value
+opt v =
+  case v of
+    Some s -> Value::from (s.clone ())
+    None -> Value::Null
+
+summary_json : &Option<Summary> -> Value
+summary_json s =
+  case s of
+    None -> Value::Null
+    Some d -> object (.to_vec ([("changed", Value::from d.changed), ("added", Value::from d.added), ("removed", Value::from d.removed), ("narDelta", Value::from d.nar_delta)]))
+
+-- One record as one line of JSON.
+export record_json : &Built -> String
+record_json b =
+  v = object (.to_vec ([("schema", Value::from SCHEMA), ("sha", Value::from (b.sha.clone ())), ("ref", Value::from (b.target.clone ())), ("host", Value::from (b.host.clone ())), ("result", Value::from (b.result.clone ())), ("drv", opt (&b.drv)), ("out", opt (&b.out)), ("evalSeconds", Value::from b.eval_secs), ("buildSeconds", Value::from b.build_secs), ("error", Value::from (b.error.clone ())), ("diff", summary_json (&b.diff)), ("at", Value::from b.at)]))
+  v.to_string ()
+
+-- A record read back (what the metrics are made of).
+export record_of : &str -> Option<Built>
+record_of line =
+  v = serde_json::from_str line |> .ok : Option<Value>
+  v |> .as_ref |> .and_then (\v -> built_of v)
+
+text : &Value -> &str -> String
+text v key = v.get key |> .and_then (\x -> x.as_str ()) |> .unwrap_or "" |> .to_string
+
+number : &Value -> &str -> u64
+number v key = v.get key |> .and_then (\x -> x.as_u64 ()) |> .unwrap_or 0
+
+built_of : &Value -> Option<Built>
+built_of v =
+  schema = v.get "schema" |> .and_then (\s -> s.as_u64 ())
+  if schema != Some SCHEMA
+    None
+  else
+    drv = v.get "drv" |> .and_then (\x -> x.as_str ()) |> .map (\s -> s.to_string ())
+    out = v.get "out" |> .and_then (\x -> x.as_str ()) |> .map (\s -> s.to_string ())
+    Some (Built { sha = text v "sha", target = text v "ref", host = text v "host", result = text v "result", drv, out, eval_secs = number v "evalSeconds", build_secs = number v "buildSeconds", error = text v "error", diff = None, at = number v "at" })
+
+-- `main`, or `pr`: the metric label (bounded, whatever the PR numbers are).
+export kind_of : &str -> &'static str
+kind_of target = if target == "main"
+  "main"
+else
+  "pr"
+
+-- The metrics, from the ledger: the latest record per (host, kind), and how
+-- many commits are built and waiting.
+export metrics : &[Built] -> u64 -> u64 -> u64 -> String
+metrics records commits pending now =
+  mut latest = BTreeMap::new () : BTreeMap<(String, &'static str), Built>
+  for b in records
+    latest.insert ((b.host.clone (), kind_of (&b.target))) (b.clone ())
+  mut out = String::new ()
+  out.push_str "# HELP vci_eval_seconds Seconds the latest evaluation of the host's toplevel took.\n# TYPE vci_eval_seconds gauge\n"
+  for kv in &latest
+    out.push_str (&"vci_eval_seconds{host=\"#{kv.0.0}\",ref=\"#{kv.0.1}\"} #{kv.1.eval_secs}\n")
+  out.push_str "# HELP vci_build_seconds Seconds the latest build of the host's toplevel took.\n# TYPE vci_build_seconds gauge\n"
+  for kv in &latest
+    out.push_str (&"vci_build_seconds{host=\"#{kv.0.0}\",ref=\"#{kv.0.1}\"} #{kv.1.build_secs}\n")
+  out.push_str "# HELP vci_last_result The latest result for the host (1 for the result it had).\n# TYPE vci_last_result gauge\n"
+  for kv in &latest
+    for r in RESULTS
+      v = if kv.1.result == r
+        1
+      else
+        0
+      out.push_str (&"vci_last_result{host=\"#{kv.0.0}\",ref=\"#{kv.0.1}\",result=\"#{r}\"} #{v}\n")
+  out.push_str "# HELP vci_last_build_timestamp_seconds When the latest record was written.\n# TYPE vci_last_build_timestamp_seconds gauge\n"
+  last = records.iter () |> .map (\b -> b.at) |> .max |> .unwrap_or 0
+  out.push_str (&"vci_last_build_timestamp_seconds #{last}\n")
+  out.push_str "# HELP vci_commits_built_total Commits built for every host.\n# TYPE vci_commits_built_total counter\n"
+  out.push_str (&"vci_commits_built_total #{commits}\n")
+  out.push_str "# HELP vci_pending_commits Open refs whose head is not built yet.\n# TYPE vci_pending_commits gauge\n"
+  out.push_str (&"vci_pending_commits #{pending}\n")
+  out.push_str "# HELP vci_last_step_timestamp_seconds When vci last listed the refs.\n# TYPE vci_last_step_timestamp_seconds gauge\n"
+  out.push_str (&"vci_last_step_timestamp_seconds #{now}\n")
+  out
+
+-- A duration as people read it: 41s, 3m12s, 1h04m.
+export took : u64 -> String
+took secs =
+  if secs < 60
+    "#{secs}s"
+  else if secs < 3600
+    "#{secs / 60}m#{pad (secs % 60)}s"
+  else
+    "#{secs / 3600}h#{pad ((secs % 3600) / 60)}m"
+
+pad : u64 -> String
+pad n = if n < 10
+  "0#{n}"
+else
+  "#{n}"
+
+-- A signed size: +12.3 MiB, -512 KiB.
+export size_of : i64 -> String
+size_of bytes =
+  sign = if bytes < 0
+    "-"
+  else
+    "+"
+  a = bytes.unsigned_abs ()
+  if a >= 1048576
+    "#{sign}#{a / 1048576}.#{(a % 1048576) * 10 / 1048576} MiB"
+  else if a >= 1024
+    "#{sign}#{a / 1024} KiB"
+  else
+    "#{sign}#{a} B"
+
+-- The commit status: its state and its text (GitHub keeps 140 characters).
+export status_of : &Built -> (&'static str, String)
+status_of b =
+  case b.result.as_str () of
+    "built" ->
+      diff = case &b.diff of
+        Some d -> " · #{d.changed} changed, #{d.added} added, #{d.removed} removed, #{size_of d.nar_delta} vs main"
+        None -> String::new ()
+      ("success", clipped ("built in #{took b.build_secs} (eval #{took b.eval_secs})#{diff}"))
+    "eval-failed" -> ("failure", clipped ("evaluation failed after #{took b.eval_secs}"))
+    _ -> ("failure", clipped ("build failed after #{took b.build_secs}"))
+
+clipped : String -> String
+clipped s = s.chars () |> .take 140 |> .collect
+
+-- The journal line for a record.
+export line_of : &Built -> String
+line_of b =
+  head = "vci: #{b.target} #{short (&b.sha)} #{b.host}: #{b.result} (eval #{took b.eval_secs}, build #{took b.build_secs})"
+  if b.error.is_empty ()
+    head
+  else
+    "#{head}: #{b.error.lines () |> .last |> .unwrap_or ""}"
+
+#[cfg(test)]
+built : &str -> &str -> &str -> u64 -> u64 -> Built
+built target host result eval build = Built { sha = std::iter::repeat_n 'a' 40 |> .collect, target = target.to_string (), host = host.to_string (), result = result.to_string (), drv = Some (.to_string "/nix/store/x.drv"), out = None, eval_secs = eval, build_secs = build, error = String::new (), diff = None, at = 100 }
+
+test "a record survives the round trip through its JSON line"
+  b = Built { out = Some (.to_string "/nix/store/x-out"), diff = Some (Summary { changed = 4, added = 1, removed = 0, nar_delta = -2048 }), ...built "pull/12" "drakkar" "built" 41 192 }
+  line = record_json (&b)
+  assert! \-> line.contains "\"narDelta\":-2048" && !(line.contains '\n')
+  back = record_of (&line) |> .expect "record"
+  assert_eq! \-> back \-> Built { diff = None, ...b }
+  assert_eq! \-> record_of "{\"schema\":2}" \-> None
+  assert_eq! \-> record_of "not json" \-> None
+
+test "the metrics hold the latest record per host and kind, with bounded labels"
+  rs = .to_vec ([built "main" "drakkar" "built" 40 100, built "pull/12" "drakkar" "build-failed" 41 7, built "main" "drakkar" "built" 39 3, built "main" "mimir" "eval-failed" 2 0]) : Vec<Built>
+  m = metrics (&rs) 3 1 500
+  assert! \-> m.contains "vci_eval_seconds{host=\"drakkar\",ref=\"main\"} 39\n"
+  assert! \-> m.contains "vci_build_seconds{host=\"drakkar\",ref=\"pr\"} 7\n"
+  assert! \-> m.contains "vci_last_result{host=\"mimir\",ref=\"main\",result=\"eval-failed\"} 1\n"
+  assert! \-> m.contains "vci_last_result{host=\"mimir\",ref=\"main\",result=\"built\"} 0\n"
+  assert! \-> m.contains "vci_commits_built_total 3\n" && m.contains "vci_pending_commits 1\n" && m.contains "vci_last_step_timestamp_seconds 500\n"
+  assert! \-> !(m.contains "pull/12")
+
+test "the status says what happened, in GitHub's 140 characters"
+  ok = Built { diff = Some (Summary { changed = 4, added = 1, removed = 2, nar_delta = 12897485 }), ...built "pull/12" "drakkar" "built" 41 192 }
+  assert_eq! \-> status_of (&ok) \-> ("success", .to_string "built in 3m12s (eval 41s) · 4 changed, 1 added, 2 removed, +12.3 MiB vs main")
+  assert_eq! \-> status_of (&built "main" "h" "eval-failed" 5 0) \-> ("failure", .to_string "evaluation failed after 5s")
+  assert_eq! \-> (status_of (&built "main" "h" "build-failed" 0 3725)).1 \-> .to_string "build failed after 1h02m"
+  long = Built { result = .to_string "built", diff = Some (Summary { changed = u64::MAX, added = u64::MAX, removed = u64::MAX, nar_delta = i64::MIN }), ...built "pull/1" "h" "built" u64::MAX u64::MAX }
+  shown = (status_of (&long)).1.chars () |> .count
+  assert! \-> shown <= 140
+  assert_eq! \-> (size_of (-524288), size_of 900, took 59, took 60) \-> (.to_string "-512 KiB", .to_string "+900 B", .to_string "59s", .to_string "1m00s")

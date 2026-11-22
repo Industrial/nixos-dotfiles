@@ -48,6 +48,12 @@ in {
     # Rollback: features.nix.vpush.enable = lib.mkForce false;
     features.nix.vpush.enable = lib.mkDefault (fleet.pushesToCache (config.networking.hostName or ""));
 
+    # Build every fleet host for main and the open PRs (features/nix/vci, GH-242) on the cache
+    # host (common/fleet.nix `isCacheIn`), whose store vcache serves: a built commit is in the
+    # cache with nothing pushed, so deploys only substitute. Off everywhere else.
+    # Rollback: features.nix.vci.enable = lib.mkForce false;
+    features.nix.vci.enable = lib.mkDefault (fleet.isCacheIn fleet.hosts (config.networking.hostName or ""));
+
     # Performance Optimization
     features.performance.environment.enable = true;
     features.performance.hardware.enable = true;

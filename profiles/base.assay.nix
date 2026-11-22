@@ -26,6 +26,22 @@ let
     .vpush
     .enable;
   vpushOn = name: vpushWith name [];
+  # The base profile's vci switch as host `name` (plus `extra` modules) sees it.
+  vciWith = name: extra:
+    (features.evalSelection {
+      modules =
+        [
+          {
+            profiles.base.enable = true;
+            networking.hostName = name;
+          }
+        ]
+        ++ extra;
+    })
+    .features
+    .nix
+    .vci
+    .enable;
 in
   assay.suite "base" {
     # base carries the headless-safe CLI set via cli-core, not cli-desktop.
@@ -56,4 +72,10 @@ in
     vpushOffOnTheCache = assay.eq (map (c: vpushOn c.name) fleet.binaryCaches) (map (_: false) fleet.binaryCaches);
     vpushOffOnNonBuilders = assay.eq (lib.filter vpushOn (lib.filter (n: !(fleet.hasRole "builder" n)) fleet.order)) [];
     vpushRollsBackWithOneOption = assay.eq (lib.filter (n: vpushWith n [{features.nix.vpush.enable = lib.mkForce false;}]) fleet.cachePushers) [];
+
+    # vci runs exactly on the cache hosts (common/fleet.nix `isCacheIn`: drakkar today),
+    # whose store vcache serves, and one option turns it off.
+    vciOnlyOnTheCache = assay.eq (lib.filter (n: vciWith n []) fleet.order) (lib.filter (fleet.isCacheIn fleet.hosts) fleet.order);
+    vciOnSomeHost = assay.eq ((lib.filter (n: vciWith n []) fleet.order) != []) true;
+    vciRollsBackWithOneOption = assay.eq (lib.filter (n: vciWith n [{features.nix.vci.enable = lib.mkForce false;}]) fleet.order) [];
   }

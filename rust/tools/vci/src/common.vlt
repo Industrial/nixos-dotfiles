@@ -1,0 +1,22 @@
+-- What every vci module shares: the error type and the Result-to-Effect lift.
+-- Commands run through vdeploy's runner (vdeploy::common::{run, exec}).
+
+import id_effect::{Effect, HNil, fail, succeed}
+
+-- Why a step, a build or the program stopped. `Forge` (listing or fetching
+-- the refs) is retried on a Schedule and the next step tries again; `Eval`
+-- and `Build` are one host's result for one commit, recorded, never the
+-- step's failure; `Ledger` is the state directory; `Usage` the operator's.
+export errors VciError
+  Usage String   "#{0}"
+  Forge String   "listing or fetching the refs: #{0}"
+  Eval String    "#{0}"
+  Build String   "#{0}"
+  Ledger String  "the ledger: #{0}"
+
+-- An effect for a computed result: the planned failure stays typed.
+export lifted : given <A: Send + 'static> Result<A, VciError> -> Effect<A, VciError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e

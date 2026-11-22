@@ -109,6 +109,10 @@ features/cli/nix-output-monitor
 # <host>): on for every builder-role host that is not a cache (huginn, muninn), which this
 # text-only check cannot see. profiles/base.assay.nix proves the selection (GH-154).
 features/nix/vpush
+# profiles/base.nix sets features.nix.vci.enable = lib.mkDefault (fleet.isCacheIn
+# fleet.hosts <host>): on for the cache host (drakkar), whose store vcache serves.
+# profiles/base.assay.nix proves the selection (vciOnlyOnTheCache, GH-242).
+features/nix/vci
 
 # --- Replaced, kept as the one-option rollback. -------------------------------------
 # nix-tree: vwhy took over in profiles/cli-core.nix (GH-182). A host that sets

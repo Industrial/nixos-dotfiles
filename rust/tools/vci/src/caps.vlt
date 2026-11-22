@@ -1,0 +1,544 @@
+-- The capabilities vci needs from the outside, each a class with a live
+-- implementation and a scripted one for tests:
+--
+--   Forge   main's head (`git ls-remote`), the open PRs (GitHub's REST API,
+--           read without a token), and fetching their heads into vci's own
+--           clone;
+--   Nix     a host's toplevel derivation at a commit (`nix eval`), and its
+--           build into an out-link (an indirect GC root), each timed;
+--   Store   the result roots (list, drop, read), and vdiff's summary of one
+--           generation against another;
+--   Ledger  which commits are built, one record per (commit, host), the
+--           metrics;
+--   Status  a GitHub commit status per host: a no-op unless a token file is
+--           configured (off by default).
+--
+-- The long steps (eval, build, fetch) are tokio child processes through
+-- vdeploy's `exec`, so an hour-long build holds no executor thread.
+
+import std::fs
+import std::io::Write
+import std::path::Path
+import std::process::{Command, Stdio}
+import std::sync::{Arc, Mutex}
+import std::time::Instant
+import id_effect::{Effect, HNil, Never, fail, succeed, suspend}
+import vdeploy::common::{Cmd, cmd, exec, first_line, now_secs, run, strs, tail_lines}
+import vdeploy::caps::{installable, nix_args, toplevel_attr}
+import vdeploy::report::write_atomic
+import vdiff::closure::{both, resolve}
+import vdiff::report::diff
+import crate::common::VciError
+import crate::common::VciError::{Forge, Ledger}
+import crate::common::lifted
+import crate::refs::{Target, main_of, pulls_of, refspecs}
+import crate::report::{Built, Summary, metrics, record_json, record_of}
+import crate::gate::{Limits, available_of, busy_of, load_of}
+
+export class Forge_
+  main : &self -> Effect<Option<Target>, VciError, HNil>
+  pulls : &self -> Effect<Vec<Target>, VciError, HNil>
+  fetch : &self -> Vec<Target> -> Effect<(), VciError, HNil>
+
+export class Nix
+  eval : &self -> String -> String -> Effect<(String, u64), (String, u64), HNil>
+  build : &self -> String -> String -> Effect<(String, u64), (String, u64), HNil>
+
+export class Store
+  roots : &self -> Effect<Vec<String>, Never, HNil>
+  drop_root : &self -> String -> Effect<(), Never, HNil>
+  root_target : &self -> String -> Effect<Option<String>, Never, HNil>
+  summary : &self -> String -> String -> Effect<Option<Summary>, Never, HNil>
+
+export class Ledger_
+  done : &self -> Effect<Vec<String>, Never, HNil>
+  record : &self -> Built -> Effect<(), VciError, HNil>
+  finish : &self -> String -> u64 -> Effect<(), VciError, HNil>
+  publish : &self -> u64 -> Effect<(), VciError, HNil>
+
+export class Status
+  post : &self -> String -> String -> String -> String -> Effect<(), Never, HNil>
+
+
+-- Whether the host is too busy for a step now (gate.vlt), and why.
+export class Gate
+  busy : &self -> Effect<Option<String>, Never, HNil>
+export newtype ForgeTool = ForgeTool (export Arc<dyn Forge_ + Send + Sync>)
+export newtype NixTool = NixTool (export Arc<dyn Nix + Send + Sync>)
+export newtype StoreTool = StoreTool (export Arc<dyn Store + Send + Sync>)
+export newtype LedgerTool = LedgerTool (export Arc<dyn Ledger_ + Send + Sync>)
+export newtype StatusTool = StatusTool (export Arc<dyn Status + Send + Sync>)
+export newtype GateTool = GateTool (export Arc<dyn Gate + Send + Sync>)
+
+instance Clone ForgeTool
+  clone : &self -> Self
+  clone self = ForgeTool (Arc::clone (&self.0))
+instance Clone NixTool
+  clone : &self -> Self
+  clone self = NixTool (Arc::clone (&self.0))
+instance Clone StoreTool
+  clone : &self -> Self
+  clone self = StoreTool (Arc::clone (&self.0))
+instance Clone LedgerTool
+  clone : &self -> Self
+  clone self = LedgerTool (Arc::clone (&self.0))
+instance Clone StatusTool
+  clone : &self -> Self
+  clone self = StatusTool (Arc::clone (&self.0))
+
+instance Clone GateTool
+  clone : &self -> Self
+  clone self = GateTool (Arc::clone (&self.0))
+-- Everything vci needs, wired once at the edge.
+export data Caps { export forge ForgeTool, export nix NixTool, export store StoreTool, export ledger LedgerTool, export status StatusTool, export gate GateTool }
+  deriving (Clone)
+
+-- ---------------------------------------------------------------- live
+
+-- Live Forge: vci's own bare clone at `repo` (created on first use), fetched
+-- from `url`; the open PRs from `pulls_url` (curl), kept when they are `repo_slug`'s own.
+export data LiveForge { export git String, export curl String, export repo String, export url String, export branch String, export pulls_url Option<String>, export repo_slug String }
+  deriving (Debug, Clone)
+
+listed_main : LiveForge -> Result<Option<Target>, VciError>
+listed_main f =
+  want = "refs/heads/#{f.branch}"
+  r = (run (&cmd (&f.git) (strs (&["ls-remote", f.url.as_str (), want.as_str ()]))) |> .map_err (\e -> Forge (e)))?
+  Ok (main_of (&r.stdout) (&f.branch))
+
+listed_pulls : LiveForge -> Result<Vec<Target>, VciError>
+listed_pulls f =
+  case &f.pulls_url of
+    None -> Ok (Vec::new ())
+    Some url ->
+      r = (run (&cmd (&f.curl) (strs (&["--silent", "--show-error", "--fail", "--location", "--max-time", "60", "--header", "Accept: application/vnd.github+json", "--header", "User-Agent: vci", url.as_str ()]))) |> .map_err (\e -> Forge (e)))?
+      pulls_of (&r.stdout) (&f.repo_slug) |> .map_err (\e -> Forge (e))
+
+-- A bare clone: vci never checks a commit out; `nix eval` reads `git+file://<repo>?rev=`.
+cloned : LiveForge -> Result<(), VciError>
+cloned f =
+  if Path::new (&f.repo) |> .join "HEAD" |> .exists
+    Ok ()
+  else
+    (fs::create_dir_all (&f.repo) |> .map_err (\e -> Forge ("creating #{f.repo}: #{e}")))?
+    run (&cmd (&f.git) (strs (&["init", "--quiet", "--bare", f.repo.as_str ()]))) |> .map (\_ -> ()) |> .map_err (\e -> Forge (e))
+
+fetch_cmd : &LiveForge -> &[Target] -> Cmd
+fetch_cmd f targets =
+  mut args = strs (&["-C", f.repo.as_str (), "fetch", "--quiet", "--prune", "--no-tags", f.url.as_str ()])
+  args.extend (refspecs targets (&f.branch))
+  cmd (&f.git) args
+
+instance Forge_ LiveForge
+  main : &self -> Effect<Option<Target>, VciError, HNil>
+  main self =
+    f = self.clone ()
+    suspend (move \-> lifted (listed_main f))
+  pulls : &self -> Effect<Vec<Target>, VciError, HNil>
+  pulls self =
+    f = self.clone ()
+    suspend (move \-> lifted (listed_pulls f))
+  fetch : &self -> Vec<Target> -> Effect<(), VciError, HNil>
+  fetch self targets =
+    f = self.clone ()
+    c = fetch_cmd (&f) (&targets)
+    suspend (move \-> lifted (cloned f)) |> .flat_map (move \_ -> exec c |> .map (\_ -> ()) |> .map_err (\e -> Forge (e)))
+
+-- Live Nix, through the daemon (vci is an ordinary user: never trusted).
+export data LiveNix { export nix String, export repo String, export roots String }
+  deriving (Debug, Clone)
+
+secs_since : Instant -> u64
+secs_since start = start.elapsed ().as_secs ()
+
+timed : Cmd -> Effect<(String, u64), (String, u64), HNil>
+timed c =
+  suspend (move \-> started c (Instant::now ()))
+
+started : Cmd -> Instant -> Effect<(String, u64), (String, u64), HNil>
+started c start =
+  exec c |> .map (move \r -> (first_line (&r.stdout), secs_since start)) |> .map_err (move \e -> (e, secs_since start))
+
+instance Nix LiveNix
+  eval : &self -> String -> String -> Effect<(String, u64), (String, u64), HNil>
+  eval self sha host =
+    attr = toplevel_attr (&self.repo) (&sha) (&host)
+    timed (cmd (&self.nix) (nix_args (&["eval", "--raw", attr.as_str ()])))
+  build : &self -> String -> String -> Effect<(String, u64), (String, u64), HNil>
+  build self drv link =
+    target = installable (&drv)
+    fs::create_dir_all (&self.roots) |> .ok
+    path = Path::new (&self.roots) |> .join (&link) |> .to_string_lossy () |> .to_string
+    timed (cmd (&self.nix) (nix_args (&["build", "--out-link", path.as_str (), "--print-out-paths", target.as_str ()])))
+
+-- Live Store: the out-links under `roots` (each an indirect GC root), and
+-- vdiff on the store database at `db`.
+export data LiveStore { export roots String, export db String }
+  deriving (Debug, Clone)
+
+names_in : &str -> Vec<String>
+names_in dir =
+  case fs::read_dir dir of
+    Err _ -> Vec::new ()
+    Ok entries ->
+      mut names = entries |> .filter_map (\e -> e.ok ()) |> .map (\e -> e.file_name ().to_string_lossy () |> .to_string) |> .filter (\n -> !(n.starts_with '.')) |> .collect : Vec<String>
+      names.sort ()
+      names
+
+counted : vdiff::report::Report -> Summary
+counted r =
+  delta = (i64::try_from r.new.nar_size |> .unwrap_or i64::MAX) - (i64::try_from r.old.nar_size |> .unwrap_or i64::MAX)
+  Summary { changed = u64::try_from (r.changed.len ()) |> .unwrap_or u64::MAX, added = u64::try_from (r.added.len ()) |> .unwrap_or u64::MAX, removed = u64::try_from (r.removed.len ()) |> .unwrap_or u64::MAX, nar_delta = delta }
+
+summarised : String -> String -> String -> Effect<Option<Summary>, Never, HNil>
+summarised db old new =
+  case resolve (&old) |> .and_then (\a -> resolve (&new) |> .map (\b -> (a, b))) of
+    Err _ -> succeed None
+    Ok (a, b) -> both db a b |> .map (\pair -> Some (counted (diff (&pair.0) (&pair.1)))) |> .catch (\_ -> succeed None)
+
+instance Store LiveStore
+  roots : &self -> Effect<Vec<String>, Never, HNil>
+  roots self =
+    dir = self.roots.clone ()
+    suspend (move \-> succeed (names_in (&dir)))
+  drop_root : &self -> String -> Effect<(), Never, HNil>
+  drop_root self name =
+    link = Path::new (&self.roots) |> .join (&name)
+    suspend (move \-> dropped link name)
+  root_target : &self -> String -> Effect<Option<String>, Never, HNil>
+  root_target self name =
+    link = Path::new (&self.roots) |> .join (&name)
+    suspend (move \-> succeed (fs::canonicalize (&link) |> .ok |> .map (\p -> p.to_string_lossy () |> .to_string)))
+  summary : &self -> String -> String -> Effect<Option<Summary>, Never, HNil>
+  summary self old new =
+    db = self.db.clone ()
+    suspend (move \-> summarised db old new)
+
+dropped : std::path::PathBuf -> String -> Effect<(), Never, HNil>
+dropped link name =
+  if fs::remove_file (&link) |> .is_ok
+    eprintln! \-> "vci: dropped the root #{name}: its ref is closed"
+  succeed (())
+
+-- Live Ledger: `<state>/done/<sha>` per built commit, `<state>/builds.jsonl`,
+-- and the metrics in the textfile directory, when there is one.
+export data LiveLedger { export state String, export textfile_dir Option<String> }
+  deriving (Debug, Clone)
+
+export const METRICS_FILE : &str = "vci.prom"
+
+appended : String -> String -> Result<(), VciError>
+appended state line =
+  (fs::create_dir_all (&state) |> .map_err (\e -> Ledger ("creating #{state}: #{e}")))?
+  path = Path::new (&state) |> .join "builds.jsonl"
+  mut file = (fs::OpenOptions::new () |> .create true |> .append true |> .open (&path) |> .map_err (\e -> Ledger ("#{path.display ()}: #{e}")))?
+  file.write_all ("#{line}\n" |> .as_bytes) |> .map_err (\e -> Ledger ("#{path.display ()}: #{e}"))
+
+-- Every record in the ledger.
+export records_in : &str -> Vec<Built>
+records_in state =
+  file = Path::new state |> .join "builds.jsonl"
+  text = fs::read_to_string (&file) |> .unwrap_or_default
+  text.lines () |> .filter_map (\l -> record_of l) |> .collect
+
+finished : LiveLedger -> String -> u64 -> Result<(), VciError>
+finished l sha pending =
+  done = Path::new (&l.state) |> .join "done"
+  (fs::create_dir_all (&done) |> .map_err (\e -> Ledger ("creating #{done.display ()}: #{e}")))?
+  (fs::write (done.join (&sha)) "" |> .map_err (\e -> Ledger ("#{sha}: #{e}")))?
+  published l pending
+
+-- The metrics now (also written on a step that built nothing, so the
+-- timestamp says vci is alive).
+export published : LiveLedger -> u64 -> Result<(), VciError>
+published l pending =
+  case &l.textfile_dir of
+    None -> Ok ()
+    Some dir ->
+      done_dir = Path::new (&l.state) |> .join "done" |> .to_string_lossy () |> .to_string
+      built = names_in (&done_dir)
+      commits = u64::try_from (built.len ()) |> .unwrap_or 0
+      text = metrics (&records_in (&l.state)) commits pending (now_secs ())
+      (fs::create_dir_all dir |> .map_err (\e -> Ledger ("creating #{dir}: #{e}")))?
+      file = Path::new dir |> .join METRICS_FILE
+      write_atomic (&file) (&text) |> .map_err (\e -> Ledger ("#{dir}/#{METRICS_FILE}: #{e}"))
+
+instance Ledger_ LiveLedger
+  done : &self -> Effect<Vec<String>, Never, HNil>
+  done self =
+    dir = Path::new (&self.state) |> .join "done" |> .to_string_lossy () |> .to_string
+    suspend (move \-> succeed (names_in (&dir)))
+  record : &self -> Built -> Effect<(), VciError, HNil>
+  record self b =
+    state = self.state.clone ()
+    suspend (move \-> lifted (appended state (record_json (&b))))
+  finish : &self -> String -> u64 -> Effect<(), VciError, HNil>
+  finish self sha pending =
+    l = self.clone ()
+    suspend (move \-> lifted (finished l sha pending))
+  publish : &self -> u64 -> Effect<(), VciError, HNil>
+  publish self pending =
+    l = self.clone ()
+    suspend (move \-> lifted (published l pending))
+
+-- Live Status. Off (a no-op) without a token file. With one, the token is
+-- read at every post (so whatever mints it, a GitHub App's installation token
+-- included, can replace it) and handed to curl on stdin as a header, never
+-- in argv or the environment.
+export data LiveStatus { export curl String, export api String, export repo_slug String, export token_file Option<String> }
+  deriving (Debug, Clone)
+
+-- The JSON body of a status.
+export status_body : &str -> &str -> &str -> String
+status_body state description context =
+  mut m = serde_json::Map::new ()
+  m.insert (.to_string "state") (serde_json::Value::from state)
+  m.insert (.to_string "description") (serde_json::Value::from description)
+  m.insert (.to_string "context") (serde_json::Value::from context)
+  serde_json::Value::Object m |> .to_string
+
+-- The token, as a header, to curl's stdin.
+fed : Option<std::process::ChildStdin> -> &str -> Result<(), String>
+fed stdin token =
+  case stdin of
+    None -> Err (.to_string "curl has no stdin")
+    Some p ->
+      mut pipe = p
+      pipe.write_all ("Authorization: Bearer #{token.trim ()}\n" |> .as_bytes) |> .map_err (\e -> "curl's stdin: #{e}")
+
+posted : LiveStatus -> String -> String -> String -> String -> Effect<(), Never, HNil>
+posted s sha host state description =
+  if &s.token_file is Some file
+    if post_now (&s) file (&sha) (&host) (&state) (&description) is Err e
+      eprintln! \-> "vci: status for #{host} at #{sha}: #{e}"
+  succeed (())
+
+post_now : &LiveStatus -> &str -> &str -> &str -> &str -> &str -> Result<(), String>
+post_now s file sha host state description =
+  token = (fs::read_to_string file |> .map_err (\e -> "reading the token file #{file}: #{e}"))?
+  url = "#{s.api}/repos/#{s.repo_slug}/statuses/#{sha}"
+  context = "vci/#{host}"
+  body = status_body state description (&context)
+  mut child = (Command::new (&s.curl) |> .args ([.to_string "--silent", .to_string "--show-error", .to_string "--fail", .to_string "--max-time", .to_string "30", .to_string "--header", .to_string "@-", .to_string "--header", .to_string "Accept: application/vnd.github+json", .to_string "--header", .to_string "User-Agent: vci", .to_string "--data-binary", body, url]) |> .stdin (Stdio::piped ()) |> .stdout (Stdio::null ()) |> .stderr (Stdio::piped ()) |> .spawn () |> .map_err (\e -> "running #{s.curl}: #{e}"))?
+  (fed (child.stdin.take ()) (&token))?
+  out = (child.wait_with_output () |> .map_err (\e -> "waiting for curl: #{e}"))?
+  if out.status.success ()
+    Ok ()
+  else
+    Err "curl failed (#{out.status}): #{tail_lines (&String::from_utf8_lossy (&out.stderr)) 3}"
+
+instance Status LiveStatus
+  post : &self -> String -> String -> String -> String -> Effect<(), Never, HNil>
+  post self sha host state description =
+    s = self.clone ()
+    suspend (move \-> posted s sha host state description)
+
+-- Live Gate: the kernel's load and memory, and whether a switch is running.
+export data LiveGate { export systemctl String, export limits Limits }
+  deriving (Debug, Clone)
+
+applying : &str -> bool
+applying systemctl =
+  Command::new systemctl |> .args ([.to_string "is-active", .to_string "--quiet", .to_string "vdeploy-apply.service"]) |> .stdin (Stdio::null ()) |> .status () |> .map (\s -> s.success ()) |> .unwrap_or false
+
+checked : LiveGate -> Option<String>
+checked g =
+  cpus = std::thread::available_parallelism () |> .map (\n -> u64::try_from (n.get ()) |> .unwrap_or 1) |> .unwrap_or 1
+  load = fs::read_to_string "/proc/loadavg" |> .ok |> .and_then (\t -> load_of (&t))
+  available = fs::read_to_string "/proc/meminfo" |> .ok |> .and_then (\t -> available_of (&t))
+  busy_of (&g.limits) cpus load available (applying (&g.systemctl))
+
+instance Gate LiveGate
+  busy : &self -> Effect<Option<String>, Never, HNil>
+  busy self =
+    g = self.clone ()
+    suspend (move \-> succeed (checked g))
+
+-- The live capabilities.
+export data Wiring
+  { export git String
+  , export curl String
+  , export nix String
+  , export repo String
+  , export url String
+  , export branch String
+  , export pulls_url Option<String>
+  , export repo_slug String
+  , export state String
+  , export textfile_dir Option<String>
+  , export db String
+  , export api String
+  , export token_file Option<String>
+  , export systemctl String
+  , export limits Limits
+  }
+  deriving (Debug, Clone)
+
+export roots_dir : &str -> String
+roots_dir state = Path::new state |> .join "roots" |> .to_string_lossy () |> .to_string
+
+export live : Wiring -> Caps
+live w =
+  forge = ForgeTool (Arc::new (LiveForge { git = w.git.clone (), curl = w.curl.clone (), repo = w.repo.clone (), url = w.url.clone (), branch = w.branch.clone (), pulls_url = w.pulls_url.clone (), repo_slug = w.repo_slug.clone () }))
+  nix = NixTool (Arc::new (LiveNix { nix = w.nix.clone (), repo = w.repo.clone (), roots = roots_dir (&w.state) }))
+  store = StoreTool (Arc::new (LiveStore { roots = roots_dir (&w.state), db = w.db.clone () }))
+  ledger = LedgerTool (Arc::new (LiveLedger { state = w.state.clone (), textfile_dir = w.textfile_dir.clone () }))
+  status = StatusTool (Arc::new (LiveStatus { curl = w.curl.clone (), api = w.api.clone (), repo_slug = w.repo_slug.clone (), token_file = w.token_file.clone () }))
+  gate = GateTool (Arc::new (LiveGate { systemctl = w.systemctl.clone (), limits = w.limits.clone () }))
+  Caps { forge, nix, store, ledger, status, gate }
+
+-- ---------------------------------------------------------------- scripted
+
+-- A scripted world, for tests. `main` and `pulls` are what the forge lists
+-- (`forge_down`: listing fails); evaluating a host named in `eval_broken`
+-- fails, building a drv of a host in `build_broken` fails; drvs are
+-- `/nix/store/<sha9>-<host>.drv` and outputs `/nix/store/<sha9>-<host>`.
+-- Every call is logged.
+export data Scripted
+  { export main Option<Target>
+  , export pulls Vec<Target>
+  , export forge_down bool
+  , export eval_broken Vec<String>
+  , export build_broken Vec<String>
+  , export roots Arc<Mutex<Vec<(String, String)>>>
+  , export done Arc<Mutex<Vec<String>>>
+  , export records Arc<Mutex<Vec<Built>>>
+  , export busy Option<String>
+  , export log Arc<Mutex<Vec<String>>>
+  }
+  deriving (Clone, Default)
+
+export noted : &Arc<Mutex<Vec<String>>> -> String -> ()
+noted log line =
+  if log.lock () is Ok held
+    mut v = held
+    v.push line
+  ()
+
+export snapshot : given <T: Clone> &Arc<Mutex<Vec<T>>> -> Vec<T>
+snapshot cell = cell.lock () |> .map (\v -> v.clone ()) |> .unwrap_or_default
+
+host_of_drv : &str -> String
+host_of_drv drv = drv.trim_end_matches ".drv" |> .rsplit '-' |> .next |> .unwrap_or "" |> .to_string
+
+instance Forge_ Scripted
+  main : &self -> Effect<Option<Target>, VciError, HNil>
+  main self =
+    if self.forge_down
+      fail (Forge (.to_string "scripted: the forge is down"))
+    else
+      succeed (self.main.clone ())
+  pulls : &self -> Effect<Vec<Target>, VciError, HNil>
+  pulls self = succeed (self.pulls.clone ())
+  fetch : &self -> Vec<Target> -> Effect<(), VciError, HNil>
+  fetch self targets =
+    noted (&self.log) ("fetch #{targets.len ()}")
+    succeed (())
+
+instance Nix Scripted
+  eval : &self -> String -> String -> Effect<(String, u64), (String, u64), HNil>
+  eval self sha host =
+    noted (&self.log) ("eval #{crate::refs::short (&sha)} #{host}")
+    if self.eval_broken.contains (&host)
+      fail ((.to_string "error: scripted evaluation failure", 2))
+    else
+      succeed (("/nix/store/#{crate::refs::short (&sha)}-#{host}.drv", 3))
+  build : &self -> String -> String -> Effect<(String, u64), (String, u64), HNil>
+  build self drv link =
+    host = host_of_drv (&drv)
+    noted (&self.log) ("build #{drv} -> #{link}")
+    if self.build_broken.contains (&host)
+      fail ((.to_string "error: scripted build failure", 5))
+    else
+      out = drv.trim_end_matches ".drv" |> .to_string
+      name = Path::new (&link) |> .file_name |> .map (\n -> n.to_string_lossy () |> .to_string) |> .unwrap_or_default
+      if self.roots.lock () is Ok held
+        mut v = held
+        v.retain (\r -> r.0 != name)
+        v.push ((name, out.clone ()))
+      succeed ((out, 7))
+
+instance Store Scripted
+  roots : &self -> Effect<Vec<String>, Never, HNil>
+  roots self = succeed (snapshot (&self.roots) |> .into_iter |> .map (\r -> r.0) |> .collect)
+  drop_root : &self -> String -> Effect<(), Never, HNil>
+  drop_root self name =
+    noted (&self.log) ("drop #{name}")
+    if self.roots.lock () is Ok held
+      mut v = held
+      v.retain (\r -> r.0 != name)
+    succeed (())
+  root_target : &self -> String -> Effect<Option<String>, Never, HNil>
+  root_target self name = succeed (snapshot (&self.roots) |> .into_iter |> .find (\r -> r.0 == name) |> .map (\r -> r.1))
+  summary : &self -> String -> String -> Effect<Option<Summary>, Never, HNil>
+  summary self old new =
+    noted (&self.log) ("diff #{old} #{new}")
+    succeed (Some (Summary { changed = 1, added = 0, removed = 0, nar_delta = 1024 }))
+
+instance Ledger_ Scripted
+  done : &self -> Effect<Vec<String>, Never, HNil>
+  done self = succeed (snapshot (&self.done))
+  record : &self -> Built -> Effect<(), VciError, HNil>
+  record self b =
+    if self.records.lock () is Ok held
+      mut v = held
+      v.push b
+    succeed (())
+  finish : &self -> String -> u64 -> Effect<(), VciError, HNil>
+  finish self sha pending =
+    noted (&self.log) ("finish #{crate::refs::short (&sha)} pending #{pending}")
+    if self.done.lock () is Ok held
+      mut v = held
+      v.push sha
+    succeed (())
+  publish : &self -> u64 -> Effect<(), VciError, HNil>
+  publish self pending =
+    noted (&self.log) ("publish pending #{pending}")
+    succeed (())
+
+instance Gate Scripted
+  busy : &self -> Effect<Option<String>, Never, HNil>
+  busy self = succeed (self.busy.clone ())
+
+instance Status Scripted
+  post : &self -> String -> String -> String -> String -> Effect<(), Never, HNil>
+  post self sha host state description =
+    noted (&self.log) ("status #{crate::refs::short (&sha)} #{host} #{state}: #{description}")
+    succeed (())
+
+export scripted_caps : Scripted -> Caps
+scripted_caps w =
+  a = Arc::new w
+  Caps { forge = ForgeTool (a.clone ()), nix = NixTool (a.clone ()), store = StoreTool (a.clone ()), ledger = LedgerTool (a.clone ()), status = StatusTool (a.clone ()), gate = GateTool a }
+
+test "a status body is GitHub's, and posting without a token file does nothing"
+  body = status_body "success" "built in 3s" "vci/drakkar"
+  v = serde_json::from_str (&body) |> .ok : Option<serde_json::Value>
+  assert_eq! \-> v |> .and_then (\v -> v.get "context" |> .and_then (\c -> c.as_str ()) |> .map (\c -> c.to_string ())) \-> Some (.to_string "vci/drakkar")
+  s = LiveStatus { curl = .to_string "/nonexistent/curl", api = .to_string "https://api.github.com", repo_slug = .to_string "I/d", token_file = None }
+  -- No token file: no curl is run at all (it does not exist here).
+  ran = id_effect::testing::run_test (posted s (.to_string "a") (.to_string "h") (.to_string "success") (.to_string "x")) |> .into_result
+  assert! \-> ran.is_ok ()
+
+test "a missing token file is reported, never fatal, and the token never reaches argv"
+  s = LiveStatus { curl = .to_string "/nonexistent/curl", api = .to_string "https://api.github.com", repo_slug = .to_string "I/d", token_file = Some (.to_string "/nonexistent/token") }
+  err = post_now (&s) "/nonexistent/token" "a" "h" "success" "x" |> .err |> .unwrap_or_default
+  assert! \-> err.contains "reading the token file"
+
+test "the ledger: records appended and read back, done markers, the metrics file"
+  dir = std::env::temp_dir () |> .join ("vci-ledger-#{std::process::id ()}")
+  fs::remove_dir_all (&dir) |> .ok
+  state = dir.join "state" |> .to_string_lossy () |> .to_string
+  text = dir.join "text" |> .to_string_lossy () |> .to_string
+  l = LiveLedger { state = state.clone (), textfile_dir = Some (text.clone ()) }
+  b = Built { sha = std::iter::repeat_n 'a' 40 |> .collect, target = .to_string "main", host = .to_string "h", result = .to_string "built", drv = None, out = None, eval_secs = 4, build_secs = 9, error = String::new (), diff = None, at = 1 }
+  appended (state.clone ()) (record_json (&b)) |> .expect "append"
+  appended (state.clone ()) (record_json (&b)) |> .expect "append"
+  assert_eq! \-> records_in (&state) |> .len \-> 2
+  finished (l.clone ()) (b.sha.clone ()) 0 |> .expect "finish"
+  done_dir = Path::new (&state) |> .join "done" |> .to_string_lossy () |> .to_string
+  assert_eq! \-> names_in (&done_dir) \-> .to_vec ([b.sha.clone ()])
+  prom = Path::new (&text) |> .join METRICS_FILE
+  m = fs::read_to_string (&prom) |> .unwrap_or_default
+  assert! \-> m.contains "vci_build_seconds{host=\"h\",ref=\"main\"} 9\n" && m.contains "vci_commits_built_total 1\n"
+  fs::remove_dir_all (&dir) |> .ok

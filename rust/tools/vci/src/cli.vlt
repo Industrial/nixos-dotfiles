@@ -1,0 +1,154 @@
+-- The command line.
+--
+--   vci --host NAME [--host NAME…] [--once] [--url URL] [--branch NAME]
+--       [--pulls-url URL | --no-pulls] [--repo-slug OWNER/REPO] [--repo DIR]
+--       [--state-dir DIR] [--textfile-dir DIR] [--interval DURATION]
+--       [--status-token-file FILE] [--api URL] [--git PROG] [--curl PROG]
+--       [--nix PROG] [--db FILE] [--systemctl PROG] [--max-load N] [--min-free-memory SIZE]
+
+import vdeploy::cli::parse_duration
+import crate::gate::{DEFAULT_MIN_FREE, size_parsed}
+
+export const USAGE : &str = "usage: vci --host NAME [--host NAME...] [--once] [--url URL] [--branch NAME] [--pulls-url URL | --no-pulls] [--repo-slug OWNER/REPO] [--repo DIR] [--state-dir DIR] [--textfile-dir DIR] [--interval DURATION] [--status-token-file FILE] [--api URL] [--git PROG] [--curl PROG] [--nix PROG] [--db FILE] [--systemctl PROG] [--max-load N] [--min-free-memory SIZE]"
+
+export const DEFAULT_SLUG : &str = "Industrial/nixos-dotfiles"
+
+export data Options
+  { export hosts Vec<String>
+  , export once bool
+  , export url String
+  , export branch String
+  , export pulls_url Option<String>
+  , export repo_slug String
+  , export repo String
+  , export state_dir String
+  , export textfile_dir Option<String>
+  , export interval u64
+  , export token_file Option<String>
+  , export api String
+  , export git String
+  , export curl String
+  , export nix String
+  , export db String
+  , export systemctl String
+  , export max_load Option<f64>
+  , export min_free u64
+  , export help bool
+  }
+  deriving (Debug, Clone, PartialEq)
+
+-- GitHub's open-PR list for a repository (read without a token).
+export pulls_url_of : &str -> &str -> String
+pulls_url_of api slug = "#{api}/repos/#{slug}/pulls?state=open&per_page=100"
+
+export defaults : Options
+defaults = Options { hosts = Vec::new (), once = false, url = "https://github.com/#{DEFAULT_SLUG}.git", branch = .to_string "main", pulls_url = Some (pulls_url_of "https://api.github.com" DEFAULT_SLUG), repo_slug = DEFAULT_SLUG.to_string (), repo = .to_string "/var/lib/vci/repo", state_dir = .to_string "/var/lib/vci", textfile_dir = None, interval = 120, token_file = None, api = .to_string "https://api.github.com", git = .to_string "git", curl = .to_string "curl", nix = .to_string "nix", db = (vdeploy::cli::defaults ()).db, systemctl = .to_string "systemctl", max_load = None, min_free = DEFAULT_MIN_FREE, help = false }
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+-- The options in `args` (argv without the program name).
+export parse_args : &[String] -> Result<Options, String>
+parse_args args =
+  mut o = defaults ()
+  mut slug_set = false
+  mut pulls_set = false
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "--host" ->
+        o.hosts.push ((value (it.next ()) "--host")?)
+      "--once" ->
+        o.once := true
+      "--url" ->
+        o.url := (value (it.next ()) "--url")?
+      "--branch" ->
+        o.branch := (value (it.next ()) "--branch")?
+      "--pulls-url" ->
+        o.pulls_url := Some ((value (it.next ()) "--pulls-url")?)
+        pulls_set := true
+      "--no-pulls" ->
+        o.pulls_url := None
+        pulls_set := true
+      "--repo-slug" ->
+        o.repo_slug := (value (it.next ()) "--repo-slug")?
+        slug_set := true
+      "--repo" ->
+        o.repo := (value (it.next ()) "--repo")?
+      "--state-dir" ->
+        o.state_dir := (value (it.next ()) "--state-dir")?
+      "--textfile-dir" ->
+        o.textfile_dir := Some ((value (it.next ()) "--textfile-dir")?)
+      "--interval" ->
+        v = (value (it.next ()) "--interval")?
+        o.interval := (parse_duration (&v) |> .filter (\n -> *n > 0) |> .ok_or ("--interval: not a positive duration: #{v}"))?
+      "--status-token-file" ->
+        o.token_file := Some ((value (it.next ()) "--status-token-file")?)
+      "--api" ->
+        o.api := (value (it.next ()) "--api")?
+      "--git" ->
+        o.git := (value (it.next ()) "--git")?
+      "--curl" ->
+        o.curl := (value (it.next ()) "--curl")?
+      "--nix" ->
+        o.nix := (value (it.next ()) "--nix")?
+      "--max-load" ->
+        v = (value (it.next ()) "--max-load")?
+        o.max_load := Some ((v.parse () : Result<f64, std::num::ParseFloatError>) |> .ok |> .filter (\x -> *x > 0.0) |> .ok_or ("--max-load: not a positive number: #{v}"))?
+      "--min-free-memory" ->
+        v = (value (it.next ()) "--min-free-memory")?
+        o.min_free := (size_parsed (&v) |> .ok_or ("--min-free-memory: not a size (like 10G): #{v}"))?
+      "--systemctl" ->
+        o.systemctl := (value (it.next ()) "--systemctl")?
+      "--db" ->
+        o.db := (value (it.next ()) "--db")?
+      "-h" ->
+        o.help := true
+      "--help" ->
+        o.help := true
+      other ->
+        return Err "unknown argument: #{other}"
+  -- Another repository's open PRs, unless they were named explicitly.
+  if slug_set && !pulls_set
+    o.pulls_url := Some (pulls_url_of (&o.api) (&o.repo_slug))
+  if !o.help && o.hosts.is_empty ()
+    return Err (.to_string "--host is required (the nixosConfigurations to build; repeat it)")
+  Ok o
+
+#[cfg(test)]
+args : &[&str] -> Vec<String>
+args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "hosts are all it needs; the rest builds this repository's main and open PRs"
+  o = parse_args (&args (&["--host", "drakkar", "--host", "mimir"])) |> .expect "options"
+  assert_eq! \-> o.hosts \-> args (&["drakkar", "mimir"])
+  assert_eq! \-> (o.url.as_str (), o.branch.as_str (), o.interval, o.token_file.clone ()) \-> ("https://github.com/Industrial/nixos-dotfiles.git", "main", 120, None)
+  assert_eq! \-> o.pulls_url \-> Some (.to_string "https://api.github.com/repos/Industrial/nixos-dotfiles/pulls?state=open&per_page=100")
+
+test "every option is read; a slug moves the PR list with it, unless one is given"
+  o = parse_args (&args (&["--host", "h", "--once", "--url", "file:///srv/r.git", "--branch", "b", "--repo-slug", "o/r", "--repo", "/r", "--state-dir", "/s", "--textfile-dir", "/t", "--interval", "5m", "--status-token-file", "/run/credentials/vci.service/status-token", "--api", "http://api", "--git", "/g", "--curl", "/c", "--nix", "/n", "--db", "/db"])) |> .expect "options"
+  assert_eq! \-> (o.once, o.url.as_str (), o.branch.as_str (), o.repo_slug.as_str (), o.repo.as_str (), o.state_dir.as_str (), o.interval) \-> (true, "file:///srv/r.git", "b", "o/r", "/r", "/s", 300)
+  assert_eq! \-> (o.textfile_dir.clone (), o.token_file.clone (), o.pulls_url.clone ()) \-> (Some (.to_string "/t"), Some (.to_string "/run/credentials/vci.service/status-token"), Some (.to_string "http://api/repos/o/r/pulls?state=open&per_page=100"))
+  assert_eq! \-> (o.git.as_str (), o.curl.as_str (), o.nix.as_str (), o.db.as_str ()) \-> ("/g", "/c", "/n", "/db")
+  p = parse_args (&args (&["--host", "h", "--repo-slug", "o/r", "--pulls-url", "file:///srv/pulls.json"])) |> .expect "options"
+  assert_eq! \-> p.pulls_url \-> Some (.to_string "file:///srv/pulls.json")
+  n = parse_args (&args (&["--host", "h", "--no-pulls"])) |> .expect "options"
+  assert_eq! \-> n.pulls_url \-> None
+
+test "bad command lines are refused with the reason"
+  assert! \-> parse_args (&args (&[])) |> .err |> .map (\e -> e.contains "--host is required") |> .unwrap_or false
+  assert_eq! \-> parse_args (&args (&["--host", "h", "--interval", "0"])) \-> Err (.to_string "--interval: not a positive duration: 0")
+  assert_eq! \-> parse_args (&args (&["--host"])) \-> Err (.to_string "--host needs a value")
+  assert_eq! \-> parse_args (&args (&["--host", "h", "--frob"])) \-> Err (.to_string "unknown argument: --frob")
+  assert! \-> parse_args (&args (&["--help"])) |> .map (\o -> o.help) |> .unwrap_or false
+
+test "the busy gate: defaults, and the limits read"
+  d = parse_args (&args (&["--host", "h"])) |> .expect "options"
+  assert_eq! \-> (d.max_load, d.min_free, d.systemctl.as_str ()) \-> (None, DEFAULT_MIN_FREE, "systemctl")
+  o = parse_args (&args (&["--host", "h", "--max-load", "6", "--min-free-memory", "16G", "--systemctl", "/s/systemctl"])) |> .expect "options"
+  assert_eq! \-> (o.max_load, o.min_free, o.systemctl.as_str ()) \-> (Some 6.0, 17179869184, "/s/systemctl")
+  assert! \-> parse_args (&args (&["--host", "h", "--max-load", "0"])) |> .is_err
+  assert! \-> parse_args (&args (&["--host", "h", "--min-free-memory", "lots"])) |> .is_err
