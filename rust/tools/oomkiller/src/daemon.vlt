@@ -1,10 +1,13 @@
--- The oomkiller's edge: everything that touches the machine. sysinfo for
--- memory and the process table, /proc for ownership, `kill -9` for the kill,
--- and the loop that runs them. Every decision is `policy.vlt`'s.
+-- The oomkiller as an id_effect program: one check (`tick`) over the
+-- capabilities in `ports.vlt`, repeated on a fixed Schedule. Nothing here
+-- touches the machine, so every path is tested with fakes on virtual time.
+-- The decisions are `policy.vlt`'s, and the real capabilities are `live.vlt`'s.
 
-import sysinfo::System
-import std::os::unix::fs::MetadataExt
-import crate::policy::{ProcessInfo, exceeded_line, kill_failed_line, killed_line, pick_victim, threshold_exceeded}
+
+import std::time::Duration
+import id_effect::{Effect, Need, Schedule, fail, need, succeed}
+import crate::policy::{Line, ProcessInfo, Reading, Tick, journal, pick_victim, threshold_exceeded}
+import crate::ports::{DaemonEnv, DaemonError, Kill, Log, Memory, Owner, Processes}
 
 -- Seconds between memory checks. A check only refreshes memory totals (one
 -- read of /proc/meminfo); the process table is walked only past the threshold.
@@ -12,107 +15,201 @@ import crate::policy::{ProcessInfo, exceeded_line, kill_failed_line, killed_line
 -- from 80% to exhaustion between two checks.
 export const INTERVAL_SECS : u64 = 1
 
--- The uid owning /proc/<pid>, or None once the process is gone or unreadable.
-proc_uid : u32 -> Option<u32>
-proc_uid pid =
-  std::fs::metadata (format! \-> "/proc/#{pid}") |> .ok |> .map (\m -> m.uid ())
+reading : Effect<Reading, DaemonError, DaemonEnv>
+reading =
+  memory : Need<Memory> = need ()
+  memory.flat_map (\m -> (m.inner.read ()).widen ().any_env ())
 
--- This daemon's own uid: the user whose processes it may kill.
-export current_uid : Result<u32, String>
-current_uid =
-  std::fs::metadata "/proc/self" |> .map (\m -> m.uid ()) |> .map_err (\e -> format! \-> "Failed to get current process metadata: #{e}")
+-- SIGKILL the victim. A refused kill is an outcome to report, not a failure
+-- of the check.
+kill_victim : Reading -> ProcessInfo -> Effect<Tick, DaemonError, DaemonEnv>
+kill_victim r victim =
+  killer : Need<Kill> = need ()
+  pid = victim.pid
+  kept = victim.clone ()
+  killer.flat_map (move \k -> (((k.inner.kill pid).map (move \_ -> Tick::Killed r victim)).catch (move \e -> succeed (Tick::KillFailed r kept e.reason))).any_env ())
 
-cmdline_of : &sysinfo::Process -> String
-cmdline_of process =
-  parts = process.cmd () |> .iter |> .map (\s -> s.to_string_lossy ().into_owned ()) |> .collect : Vec<String>
-  parts.join " "
+act : Reading -> Option<ProcessInfo> -> Effect<Tick, DaemonError, DaemonEnv>
+act r victim = case victim of
+  None -> succeed (Tick::NoVictim r)
+  Some p -> kill_victim r p
 
--- Every process sysinfo last saw whose owner /proc can still name.
-snapshot : &System -> Vec<ProcessInfo>
-snapshot system =
-  mut out = Vec::new () : Vec<ProcessInfo>
-  for entry in system.processes ()
-    n = entry.0.as_u32 ()
-    process = entry.1
-    if proc_uid n is Some uid
-      name = process.name ().to_string_lossy ().into_owned ()
-      out.push (ProcessInfo { pid = n, uid, memory = process.memory (), name, cmdline = cmdline_of process })
-  out
+-- Past the threshold: walk the process table and act on the largest process
+-- the owner has.
+reap : Reading -> Effect<Tick, DaemonError, DaemonEnv>
+reap r =
+  owner : Need<Owner> = need ()
+  owner.flat_map (move \o -> candidates o.uid r)
 
--- SIGKILL, through kill(1) as the daemon always has.
-kill : &ProcessInfo -> Result<(), String>
-kill process =
-  output = (std::process::Command::new "kill" |> .arg "-9" |> .arg (process.pid.to_string ()) |> .output) |> .map_err (\e -> format! \-> "Failed to execute kill command: #{e}")
-  out = output?
-  if out.status.success ()
-    Ok ()
+candidates : u32 -> Reading -> Effect<Tick, DaemonError, DaemonEnv>
+candidates uid r =
+  table : Need<Processes> = need ()
+  listed = table.flat_map (\t -> (t.inner.snapshot ()).widen ().any_env ())
+  listed.flat_map (move \ps -> act r (pick_victim ps uid))
+
+decide : Reading -> Effect<Tick, DaemonError, DaemonEnv>
+decide r = case threshold_exceeded r.used r.total of
+  Err e -> fail (DaemonError::MemoryUnreadable e)
+  Ok exceeded -> if exceeded
+    reap r
   else
-    stderr = String::from_utf8_lossy (&out.stderr)
-    Err (format! \-> "Failed to kill name=#{process.name} pid=#{process.pid}: #{stderr}")
+    succeed Tick::Idle
 
--- Past the threshold: refresh the process table (expensive, so only now),
--- pick the victim, kill it, and say what happened.
-reap : &mut System -> ()
-reap system =
-  system.refresh_all ()
-  case current_uid () of
-    Err e -> eprintln! \-> "Failed to find highest memory process: #{e}"
-    Ok uid -> kill_largest (snapshot system) uid
-  ()
+-- One check. It fails only when the reading is unusable, which ends the daemon.
+export tick : Effect<Tick, DaemonError, DaemonEnv>
+tick = (reading ()).flat_map decide
 
-kill_largest : Vec<ProcessInfo> -> u32 -> ()
-kill_largest processes uid =
-  case pick_victim processes uid of
-    None -> eprintln! \-> "Memory threshold exceeded but no killable process found"
-    Some victim -> report (&victim) (kill (&victim))
-  ()
+write : Vec<Line> -> Effect<(), DaemonError, DaemonEnv>
+write lines =
+  log : Need<Log> = need ()
+  log.flat_map (move \l -> (l.inner.write lines).widen ().any_env ())
 
-report : &ProcessInfo -> Result<(), String> -> ()
-report victim outcome =
-  case outcome of
-    Ok _ -> println! \-> "#{killed_line victim}"
-    Err e -> eprintln! \-> "#{kill_failed_line victim (&e)}"
-  ()
+-- One check, journalled.
+export step : Effect<Tick, DaemonError, DaemonEnv>
+step = (tick ()).flat_map (\t -> (write (journal (&t))).map (move \_ -> t))
 
--- One check. Err only when memory cannot be read, which ends the daemon.
-export iteration : &mut System -> Result<(), String>
-iteration system =
-  system.refresh_memory ()
-  used = system.used_memory ()
-  total = system.total_memory ()
-  if (threshold_exceeded used total)?
-    println! \-> "#{exceeded_line used total}"
-    reap system
-  Ok ()
+-- `step`, repeated on `schedule` until a check fails.
+export run_on : given <Out: Send + 'static> Schedule<Out, Tick> -> Effect<Out, DaemonError, DaemonEnv>
+run_on schedule = Effect::repeat crate::daemon::step schedule
 
--- The daemon: check every INTERVAL_SECS, forever. One System is reused, because
--- building it scans the whole machine.
-export run : ()
-run =
-  mut system = System::new_all ()
-  loop
-    if iteration (&mut system) is Err e
-      eprintln! \-> "Failed to read memory: #{e}"
-      std::process::exit 1
-    std::thread::sleep (std::time::Duration::from_secs INTERVAL_SECS)
-  ()
+-- Journal the reason before failing, as the daemon always has.
+fail_loudly : DaemonError -> Effect<u64, DaemonError, DaemonEnv>
+fail_loudly e =
+  line = Line::Warn (e.to_string ())
+  (write (.to_vec ([line]))).flat_map (move \_ -> fail e)
 
-test "this process belongs to this daemon's uid"
-  assert! \-> proc_uid (std::process::id ()) == .ok (current_uid ())
+-- The daemon: a check every INTERVAL_SECS, forever, until one fails.
+export daemon : Effect<u64, DaemonError, DaemonEnv>
+daemon = (run_on (Schedule::spaced (Duration::from_secs INTERVAL_SECS))).catch fail_loudly
 
-test "a pid that does not exist has no owner"
-  assert! \-> proc_uid 999999999 == None
+-- Fakes: values behind the same traits, recording what they were asked to do.
 
-test "the snapshot sees this process"
-  mut system = System::new_all ()
-  system.refresh_all ()
-  me = std::process::id ()
-  assert! \-> snapshot (&system) |> .iter |> .any (\p -> p.pid == me)
+#[cfg(test)]
+import std::sync::{Arc, Mutex, PoisonError}
+#[cfg(test)]
+import id_effect::{Exit, assert_exit_success, expect_exit_failure, run_test, sync}
+#[cfg(test)]
+import crate::ports::{Journal, KillError, Killer, MemoryProbe, ProcessTable, env}
+#[cfg(test)]
+import id_effect::Never
 
-test "killing a pid that does not exist fails"
-  p = ProcessInfo { pid = 999999999, uid = 0, memory = 0, name = .to_string "ghost", cmdline = String::new () }
-  assert! \-> .is_err (kill (&p))
+#[cfg(test)]
+data FixedMemory { reading Reading }
 
-test "an iteration on a healthy machine succeeds"
-  mut system = System::new_all ()
-  assert! \-> .is_ok (iteration (&mut system))
+#[cfg(test)]
+instance MemoryProbe FixedMemory
+  read : &self -> Effect<Reading, Never>
+  read self = succeed self.reading
+
+#[cfg(test)]
+data FixedTable { processes Vec<ProcessInfo> }
+
+#[cfg(test)]
+instance ProcessTable FixedTable
+  snapshot : &self -> Effect<Vec<ProcessInfo>, Never>
+  snapshot self = succeed (self.processes.clone ())
+
+#[cfg(test)]
+data RecordingKiller { killed Arc<Mutex<Vec<u32>>>, refuse bool }
+
+#[cfg(test)]
+instance Killer RecordingKiller
+  kill : &self -> u32 -> Effect<(), KillError>
+  kill self pid =
+    killed = Arc::clone (&self.killed)
+    refuse = self.refuse
+    if refuse
+      fail (KillError { reason = .to_string "denied" })
+    else
+      sync (move \-> (killed.lock ().unwrap_or_else PoisonError::into_inner).push pid)
+
+#[cfg(test)]
+data RecordingJournal { lines Arc<Mutex<Vec<Line>>> }
+
+#[cfg(test)]
+instance Journal RecordingJournal
+  write : &self -> Vec<Line> -> Effect<(), Never>
+  write self lines =
+    kept = Arc::clone (&self.lines)
+    sync (move \-> (kept.lock ().unwrap_or_else PoisonError::into_inner).extend lines)
+
+#[cfg(test)]
+data Fakes { env DaemonEnv, killed Arc<Mutex<Vec<u32>>>, lines Arc<Mutex<Vec<Line>>> }
+
+#[cfg(test)]
+fakes : Reading -> Vec<ProcessInfo> -> bool -> Fakes
+fakes r processes refuse =
+  killed = Arc::new (Mutex::new (Vec::new ()))
+  lines = Arc::new (Mutex::new (Vec::new ()))
+  memory = Memory { inner = Arc::new (FixedMemory { reading = r }) }
+  table = Processes { inner = Arc::new (FixedTable { processes }) }
+  killer = Kill { inner = Arc::new (RecordingKiller { killed = Arc::clone (&killed), refuse }) }
+  log = Log { inner = Arc::new (RecordingJournal { lines = Arc::clone (&lines) }) }
+  Fakes { env = env memory table killer log (Owner { uid = 1000 }), killed, lines }
+
+#[cfg(test)]
+killed_of : &Fakes -> Vec<u32>
+killed_of f = (f.killed.lock ().unwrap_or_else PoisonError::into_inner).clone ()
+
+#[cfg(test)]
+lines_of : &Fakes -> Vec<Line>
+lines_of f = (f.lines.lock ().unwrap_or_else PoisonError::into_inner).clone ()
+
+#[cfg(test)]
+proc : u32 -> u32 -> u64 -> ProcessInfo
+proc pid uid memory = ProcessInfo { pid, uid, memory, name = .to_string "p", cmdline = String::new () }
+
+#[cfg(test)]
+crowd : Vec<ProcessInfo>
+crowd = .to_vec ([proc 1 0 9000, proc 2 1000 300, proc 3 1000 20, proc 4 1001 8000])
+
+#[cfg(test)]
+full : Reading
+full = Reading { used = 95, total = 100 }
+
+test "below the threshold nothing is walked or killed"
+  f = fakes (Reading { used = 50, total = 100 }) (crowd ()) false
+  exit = run_test ((tick ()).provide_all (f.env.clone ()))
+  assert_exit_success (&exit) (&Tick::Idle)
+  assert! \-> killed_of (&f) == Vec::new ()
+
+test "past the threshold the user's largest process is killed"
+  f = fakes (full ()) (crowd ()) false
+  exit = run_test ((tick ()).provide_all (f.env.clone ()))
+  assert_exit_success (&exit) (&Tick::Killed (full ()) (proc 2 1000 300))
+  assert! \-> killed_of (&f) == .to_vec ([2])
+
+test "a refused kill is an outcome, not a failure"
+  f = fakes (full ()) (crowd ()) true
+  exit = run_test ((tick ()).provide_all (f.env.clone ()))
+  assert_exit_success (&exit) (&Tick::KillFailed (full ()) (proc 2 1000 300) (.to_string "denied"))
+
+test "with no owned process there is no victim"
+  f = fakes (full ()) (.to_vec ([proc 1 0 9000])) false
+  exit = run_test ((tick ()).provide_all (f.env.clone ()))
+  assert_exit_success (&exit) (&Tick::NoVictim (full ()))
+  assert! \-> killed_of (&f) == Vec::new ()
+
+test "a zero total fails the check"
+  f = fakes (Reading { used = 0, total = 0 }) (crowd ()) false
+  e = expect_exit_failure (run_test ((tick ()).provide_all (f.env.clone ())))
+  assert! \-> matches!(e, DaemonError::MemoryUnreadable(_))
+
+test "a step journals what the check did"
+  f = fakes (full ()) (crowd ()) false
+  exit = run_test ((step ()).provide_all (f.env.clone ()))
+  assert_exit_success (&exit) (&Tick::Killed (full ()) (proc 2 1000 300))
+  assert! \-> lines_of (&f) == journal (&Tick::Killed (full ()) (proc 2 1000 300))
+
+test "the schedule repeats the check on virtual time"
+  f = fakes (full ()) (crowd ()) false
+  schedule = (Schedule::spaced (Duration::from_secs INTERVAL_SECS)).intersect (Schedule::recurs 2)
+  exit = run_test ((run_on schedule).provide_all (f.env.clone ()))
+  assert! \-> matches!(exit, Exit::Success(_))
+  assert! \-> killed_of (&f) == .to_vec ([2, 2, 2])
+
+test "the daemon stops, journalled, at the first unusable reading"
+  f = fakes (Reading { used = 0, total = 0 }) (crowd ()) false
+  e = expect_exit_failure (run_test ((daemon ()).provide_all (f.env.clone ())))
+  assert! \-> matches!(e, DaemonError::MemoryUnreadable(_))
+  assert! \-> lines_of (&f) == .to_vec ([Line::Warn (.to_string "Failed to read memory: Total memory is 0, cannot calculate usage percentage")])
