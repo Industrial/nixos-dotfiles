@@ -1,0 +1,208 @@
+do
+-- CRIEVE NOTE: This file is currently identical in both Retail and Classic.
+-- DO NOT TOUCH IT.
+local app = select(2, ...);
+
+-- App locals
+local ArrayAppend = app.ArrayAppend;
+
+-- Global locals
+local setmetatable,rawget
+	= setmetatable,rawget
+
+local GenerateGroupsForGenericSubGroup = function(t)
+	-- only load this if we're in a tooltip-level or new window build
+	if app.GetSkipLevel() < 1 then return end
+	if rawget(t,"parent") then return end
+
+	-- local parent = rawget(t,"parent")
+	-- local window = app.GetRelativeValue(t, "window")
+	-- local sp = t.sourceParent
+	-- app.PrintDebug("spg?",app:SearchLink(t),
+	-- 	"p",parent and app:SearchLink(parent),
+	-- 	"sp",sp and app:SearchLink(sp),
+	-- 	"w",window and window.Suffix)
+
+	local spg = t._g
+	if spg then return spg end
+
+	-- direct object which is a child of a 'generic object container' can instead show the generic parent object content
+	-- when the direct object is the root of a window/tooltip
+	local sp = t.sourceParent
+	if not sp then app.PrintDebug("spg.sourceParent MISSING??",app:SearchLink(t)) return end
+	spg = {}
+	-- make a copy of the non-object groups for this object to display
+	local g = sp.g
+	local o
+	for i=1,#g do
+		o = g[i]
+		if not o.objectID then
+			spg[#spg + 1] = o
+		end
+	end
+	-- add symlink from generic container if any
+	local sym = app.ResolveSymbolicLink(sp)
+	if sym then
+		app.ArrayAppend(spg, sym)
+	end
+	-- for cached reference
+	t._g = spg
+	-- app.PrintDebug("spg",#spg)
+	return spg
+end
+
+-- Object Lib (as in "World Object")
+app.CreateObject = app.CreateClass("Object", "objectID", {
+	name = function(t)
+		return app.ObjectNames[t.objectID] or t.basename;
+	end,
+	basename = function(t)
+		return app.GetNameFromProviders(t) or ("Object ID #" .. t.objectID);
+	end,
+	icon = function(t)
+		local customIcon = app.ObjectIcons[t.objectID] or app.GetIconFromProviders(t)
+		if customIcon then return customIcon end
+
+		local g = t.g
+		if g then
+			local o
+			for i=1,#g do
+				o = g[i]
+				customIcon = (o.itemID or o.criteriaID) and o.icon or nil
+				if customIcon then return customIcon end
+			end
+		end
+		-- default object icon
+		return app.asset("Interface_Tchest")
+	end,
+	model = function(t)
+		return app.ObjectModels[t.objectID];
+	end,
+	indicatorIcon = function(t)
+		if app.ActiveVignettes.object[t.objectID] then
+			return app.asset("Interface_Ping");
+		end
+	end,
+},
+"AsGenericObjectContainer", {
+	__ignoreCaching = app.ReturnTrue,
+	trackable = function(t)
+		if t.questID then return true end
+		local g = t.g
+		local o
+		for i=1,#g do
+			o = g[i]
+			if o.objectID and o.trackable then return true end
+		end
+	end,
+	repeatable = function(t)
+		if t.questID then return t.isDaily or t.isWeekly or t.isMonthly or t.isYearly end
+		local g = t.g
+		local o
+		for i=1,#g do
+			o = g[i]
+			if o.objectID and o.repeatable then return true end
+		end
+	end,
+	saved = function(t)
+		local questID = t.questID
+		if questID and app.IsQuestFlaggedCompleted(questID) then return true end
+		local g = t.g
+		local o, anySaved
+		for i=1,#g do
+			o = g[i]
+			if o.objectID then
+				if o.saved then
+					anySaved = true
+				else
+					return
+				end
+			end
+		end
+		-- every contained sub-object is already saved, so the repeated object should also be marked as saved
+		return anySaved
+	end,
+	coords = function(t)
+		local g, unsaved = t.g, {}
+		local o
+		for i=1,#g do
+			o = g[i]
+			-- show collected coords of all sub-objects which are not saved
+			if o.objectID and not o.saved then
+				local coords = o.coords;
+				if coords then
+					for mapID,coordsForMap in pairs(coords) do
+						local unsavedByMap = unsaved[mapID];
+						if not unsavedByMap then
+							unsavedByMap = {};
+							unsaved[mapID] = unsavedByMap;
+						end
+						ArrayAppend(unsavedByMap, coordsForMap)
+					end
+				end
+			end
+		end
+		return unsaved
+	end,
+	maps = function(t)
+		local g, unsaved = t.g, {}
+		local o
+		for i=1,#g do
+			o = g[i]
+			-- show collected maps of all sub-objects which are not saved
+			if o.objectID and o.maps and not o.saved then
+				ArrayAppend(unsaved, o.maps)
+			end
+		end
+		return unsaved
+	end,
+	indicatorIcon = function(t)
+		local g, activeObjectVignettes = t.g, app.ActiveVignettes.object
+		for i=1,#g do
+			if activeObjectVignettes[g[i].objectID] then
+				return app.asset("Interface_Ping")
+			end
+		end
+	end,
+	-- This is never used typically since this class is only generated for objects which have a raw .g
+	-- However there are situations where cloning an existing AsGenericObjectContainer object can expect removed .g (rootOnly)
+	-- Which then causes Lua exceptions due to the above logic not checking for existence
+	-- Perhaps an alternate fix in the future but for now this would prevent nuance situations and not affect existing handling
+	g = function(t)
+		return app.EmptyTable
+	end
+},
+function(t) return t.type == "AsGenericObjectContainer" end,
+"AsSubGenericObjectWithQuest", {
+	CACHE = function() return "Quests" end,
+	ImportFrom = "Quest",
+	ImportFields = { "repeatable", "trackable", "saved" },
+	CollectibleType = function() return "QuestsHidden" end,
+	collectible = app.GlobalVariants.AndLockCriteria.collectible,
+	collected = function(t)
+		return app.TypicalCharacterCollected("Quests", t.questID)
+	end,
+	variants = {
+		app.GlobalVariants.AndLockCriteria,
+	},
+	g = GenerateGroupsForGenericSubGroup,
+},
+function(t) return t.questID and t.type == "AsSubGenericObject" end,
+"AsSubGenericObject", {
+	g = GenerateGroupsForGenericSubGroup,
+},
+function(t) return t.type == "AsSubGenericObject" end,
+"WithQuest", {
+	CACHE = function() return "Quests" end,
+	ImportFrom = "Quest",
+	ImportFields = { "repeatable", "trackable", "saved" },
+	CollectibleType = function() return "QuestsHidden" end,
+	collectible = app.GlobalVariants.AndLockCriteria.collectible,
+	collected = function(t)
+		return app.TypicalCharacterCollected("Quests", t.questID)
+	end,
+	variants = {
+		app.GlobalVariants.AndLockCriteria,
+	},
+}, function(t) return t.questID end);
+end

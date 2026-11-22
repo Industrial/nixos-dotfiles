@@ -79,7 +79,6 @@ PawnLocal =
 		["AgilityInfo"] = "主要屬性, 敏捷.",
 		["ApInfo"] = "Attack Power.  Increases the damage of physical attacks.  Does not include attack power gained from strength and agility.",
 		["ArcaneResistInfo"] = "Arcane Resistance.  Reduces the damage taken from arcane-based attacks.",
-		["ArcaneSpellDamage"] = "祕法法術傷害",
 		["ArcaneSpellDamageInfo"] = "Arcane damage.  Increases the damage dealt by your arcane spells.",
 		["ArmorInfo"] = "基本護甲值，不包含坦克裝備的 \"額外護甲值\" 屬性",
 		["ArmorPenetrationInfo"] = "護甲穿透。 使你的部分物理攻擊傷害無視護甲。",
@@ -90,7 +89,6 @@ PawnLocal =
 		["Cloth"] = "布甲",
 		["ClothInfo"] = "此物若為布甲，則增計多少分數。",
 		["CorruptionInfo"] = "恩若司的腐化。腐化值為負值時，會根據腐化程度從物品評分中刪除分數。",
-		["Crit"] = "致命一擊",
 		["CritInfo"] = "致命一擊: 影響近戰攻擊，遠程攻擊，法術。",
 		["DefenseInfo"] = "Defense skill.  Decreases the chance that you'll be hit by boss attacks.",
 		["DodgeInfo"] = "Dodge.  Increases the chance that you'll dodge attacks entirely.",
@@ -101,16 +99,12 @@ PawnLocal =
 		["ExpertiseInfo"] = "Expertise. Negates your enemy's chances to dodge and parry.",
 		["FeralApInfo"] = "Feral Attack Power.  Increases the damage of druid attacks when in feral forms.  Does not include attack power gained from strength and agility.",
 		["FireResistInfo"] = "Fire Resistance.  Reduces the damage taken from fire-based attacks.",
-		["FireSpellDamage"] = "火焰法術傷",
 		["FireSpellDamageInfo"] = "Fire damage.  Increases the damage dealt by your fire spells.",
 		["FrostResistInfo"] = "Frost Resistance.  Reduces the damage taken from frost-based attacks.",
-		["FrostSpellDamage"] = "冰霜法術傷害",
 		["FrostSpellDamageInfo"] = "Frost damage.  Increases the damage dealt by your frost spells.",
 		["HasteInfo"] = "加速: 影響近戰攻擊，遠程攻擊，法術。",
-		["Healing"] = "治療法術",
 		["HealingInfo"] = "Spell healing.  Increases the power of your healing spells.",
 		["HitInfo"] = "Hit.  Increases the chance that your physical attacks hit the target, especially bosses.",
-		["HolySpellDamage"] = "Holy Damage",
 		["HolySpellDamageInfo"] = "Holy damage.  Increases the damage dealt by your holy spells.",
 		["Hp5Info"] = "Health regeneration per 5 seconds.  Increases the rate at which you regenerate health.",
 		["IndestructibleInfo"] = "無法摧毀: 使物品不損失耐久度",
@@ -129,7 +123,6 @@ PawnLocal =
 		["Mp5Info"] = "Mana regeneration per 5 seconds.  Affects your mana regeneration even when in combat.",
 		["MultistrikeInfo"] = "Multistrike. Increases the chance that your attacks and healing spells will hit your target two extra times at reduced potency.",
 		["NatureResistInfo"] = "Nature Resistance.  Reduces the damage taken from nature-based attacks.",
-		["NatureSpellDamage"] = "自然法術傷害",
 		["NatureSpellDamageInfo"] = "Nature damage.  Increases the damage dealt by your nature spells.",
 		["ParryInfo"] = "Parry.  Increases the chance that you'll parry enemy attacks.",
 		["Plate"] = "鎧甲",
@@ -139,7 +132,6 @@ PawnLocal =
 		--[[Translation missing --]]
 		["ResilienceInfo"] = "Resilience. Reduces the chance that you'll be critically hit, and decreases the damage of critical hits that you do take.",
 		["ShadowResistInfo"] = "Shadow Resistance.  Reduces the damage taken from shadow-based attacks.",
-		["ShadowSpellDamage"] = "暗影法術傷害",
 		["ShadowSpellDamageInfo"] = "Shadow damage.  Increases the damage dealt by your shadow spells.",
 		["Shield"] = "盾牌",
 		["ShieldInfo"] = "此物若為盾牌，則增計多少分數。",
@@ -152,7 +144,6 @@ PawnLocal =
 如果你偏好快速武器，此數應為負值。並請參閱 "特定武器屬性" 的 "速度基線" 部份。]=],
 		["SpeedIs"] = "1 |cffffffff武器速度|r 價值:",
 		["SpellCritInfo"] = "Spell critical strike.  Increases the chance that your spells will hit with increased potency.",
-		["SpellDamage"] = "法術傷害",
 		["SpellDamageInfo"] = "Spell damage.  Increases the damage dealt by your offensive spells.",
 		["SpellHitInfo"] = "Spell Hit.  Increases the chance that your damaging spells hit the target, especially bosses.",
 		--[[Translation missing --]]
@@ -507,6 +498,7 @@ WoW中所有的物件都有個ID，通常只有寫插件的人才需要這些資
 
 PawnLocal.TooltipParsing = {
 	["Agility"] = "^%+?#敏捷$",
+	["AllResist"] = "^%+?# 所有抗性$",
 	["AllStats"] = "^%+?#所有屬性$",
 	["Ap"] = "^%+?#攻擊強度$",
 	["Ap2"] = "^裝備： %+#攻擊強度。$",
@@ -517,6 +509,7 @@ PawnLocal.TooltipParsing = {
 	["ArcaneSpellDamage3"] = "^%+#秘法傷害$",
 	["Armor"] = "^#點護甲$",
 	["Armor2"] = "^裝備: %+#點護甲值。$",
+	["Armor3"] = "^%+?#點護甲值$",
 	["ArmorPenetration"] = "^裝備: 你的攻擊無視目標#點護甲值。$",
 	["ArmorPenetrationRating"] = "^裝備: 提高#點護甲穿透等級。$",
 	["ArmorPenetrationRating2"] = "^裝備: 提高#點護甲穿透。$",
@@ -529,6 +522,7 @@ PawnLocal.TooltipParsing = {
 	["BlockRating"] = "^裝備: 使你的格擋等級提高#點。$",
 	["BlockRating2"] = "^裝備: 提高#點盾牌格擋。$",
 	["BlockValue"] = "^裝備： 使你的盾牌格擋值提高#點。$",
+	["BlockValueForever"] = "^裝備：提高#點盾牌格擋值。$",
 	["Bow"] = "^弓$",
 	["ChanceOnHit"] = "擊中時可能: ",
 	["Charges"] = "^.+次?$",
@@ -573,6 +567,7 @@ PawnLocal.TooltipParsing = {
 	["Equip"] = "裝備: ",
 	["Expertise"] = "^%+?#熟練$",
 	["ExpertiseClassic"] = "^裝備： 使你的攻擊被閃躲或招架的機率降低#%%。$",
+	["ExpertiseForever"] = "^裝備：被閃躲或招架的機率降低#%%。$",
 	["ExpertiseRating"] = "^裝備: 提高#點熟練。$",
 	["ExpertiseRatingShort"] = "^%+?#熟練等級$",
 	["FeralAp"] = "^裝備： 在獵豹、熊或巨熊形態下的攻擊強度提高#點。$",
@@ -592,6 +587,7 @@ PawnLocal.TooltipParsing = {
 	["Haste"] = "^%+?#加速$",
 	["Haste2"] = "^裝備: 提高#點加速。$",
 	["HasteClassic"] = "^裝備： 你的攻擊速度提高#%%。$",
+	["HasteCombined"] = "^	裝備：使你的攻擊速度和施法速度提高#%%。$",
 	["HasteRating"] = "^裝備: 提高#點加速。$",
 	["HasteRating2"] = "^UNUSED$",
 	--[[Translation missing --]]
@@ -600,6 +596,7 @@ PawnLocal.TooltipParsing = {
 	["Healing"] = "^%+# 治療法術$",
 	["Healing2"] = "^裝備： 提高法術和魔法效果所造成的治療效果，最多#點。$",
 	["Healing3"] = "^%+#治療$",
+	["Healing4"] = "^裝備：使所有法術和魔法效果所造成的治療效果最多提高#點。$",
 	["HeirloomLevelRange"] = "^需要等級(%d+)至(%d+)%((%d+)%)",
 	["HeirloomXpBoost"] = "^裝備: .*獲得的經驗值提高%d+%%。",
 	["HeirloomXpBoost2"] = "^UNUSED$",
@@ -690,6 +687,7 @@ PawnLocal.TooltipParsing = {
 	["SpellDamageAndHealingEnchant"] = "^%+#治療和%+#法術傷害",
 	["SpellDamageAndHealingShort"] = "^%+#治療法術和%+#傷害法術",
 	["SpellDamageAndHealingShort2"] = "^UNUSED$",
+	["SpellDamageNoHealing"] = "^裝備：使法術和魔法效果所造成的傷害最多提高#點。$",
 	["SpellHasteClassic"] = "^裝備： 你的施法速度提高#%%。$",
 	["SpellHasteRating"] = "^裝備: 提高#點法術加速。$",
 	["SpellHasteRatingShort"] = "^%+?#法術加速等級$",
@@ -699,6 +697,7 @@ PawnLocal.TooltipParsing = {
 	["SpellHitRatingShort"] = "^%+?#法術命中等級$",
 	["SpellPenetration"] = "^裝備: 使你的法術穿透力提高#點。$",
 	["SpellPenetrationClassic"] = "^裝備： 使你法術目標的魔法抗性降低#點。$",
+	["SpellPenetrationForever"] = "^裝備：你的法術會穿透#點魔法抗性。$",
 	["SpellPenetrationShort"] = "^%+?#法術穿透力$",
 	["SpellPower"] = "^%+?#法術能量$",
 	["SpellPower2"] = "^裝備： 提高#點法術能量。$",
@@ -740,7 +739,7 @@ PawnLocal.TooltipParsing = {
 
 -- Special case: weapons actually use different text on live versus classic.
 -- So, patch things up here.
-if VgerCore.IsClassic then
+if VgerCore.IsClassic or VgerCore.IsForever then
 
 	local TooltipParsing_Classic =
 	{
@@ -824,6 +823,36 @@ if VgerCore.IsWrath or VgerCore.IsCataclysm or VgerCore.IsMists then
 
 	local Key, NewString
 	for Key, NewString in pairs(TooltipParsing_Wrath) do
+		PawnLocal.TooltipParsing[Key] = NewString
+	end
+end
+
+if VgerCore.IsForever then
+
+	local TooltipParsing_Forever =
+	{
+		["Ap2"] = "^裝備：%+#點攻擊強度。$",
+		["ArcaneSpellDamage2"] = "^裝備：使秘法法術和效果所造成的傷害最多提高#點。$",
+		["BlockPercent"] = "^裝備：使你用盾牌格擋攻擊的機率提高#%%。$",
+		["CritPercentCombined"] = "^裝備：使你造成致命一擊的機率提高#%%。$",
+		["DefenseSkill"] = "^裝備：防禦提高#點。$",
+		["DodgePercent"] = "^裝備：使你閃躲攻擊的機率提高#%%。$",
+		["FireSpellDamage2"] = "^裝備：使火焰法術和效果造成的傷害最多提高#點。$",
+		["FrostSpellDamage2"] = "^裝備：使冰霜法術和效果所造成的傷害最多提高#點。$",
+		["HitPercentCombined"] = "^裝備：使你的命中率提高#%%。$",
+		["HolySpellDamage2"] = "^裝備：使神聖法術和效果所造成的傷害最多提高#點。$",
+		["Hp5"] = "^裝備：每5秒恢復#點生命力。$",
+		["Mp5"] = "^裝備：每5秒恢復#點法力。$",
+		["NatureSpellDamage2"] = "^裝備：使自然法術和效果造成的傷害最多提高#點。$",
+		["ParryPercent"] = "^裝備：使你招架攻擊的機率提高#%%。$",
+		["Rap"] = "^裝備：%+#點遠程攻擊強度。$",
+		["ShadowSpellDamage2"] = "^裝備：使暗影法術和效果所造成的傷害最多提高#點。$",
+		["SpellDamageAndHealing"] = "^裝備：使法術和魔法效果所造成的治療效果提高最多#點，法術傷害提高最多#點。$",
+		["SpellDamage3"] = "^裝備：使魔法法術和效果造成的傷害和治療效果最多提高#點。$",
+	}
+
+	local Key, NewString
+	for Key, NewString in pairs(TooltipParsing_Forever) do
 		PawnLocal.TooltipParsing[Key] = NewString
 	end
 end

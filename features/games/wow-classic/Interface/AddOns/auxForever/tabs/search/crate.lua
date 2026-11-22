@@ -50,6 +50,8 @@ end
 -- text is not loaded, or its tooltip has no Use line yet (0.8 build 14: crates hovered in aux's
 -- results showed no bundles, Tyler, build 13; the list is the use spell's text, which the game loads
 -- after the item). Blizzard's code: C_Item.GetItemSpell, C_Spell.IsSpellDataCached.
+local pending_seen = {}
+
 local function use_text_pending(item_id, texts)
     local _, spell_id
     if C_Item and C_Item.GetItemSpell then
@@ -63,11 +65,25 @@ local function use_text_pending(item_id, texts)
         return true
     end
     local use = ITEM_SPELL_TRIGGER_ONUSE or 'Use:'
+    local equip = ITEM_SPELL_TRIGGER_ONEQUIP or 'Equip:'
+    local proc = ITEM_SPELL_TRIGGER_ONPROC or 'Chance on hit:'
     for _, text in ipairs(texts) do
-        if type(text) == 'string' and strfind(text, use, 1, true) then
+        if type(text) == 'string' and (
+            strfind(text, use, 1, true)
+            or strfind(text, equip, 1, true)
+            or strfind(text, proc, 1, true)
+        ) then
+            pending_seen[item_id] = nil
             return false
         end
     end
+    -- Spell data is cached, yet none of Use/Equip/Chance on hit appeared (e.g. a hidden passive
+    -- spell, or a tooltip built 1ms before the spell finished loading): allow one retry, then cache.
+    if pending_seen[item_id] then
+        pending_seen[item_id] = nil
+        return false
+    end
+    pending_seen[item_id] = true
     return true
 end
 

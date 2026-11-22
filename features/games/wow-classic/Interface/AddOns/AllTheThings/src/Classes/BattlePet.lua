@@ -1,0 +1,272 @@
+-- BattlePet Class
+local _, app = ...
+
+-- Battle Pets are handled in Mounts & Battle Pets for Classic/TBC
+if app.GameBuildVersion < 30000 and not app.IsForever then return; end
+
+-- Globals
+local wipe, setmetatable, rawget, select,pairs
+	= wipe, setmetatable, rawget, select,pairs
+
+-- WoW API Cache
+
+-- Module
+
+-- App
+
+-- BattlePet Lib / Species Lib
+local KEY, CACHE = "speciesID", "BattlePets"
+local CLASSNAME = "BattlePet"
+
+--- @type function,function,function,function,function,function
+local C_PetJournal_GetNumCollectedInfo,C_PetJournal_GetPetInfoByPetID,C_PetJournal_GetPetInfoBySpeciesID,C_PetJournal_GetPetInfoByIndex,C_PetJournal_GetNumPets,C_PetJournal_GetPetStats
+	= C_PetJournal.GetNumCollectedInfo,C_PetJournal.GetPetInfoByPetID,C_PetJournal.GetPetInfoBySpeciesID,C_PetJournal.GetPetInfoByIndex,C_PetJournal.GetNumPets,C_PetJournal.GetPetStats
+
+local cache = app.CreateCache(KEY);
+local function CacheInfo(t, field)
+	local _t, id = cache.GetCached(t);
+	-- speciesName, speciesIcon, petType, companionID, tooltipSource, tooltipDescription, isWild,
+	-- canBattle, isTradeable, isUnique, obtainable, creatureDisplayID = C_PetJournal.GetPetInfoBySpeciesID(speciesID)
+	local speciesName, speciesIcon, petType, _, _, tooltipDescription, _, _, _, _, _, creatureDisplayID = C_PetJournal_GetPetInfoBySpeciesID(id);
+	if speciesName and speciesIcon and petType and tooltipDescription and creatureDisplayID then
+		_t.name = speciesName;
+		_t.icon = speciesIcon;
+		_t.petTypeID = petType;
+		_t.lore = tooltipDescription;
+		_t.displayID = creatureDisplayID;
+		if not t.itemID or not t.link then
+			_t.text = "|cff0070dd"..speciesName.."|r";
+		end
+	else
+		_t.name = UNKNOWN;
+		if not t.itemID or not t.link then
+			_t.text = "|cff0070dd"..UNKNOWN.."|r";
+		end
+	end
+	if field then return _t[field]; end
+end
+-- Returns how many of a given speciesID are currently collected
+local CollectedSpeciesHelper = setmetatable({}, {
+	__index = function(t, key)
+		if key and key > 0 then
+			local num = C_PetJournal_GetNumCollectedInfo(key)
+			-- app.PrintDebug("SPECIES->NUM",key,num)
+			if not num then
+				-- app.PrintDebug("SpeciesID " .. key .. " was not found.")
+				num = 0
+			end
+			t[key] = num
+			return num
+		end
+		return 0
+	end
+});
+local PetIDSpeciesIDHelper = setmetatable({}, {
+	-- this metafunction seems to never be utilized... but guess it can stay for now
+	__index = function(t, key)
+		-- PetID are strings
+		local speciesID = C_PetJournal_GetPetInfoByPetID(key);
+		if speciesID then
+			-- app.PrintDebug("PET->SPECIES",key,speciesID)
+			t[key] = speciesID;
+		end
+		return speciesID;
+	end
+});
+
+local PerCharacterSpecies = {
+	[280] = true,	-- Guild Page [A]
+	[281] = true,	-- Guild Page [H]
+	[282] = true,	-- Guild Herald [A]
+	[283] = true,	-- Guild Herald [H]
+	-- ...etc
+}
+app.CreateSpecies = app.CreateClass(CLASSNAME, KEY, {
+	CACHE = function() return CACHE end,
+	collectible = function(t) return app.Settings.Collectibles[CACHE]; end,
+	collected = function(t)
+		-- certain Battle Pets are per Character, so we can implicitly check for them as Account-Wide since Battle Pets have no toggle for that
+		-- account-wide collected
+		return app.TypicalAccountCollected(CACHE, t[KEY])
+	end,
+	saved = function(t)
+		local id = t[KEY]
+		local saved = CollectedSpeciesHelper[id] > 0
+		-- weird bug where ATT fails to scan battle pets,
+		-- can manually make it collected when checking the saved state (i.e. displayed in a row)
+		-- character collected
+		if saved then
+			-- hopefully no longer needed...
+			-- if not t.collected then
+			-- 	app.SetThingCollected(KEY, id, not PerCharacterSpecies[id], true)
+			-- end
+			return 1
+		end
+	end,
+	text = function(t)
+		return t.link or cache.GetCachedField(t, "text", CacheInfo);
+	end,
+	icon = function(t)
+		return cache.GetCachedField(t, "icon", CacheInfo);
+	end,
+	lore = function(t)
+		return cache.GetCachedField(t, "lore", CacheInfo);
+	end,
+	displayID = function(t)
+		return cache.GetCachedField(t, "displayID", CacheInfo);
+	end,
+	petTypeID = function(t)
+		return cache.GetCachedField(t, "petTypeID", CacheInfo);
+	end,
+	name = function(t)
+		return cache.GetCachedField(t, "name", CacheInfo);
+	end,
+	b = function(t)
+		return cache.GetCachedField(t, "b");
+	end,
+	tsm = function(t)
+		return ("p:%d:1:3"):format(t.speciesID);
+	end,
+	knownByID = function(t)
+		return t.speciesID
+	end,
+	perCharacter = function(t)
+		return PerCharacterSpecies[t.speciesID]
+	end,
+},
+"WithItem", {
+	ImportFrom = "Item",
+	ImportFields = { "name", "link", "tsm", "costCollectibles", "AsyncRefreshFunc" }
+},
+function(t) return t.itemID end);
+
+app.AddEventHandler("OnRefreshCollections", function()
+	wipe(CollectedSpeciesHelper)
+	local acct, char, none = {}, {}, {}
+	local num
+
+	-- app.PrintDebug("RCBP.Cache")
+	for speciesID in pairs(app.GetRawFieldContainer("speciesID")) do
+		-- app.PrintDebug("RCBP",speciesID,CollectedSpeciesHelper[speciesID])
+		num = CollectedSpeciesHelper[speciesID]
+		if num > 0 then
+			if PerCharacterSpecies[speciesID] then
+				char[speciesID] = true
+			else
+				acct[speciesID] = true
+			end
+		else
+			none[speciesID] = true
+		end
+	end
+	-- app.PrintDebug("RCBP.Cache.Done")
+	-- Remove unknown
+	app.SetBatchCached(CACHE, none)
+	app.SetBatchAccountCached(CACHE, none)
+	-- Cache all ids which are known
+	app.SetBatchCached(CACHE, char, 1)
+	app.SetBatchAccountCached(CACHE, acct, 1)
+	-- app.PrintDebug("RCBP-Done")
+end)
+app.AddEventHandler("OnSavedVariablesAvailable", function(currentCharacter, accountWideData)
+	if not currentCharacter[CACHE] then currentCharacter[CACHE] = {} end
+	if not accountWideData[CACHE] then accountWideData[CACHE] = {} end
+end)
+do
+local function SyncPetIDSpeciesIDHelper()
+	-- app.PrintDebug("RCBP.SyncPetIDs")
+	local i = 1
+	local petID, speciesID = C_PetJournal_GetPetInfoByIndex(i)
+	while petID do
+		-- app.PrintDebug("RCBP",i,petID,speciesID,speciesID and CollectedSpeciesHelper[speciesID])
+		-- apparently some users can have a nil speciesID here...
+		if speciesID then
+			PetIDSpeciesIDHelper[petID] = speciesID
+		end
+		i = i + 1
+		petID, speciesID = C_PetJournal_GetPetInfoByIndex(i)
+	end
+	-- app.PrintDebug("RCBP.SyncPetIDs.Done",i-1)
+end
+app.AddEventHandlerOnce("OnRefreshCollectionsDone", SyncPetIDSpeciesIDHelper)
+end
+-- at some point speciesID began to be included in the Event payload, huzzah!
+app.AddEventRegistration("NEW_PET_ADDED", function(petID, speciesID)
+	local speciesID = speciesID or PetIDSpeciesIDHelper[petID]
+	PetIDSpeciesIDHelper[petID] = speciesID
+	-- app.PrintDebug("NEW_PET_ADDED", petID, speciesID)
+
+	if speciesID then
+		CollectedSpeciesHelper[speciesID] = nil
+		-- if the CollectedSpeciesHelper is exactly 1, then this is newly collected
+		if CollectedSpeciesHelper[speciesID] == 1 then
+			app.SetThingCollected(KEY, speciesID, not PerCharacterSpecies[speciesID], true)
+		end
+	end
+end)
+-- at some point speciesID began to be included in the Event payload, huzzah!
+app.AddEventRegistration("PET_JOURNAL_PET_DELETED", function(petID, speciesID)
+	local speciesID = speciesID or PetIDSpeciesIDHelper[petID];
+	-- app.PrintDebug("PET_JOURNAL_PET_DELETED",petID,speciesID);
+
+	if speciesID then
+		CollectedSpeciesHelper[speciesID] = nil
+		-- if the CollectedSpeciesHelper is exactly 0, then this is now removed
+		if CollectedSpeciesHelper[speciesID] == 0 then
+			-- app.PrintDebug("Pet Missing",speciesID);
+			app.SetThingCollected(KEY, speciesID, not PerCharacterSpecies[speciesID])
+		end
+	end
+end)
+app.AddSimpleCollectibleSwap(CLASSNAME, CACHE)
+if C_PetJournal_GetPetStats then
+	app.AddEventHandler("OnLoad", function()
+		app.Settings.CreateInformationType("Owned Pets", {
+			priority = 11000,
+			text = app.L.OWNED_PETS,
+			Process = function(t, data, tooltipInfo)
+				local speciesID = data.speciesID;
+				if speciesID then
+					local totalPets = C_PetJournal_GetNumPets() or 0;
+					if totalPets > 0 then
+						local index = 0;
+						for i=1,totalPets do
+							local petID, s, owned, customName, level, _, _, name, _, _, _, _, _, _, canBattle = C_PetJournal_GetPetInfoByIndex(i);
+							if owned and speciesID == s then
+								index = index + 1;
+								if index == 1 then
+									tooltipInfo[#tooltipInfo+1] = { left = " " }
+									tooltipInfo[#tooltipInfo+1] = { left = app.L.OWNED_PETS }
+								end
+								local health, maxHealth, power, speed, rarity;
+								if petID and canBattle ~= false then
+									health, maxHealth, power, speed, rarity = C_PetJournal_GetPetStats(petID);
+								end
+								local left = customName;
+								if not left or left == "" then left = name; end
+								if not left or left == "" then left = data.name; end
+								if not left or left == "" then left = UNKNOWN; end
+								local quality = rarity and _G["BATTLE_PET_BREED_QUALITY" .. rarity];
+								if level and quality then
+									left = LEVEL .. " " .. level .. " (" .. quality .. ")";
+								end
+								local right;
+								if health and maxHealth then
+									right = health .. " / " .. maxHealth;
+								end
+								if power and speed then
+									local stats = "[" .. power .. " | " .. speed .. "]";
+									right = right and (right .. " " .. stats) or stats;
+								end
+								tooltipInfo[#tooltipInfo+1] = {
+									left = left,
+									right = right,
+								}
+							end
+						end
+					end
+				end
+			end
+		});
+	end);
+end

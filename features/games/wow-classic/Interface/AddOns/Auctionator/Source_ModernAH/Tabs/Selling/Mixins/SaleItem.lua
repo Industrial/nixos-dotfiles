@@ -557,10 +557,11 @@ function AuctionatorSaleItemMixin:ProcessItemResults(itemKey)
   -- from the searched for itemKey)
   if C_AuctionHouse.GetNumItemSearchResults(itemKey) > 0 then
     local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, 1)
-    local dbKeys = Auctionator.Utilities.DBKeyFromBrowseResult({ itemKey = result.itemKey })
-    for _, key in ipairs(dbKeys) do
-      Auctionator.Database:SetPrice(key, result.buyoutAmount or result.bidAmount)
-    end
+    Auctionator.Utilities.DBKeyFromItemKey(result.itemKey, function(dbKeys)
+      for _, key in ipairs(dbKeys) do
+        Auctionator.Database:SetPrice(key, result.buyoutAmount or result.bidAmount)
+      end
+    end)
   end
 
   -- Get the first result that matches the price matching requirements

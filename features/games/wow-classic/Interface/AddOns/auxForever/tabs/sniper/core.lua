@@ -6,6 +6,7 @@ local money = require 'aux.util.money'
 local scan = require 'aux.core.scan'
 local history = require 'aux.core.history'
 local buy_bar = require 'aux.gui.buy_bar'
+local filter_util = require 'aux.util.filter'
 
 local tab = aux.tab 'Sniper'
 
@@ -291,8 +292,23 @@ end
 
 -- Open one item (inside the round) and keep its cheapest auction when it is a deal. price: its
 -- lowest price on the list, which counts as judged once the item is open.
-function check_item(item_key, key, price, other_keys)
-    local records = scan.read_item(item_key)
+-- 0.9: round_reads caches each version read during the round so K versions of the same gear ending
+-- take K requests instead of K*K.
+function check_item(item_key, key, price, other_keys, round_reads, validator, round_scope_id)
+    local function read_cached(ik)
+        if not round_reads then
+            return scan.read_item(ik)
+        end
+        local k = scan.item_key_string(ik)
+        local cached = round_reads[k]
+        if cached ~= nil then
+            return cached or nil
+        end
+        local recs = scan.read_item(ik)
+        round_reads[k] = recs or false
+        return recs
+    end
+    local records = read_cached(item_key)
     if not records then
         known[key] = nil -- no answer: try again next round
         return
@@ -306,7 +322,16 @@ function check_item(item_key, key, price, other_keys)
         listed = {}
         for _, record in ipairs(records) do tinsert(listed, record) end
         for _, other_key in ipairs(other_keys) do
-            for _, record in ipairs(scan.read_item(other_key) or empty) do
+            if scan.is_throttled() then
+                known[key] = nil
+                return
+            end
+            local other_records = read_cached(other_key)
+            if scan.is_throttled() then
+                known[key] = nil
+                return
+            end
+            for _, record in ipairs(other_records or empty) do
                 tinsert(listed, record)
             end
         end
@@ -314,7 +339,7 @@ function check_item(item_key, key, price, other_keys)
     local cheapest
     local tiers = {}
     for _, record in ipairs(records) do
-        if not record.own and record.buyout_price > 0 then
+        if not record.own and record.buyout_price > 0 and (not validator or validator(record)) then
             tinsert(tiers, record)
             if not cheapest or record.unit_buyout_price < cheapest.unit_buyout_price then
                 cheapest = record
@@ -350,6 +375,7 @@ function check_item(item_key, key, price, other_keys)
     end
     cheapest.deal_key = key
     cheapest.deal_item_key = item_key -- to read the item again when the deal is selected
+    cheapest.deal_scope = round_scope_id
     cheapest.deal_reason = reason
     cheapest.deal_market = market
     cheapest.deal_read_at = GetTime()
@@ -457,7 +483,193 @@ local function other_versions(result, price_key)
     return keys
 end
 
-function check_list(results, seen)
+-- 0.9 build 4 (FB-055, khorrs; Tyler): Narrower Sniper scopes and minimum quality.
+-- Whole-AH browsing on Forever takes ~38s+ per round (Seen 2026-11-17); narrowing to a category,
+-- a minimum quality, or a Search Favorite drops rounds to ~1-3s.
+M.QUALITY_OPTIONS = {
+    {1, 'Common+'},
+    {2, 'Uncommon+'},
+    {3, 'Rare+'},
+    {4, 'Epic+'},
+}
+
+M.QUICK_SCOPES = {
+    {kind = 'all', label = 'All'},
+    {kind = 'category', name = 'Trade Goods', label = 'Trade Goods'},
+    {kind = 'category', name = 'Consumables', label = 'Consumables'},
+    {kind = 'category', name = 'Recipes', label = 'Recipes'},
+}
+
+local function strip_colors(text)
+    if type(text) ~= 'string' then return '' end
+    return gsub(gsub(text, '|c%x%x%x%x%x%x%x%x', ''), '|r', '')
+end
+
+local function find_category_index(name)
+    if not (AuctionCategories and type(name) == 'string' and name ~= '') then
+        return nil
+    end
+    local target = strlower(name)
+    for i, cat in ipairs(AuctionCategories) do
+        if not (cat.flags and cat.flags.WOW_TOKEN_FLAG) and type(cat.name) == 'string' and strlower(cat.name) == target then
+            return i
+        end
+    end
+end
+
+function M.available_categories()
+    local names = {}
+    for _, cat in ipairs(AuctionCategories or empty) do
+        if not (cat.flags and cat.flags.WOW_TOKEN_FLAG) and type(cat.name) == 'string' and cat.name ~= '' then
+            tinsert(names, cat.name)
+        end
+    end
+    return names
+end
+
+function M.favorite_scopes()
+    local list = {}
+    for _, entry in ipairs(aux.realm_data and aux.realm_data.favorite_searches or empty) do
+        if type(entry.filter_string) == 'string' and entry.filter_string ~= '' then
+            local clean = aux.trim(strip_colors(entry.prettified or entry.filter_string))
+            tinsert(list, {
+                kind = 'favorite',
+                name = clean ~= '' and clean or entry.filter_string,
+                filter_string = entry.filter_string,
+            })
+        end
+    end
+    return list
+end
+
+function M.get_scope()
+    local s = aux.account_data and aux.account_data.sniper_scope
+    if type(s) == 'table' and (s.kind == 'all' or s.kind == 'category' or s.kind == 'favorite') then
+        return s
+    end
+    return {kind = 'all'}
+end
+
+function M.get_quality()
+    local q = aux.account_data and tonumber(aux.account_data.sniper_quality) or 1
+    return max(1, min(4, floor(q)))
+end
+
+function M.quality_label(q)
+    q = max(1, min(4, floor(tonumber(q) or get_quality())))
+    return QUALITY_OPTIONS[q] and QUALITY_OPTIONS[q][2] or 'Common+'
+end
+
+function M.scope_label(scope)
+    scope = scope or get_scope()
+    if scope.kind == 'category' and type(scope.name) == 'string' and scope.name ~= '' then
+        return scope.name
+    elseif scope.kind == 'favorite' then
+        local label = aux.trim(strip_colors(scope.name or scope.filter_string or ''))
+        if label ~= '' then
+            return label
+        end
+    end
+    return 'Everything'
+end
+
+function M.scope_id(scope, q)
+    scope = scope or get_scope()
+    q = max(1, min(4, floor(tonumber(q) or get_quality())))
+    if scope.kind == 'category' and type(scope.name) == 'string' and scope.name ~= '' then
+        return 'cat:' .. strlower(scope.name) .. ':' .. q
+    elseif scope.kind == 'favorite' and type(scope.filter_string) == 'string' and scope.filter_string ~= '' then
+        return 'fav:' .. scope.filter_string .. ':' .. q
+    end
+    return 'all:' .. q
+end
+
+function M.watch_summary(scope, q)
+    scope = scope or get_scope()
+    q = max(1, min(4, floor(tonumber(q) or get_quality())))
+    if scope.kind == 'all' then
+        if q <= 1 then
+            return 'the whole auction house'
+        end
+        return 'all ' .. quality_label(q) .. ' items'
+    end
+    local label = scope_label(scope)
+    return q > 1 and (label .. ' (' .. quality_label(q) .. ')') or label
+end
+
+function M.scope_queries(scope, q)
+    scope = scope or get_scope()
+    q = max(1, min(4, floor(tonumber(q) or get_quality())))
+    if scope.kind == 'category' and type(scope.name) == 'string' and scope.name ~= '' then
+        local class_idx = find_category_index(scope.name)
+        if class_idx then
+            return {{blizzard_query = {class = class_idx, quality = q}}}, scope_id(scope, q)
+        end
+    elseif scope.kind == 'favorite' and type(scope.filter_string) == 'string' and scope.filter_string ~= '' then
+        local parsed = filter_util.queries(scope.filter_string)
+        if parsed and #parsed > 0 then
+            local queries = {}
+            for _, pq in ipairs(parsed) do
+                local bq = {}
+                for k, v in pairs(pq.blizzard_query or empty) do
+                    bq[k] = v
+                end
+                bq.quality = max(q, bq.quality or 1)
+                tinsert(queries, {blizzard_query = bq, validator = pq.validator})
+            end
+            return queries, scope_id(scope, q)
+        end
+    end
+    return {{blizzard_query = {quality = q}}}, 'all:' .. q
+end
+
+function M.same_scope(a, b)
+    a = a or {kind = 'all'}
+    b = b or {kind = 'all'}
+    if a.kind ~= b.kind then return false end
+    if a.kind == 'all' then return true end
+    if a.kind == 'category' then return strlower(a.name or '') == strlower(b.name or '') end
+    if a.kind == 'favorite' then return (a.filter_string or '') == (b.filter_string or '') end
+    return false
+end
+
+local function scope_changed()
+    aux.wipe(known)
+    aux.wipe(markets)
+    -- If currently running (mid-round or pausing between rounds), restart immediately so the player
+    -- does not wait ~35s for an Everything round to finish before their narrow scope starts.
+    if running then
+        if active then
+            scan.abort()
+        end
+        next_round_at = GetTime()
+    end
+    if update_scope_controls then
+        update_scope_controls()
+    end
+    update_deals()
+    update_controls()
+end
+
+function M.set_scope(scope)
+    local clean
+    if type(scope) == 'table' and scope.kind == 'category' and type(scope.name) == 'string' and scope.name ~= '' then
+        clean = {kind = 'category', name = scope.name}
+    elseif type(scope) == 'table' and scope.kind == 'favorite' and type(scope.filter_string) == 'string' and scope.filter_string ~= '' then
+        clean = {kind = 'favorite', name = strip_colors(scope.name or scope.filter_string), filter_string = scope.filter_string}
+    else
+        clean = {kind = 'all'}
+    end
+    aux.account_data.sniper_scope = clean
+    scope_changed()
+end
+
+function M.set_quality(q)
+    aux.account_data.sniper_quality = max(1, min(4, floor(tonumber(q) or 1)))
+    scope_changed()
+end
+
+function check_list(results, seen, validator, round_scope_id)
     local percent, min_profit = settings()
     local candidates, candidate_keys = {}, {}
     aux.wipe(versions)
@@ -514,23 +726,35 @@ function check_list(results, seen)
     -- each one is a request (and one per other version of a gear name): shown as "checking 12
     -- possible deals (3 done)" while it runs
     checking = {done = 0, total = #candidates}
+    local round_reads = {}
     for i, result in ipairs(candidates) do
+        if scan.is_throttled() then
+            break
+        end
         local key = scan.item_key_string(result.itemKey)
         -- selected while the round opened the ones before it
         if key ~= selected_live_key() then
-            check_item(result.itemKey, key, result.minPrice, other_versions(result, candidate_keys[i]))
+            check_item(result.itemKey, key, result.minPrice, other_versions(result, candidate_keys[i]), round_reads, validator, round_scope_id)
         end
         checking.done = checking.done + 1
     end
     checking = nil
 end
 
--- after a round: a deal whose item is gone from the list, or whose lowest price went up, sold
-local function mark_gone(seen)
+-- after a round: a deal whose item is gone from the list, or whose lowest price went up, sold.
+-- If an item IS seen at a higher price, always mark it gone; when missing from a narrow round,
+-- only mark deals from that scope (or all deals when watching Everything Common+) gone so narrowing
+-- to Trade Goods does not falsely mark earlier Armor deals gone.
+local function mark_gone(seen, round_scope_id)
     local was_gone = checked and checked.deal_gone
+    local sees_all = not round_scope_id or round_scope_id == 'all:1'
     for _, deal in ipairs(deals) do
         local price = seen[deal.deal_key]
-        if not price or price > ceil(deal.unit_buyout_price) then
+        if price then
+            if price > ceil(deal.unit_buyout_price) then
+                set_gone(deal)
+            end
+        elseif sees_all or not deal.deal_scope or deal.deal_scope == round_scope_id then
             set_gone(deal)
         end
     end
@@ -559,17 +783,20 @@ function start_round()
     local seen = seen_items
     forget_on_new_day(history.today())
     local got_list
+    local round_count = 0
+    local queries, round_scope_id = scope_queries()
     scan.start{
         type = 'list',
+        priority = scan.PRIORITY_WATCH,
         quiet = true,
-        -- 0.8.2.2 (FB-055, Tyler): common quality and up. Gray items are never a deal (item_facts),
-        -- and leaving them out of the item list makes every round shorter by their share of it (the
-        -- list comes 500 items per request, at about one request every half second)
-        queries = {{blizzard_query = {quality = 1}}},
-        on_item_list = function(results)
+        -- 0.8.2.2 (FB-055, Tyler): common quality and up; 0.9 build 4 (FB-055): narrowable by
+        -- category, minimum quality, or Search Favorite.
+        queries = queries,
+        on_item_list = function(results, query)
             got_list = true
-            last_count = #results
-            check_list(results, seen)
+            round_count = round_count + #results
+            last_count = round_count
+            check_list(results, seen, query and query.validator, round_scope_id)
         end,
         on_complete = function(result)
             active = false
@@ -585,7 +812,7 @@ function start_round()
                 last_seconds = GetTime() - t0
             end
             if whole then
-                mark_gone(seen)
+                mark_gone(seen, round_scope_id)
             end
             next_round_at = GetTime() + ROUND_PAUSE
             deals_changed = true
@@ -755,7 +982,7 @@ end
 -- the status next to Start / Stop
 function M.status()
     if not running then
-        return 'Stopped', 'Start watches the whole auction house for deals'
+        return 'Stopped', 'Start watches ' .. watch_summary() .. ' for deals'
     end
     if buy_bar.busy() or aux.bid_in_progress() then
         return 'Watching', 'waits while you buy'
@@ -820,7 +1047,7 @@ local function refresh_deal(record)
                 tinsert(fresh, auction)
             end
         end,
-        on_complete = function()
+        on_complete = function(result)
             if refreshing ~= record then return end
             refreshing = nil
             if record.commodity then
@@ -873,6 +1100,13 @@ local function refresh_deal(record)
                     return
                 end
             end
+            -- 0.9: a timed-out or throttled read did not prove the deal sold; leave it clickable
+            if not scan.saw_everything(result) then
+                if checked == record then
+                    buy_bar.show_note(record.name, 'The auction house did not answer in time. Click the row to try again.', aux.color.red)
+                end
+                return
+            end
             set_gone(record)
             if checked == record then
                 buy_bar.show_note(record.name, 'Sold before you could buy it', aux.color.red)
@@ -885,6 +1119,8 @@ local function refresh_deal(record)
         end,
     }
 end
+
+local keep_bought_message
 
 function show_deal(record)
     if record.deal_gone then
@@ -923,6 +1159,7 @@ function show_commodity_bar(record)
                     record.deal_bought = true
                     set_gone(record)
                     if checked == record then
+                        keep_bought_message = true
                         listing:SetSelectedRecord()
                     end
                 end
@@ -954,8 +1191,9 @@ function show_item_bar(record)
                     known[record.deal_key] = nil
                     set_gone(record)
                     update_deals()
-                    -- bought: the rounds go on
+                    -- bought: the rounds go on, without wiping the green "Bought ..." message
                     if checked == record then
+                        keep_bought_message = true
                         listing:SetSelectedRecord()
                     end
                 end, function(error)
@@ -1006,6 +1244,7 @@ end
 function update_selection()
     local selection = listing:GetSelection()
     if selection and selection.record ~= checked then
+        keep_bought_message = nil
         checked = selection.record
         pin_rows(checked)
         show_deal(checked)
@@ -1013,7 +1252,12 @@ function update_selection()
         checked = nil
         pin_rows()
         deals_changed = true
-        buy_bar.clear()
+        if keep_bought_message then
+            keep_bought_message = nil
+            buy_bar.clear_keeping_message()
+        else
+            buy_bar.clear()
+        end
     end
 end
 

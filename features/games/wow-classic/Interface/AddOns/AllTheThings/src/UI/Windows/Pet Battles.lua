@@ -1,0 +1,45 @@
+-- App locals
+local _, app = ...;
+local L = app.L;
+
+-- Pet battle gameplay began in Mists; Forever provides its own backport.
+if app.GameBuildVersion < 50004 and not app.IsForever then return; end
+
+-- Global locals
+local ipairs, tinsert
+	= ipairs, tinsert;
+
+-- Implementation
+app:CreateWindow("Pet Battles", {
+	AllowCompleteSound = true,
+	IsDynamicCategory = true,
+	Commands = { "attpetbattles" },
+	OnInit = function(self, handlers)
+		self:SetData(app.CreateCustomHeader(app.HeaderConstants.PET_BATTLES, {
+			description = L.PET_BATTLES_TOOLTIP,
+			visible = true,
+			expanded = true,
+			indent = 0,
+			back = 1,
+			g = {},
+			OnUpdate = function(t)
+				local g = t.g;
+				if g and #g < 1 then
+					local results = app:BuildSearchResponseForField(app:GetDatabaseRoot().g, "pb");
+					if results and #results > 0 then
+						t.g = results;
+						t.OnUpdate = nil;
+						self:AssignChildren();
+					end
+				end
+			end,
+			OnTooltip = function(t, tooltipInfo)
+				if not app.Settings:Get("Show:PetBattles") then
+					tooltipInfo[#tooltipInfo+1] = {
+						left = app.Modules.Color.Colorize("WARNING: You have Pet Battles disabled in the Settings!\n\nThis window will likely be empty as a result.", app.Colors.TooltipWarning),
+					}
+				end
+			end,
+		}));
+	end,
+});

@@ -1,0 +1,4 @@
+
+EasyFindQuestieDB = {
+["dbVersion"] = 2,
+}

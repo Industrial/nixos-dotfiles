@@ -1,0 +1,200 @@
+## Interface: 50504, 11509, 16001, 20506, 120105, 120100, 120007, 120001, 120000
+## Title: EasyFind
+## Notes: Search and locate UI elements and map locations with ease
+## Author: justawower
+## Version: 5.5.0
+## X-Curse-Project-ID: 1454793
+## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
+## Group: EasyFind
+## Category: UI
+## AddonCompartmentFunc: EasyFind_OnAddonCompartmentClick
+## SavedVariables: EasyFindDB
+## SavedVariablesPerCharacter: EasyFindCharDB
+## DefaultState: enabled
+
+Shared/Localization.lua
+Shared/Caps.lua
+Locales/enUS.lua
+Locales/deDE.lua [AllowLoadTextLocale deDE]
+Locales/esES.lua [AllowLoadTextLocale esES]
+Locales/esMX.lua [AllowLoadTextLocale esMX]
+Locales/frFR.lua [AllowLoadTextLocale frFR]
+Locales/itIT.lua [AllowLoadTextLocale itIT]
+Locales/koKR.lua [AllowLoadTextLocale koKR]
+Locales/ptBR.lua [AllowLoadTextLocale ptBR]
+Locales/ruRU.lua [AllowLoadTextLocale ruRU]
+Locales/zhCN.lua [AllowLoadTextLocale zhCN]
+Locales/zhTW.lua [AllowLoadTextLocale zhTW]
+Shared/Utils.lua
+Shared/TogglePopup.lua
+Shared/SecureOpeners.lua
+Shared/ControlSync.lua
+Shared/SearchText.lua
+Shared/CategoryMap.lua
+Shared/Scheduler.lua
+Shared/MapUtils.lua
+Shared/Signals.lua
+MapSearch/Categories.lua
+MapSearch/Indicators.lua
+MapSearch/Frames.lua
+Core/Main.lua
+Core/VersionCheck.lua
+Core/API.lua
+Core/SettingsRows.lua
+Database/TeleportData.lua
+Database/Main.lua
+Database/Characters.lua
+Database/SpellWords.lua
+Database/Holidays.lua
+Database/SkillUps.lua
+Database/Stores.lua
+Database/Social.lua
+Database/AddOns.lua
+Database/InstanceWords.lua
+Database/SearchIndex.lua
+Database/Search.lua
+Database/Dynamic.lua
+Database/Segments.lua
+Database/Instances_Forever.lua
+Database/ZoneLevels_Forever.lua [AllowLoadGameType camelot]
+Database/Loot_Forever.lua [AllowLoadGameType camelot]
+Database/Loot_Forever_deDE.lua [AllowLoadGameType camelot] [AllowLoadTextLocale deDE]
+Database/Loot_Forever_esES.lua [AllowLoadGameType camelot] [AllowLoadTextLocale esES]
+Database/Loot_Forever_esMX.lua [AllowLoadGameType camelot] [AllowLoadTextLocale esMX]
+Database/Loot_Forever_frFR.lua [AllowLoadGameType camelot] [AllowLoadTextLocale frFR]
+Database/Loot_Forever_itIT.lua [AllowLoadGameType camelot] [AllowLoadTextLocale itIT]
+Database/Loot_Forever_koKR.lua [AllowLoadGameType camelot] [AllowLoadTextLocale koKR]
+Database/Loot_Forever_ptBR.lua [AllowLoadGameType camelot] [AllowLoadTextLocale ptBR]
+Database/Loot_Forever_ruRU.lua [AllowLoadGameType camelot] [AllowLoadTextLocale ruRU]
+Database/Loot_Forever_zhCN.lua [AllowLoadGameType camelot] [AllowLoadTextLocale zhCN]
+Database/Loot_Forever_zhTW.lua [AllowLoadGameType camelot] [AllowLoadTextLocale zhTW]
+Database/LootGear_Forever.lua [AllowLoadGameType camelot]
+Database/Npcs_Forever.lua [AllowLoadGameType camelot]
+Database/Npcs_Forever_deDE.lua [AllowLoadGameType camelot] [AllowLoadTextLocale deDE]
+Database/Npcs_Forever_esES.lua [AllowLoadGameType camelot] [AllowLoadTextLocale esES]
+Database/Npcs_Forever_esMX.lua [AllowLoadGameType camelot] [AllowLoadTextLocale esMX]
+Database/Npcs_Forever_frFR.lua [AllowLoadGameType camelot] [AllowLoadTextLocale frFR]
+Database/Npcs_Forever_itIT.lua [AllowLoadGameType camelot] [AllowLoadTextLocale itIT]
+Database/Npcs_Forever_koKR.lua [AllowLoadGameType camelot] [AllowLoadTextLocale koKR]
+Database/Npcs_Forever_ptBR.lua [AllowLoadGameType camelot] [AllowLoadTextLocale ptBR]
+Database/Npcs_Forever_ruRU.lua [AllowLoadGameType camelot] [AllowLoadTextLocale ruRU]
+Database/Npcs_Forever_zhCN.lua [AllowLoadGameType camelot] [AllowLoadTextLocale zhCN]
+Database/Npcs_Forever_zhTW.lua [AllowLoadGameType camelot] [AllowLoadTextLocale zhTW]
+Database/StaticLocations.lua
+Database/StaticLocations_Forever.lua [AllowLoadGameType camelot]
+Shared/Aliases.lua
+Shared/Shortkeys.lua
+Shared/UIPins.lua
+Shared/Profiles.lua
+Shared/ResultLinks.lua
+Shared/ChatPasteSwap.lua
+Search/Modules.lua
+Search/Engine.lua
+Search/SearchBar.lua
+Search/Focus.lua
+Search/Openers.lua
+Options/SurfaceGuard.lua
+Search/Commands.lua
+Search/Results/ResultState.lua
+Search/Results/Gestures.lua
+Search/Results/Handlers/Utils.lua
+Search/Results/Handlers/Spellbook.lua
+Search/Results/Handlers/Talents.lua
+Search/Results/Handlers/Mounts.lua
+Search/Results/Handlers/Toys.lua
+Search/Results/Handlers/Outfits.lua
+Search/Results/Handlers/Appearances.lua
+Search/Results/Handlers/Pets.lua
+Search/Results/Handlers/Selection.lua
+Search/Results/Handlers/Character.lua
+Search/Results/Handlers/Achievements.lua
+Search/Results/Handlers/Macros.lua
+Search/Filters/Config.lua
+Search/Filters/ClassSpecSelector.lua
+Search/Filters/QuickFilter.lua
+Search/Filters/SourceFlyout.lua
+Search/Filters/SelectDropdown.lua
+Search/Filters/MountOptions.lua
+Search/Filters/HeirloomOptions.lua
+Search/Filters/CheckboxOptions.lua
+Search/Filters/ToyOptions.lua
+Search/Filters/NpcOptions.lua
+Search/Filters/PetOptions.lua
+Search/Filters/CharacterScope.lua
+Search/Filters/BankOptions.lua
+Search/Filters/CatalogOptions.lua
+Search/Filters/AppearanceSets.lua
+Search/Filters/AppearanceItemOptions.lua
+Search/Filters/GearOptions.lua
+Database/ProfessionData.lua
+Search/Filters/HousingOptions.lua
+Search/Filters/ProfessionOptions.lua
+Search/Filters/Dropdown.lua
+Search/Providers/Achievements.lua
+Search/MacroListSearch.lua
+Search/Aliases.lua
+Search/History.lua
+Search/Keys.lua
+Search/Answers.lua
+Search/AppsMenu.lua
+Search/NoteMenus.lua
+Search/ExtensionButtons.lua
+Search/Query.lua
+Search/Results/Theme.lua
+Search/Results/ThemeShare.lua
+Search/Results/Shortcuts.lua
+Search/Results/ResultsFrame.lua
+Search/Results/PinPopup.lua
+Search/Results/Icons.lua
+Search/Results/SecureAttributes.lua
+Search/Results/RowText.lua
+Search/Results/Tooltips.lua
+Search/Results/BagActions.lua
+Search/Results/ActionHints.lua
+Search/Results/Render/Shared.lua
+Search/Results/Render/Window.lua
+Search/Results/Render/Tree.lua
+Search/Results/Render/Text.lua
+Search/Results/Render/Widgets.lua
+Search/Results/Render/Reputation.lua
+Search/Results/Render/Layout.lua
+Search/Results/Render/RowContent.lua
+Search/Results/Render/Core.lua
+Search/Results/Rows/OutfitState.lua
+Search/Results/Rows/Settings.lua
+Search/Results/Rows/ResultContextMenu.lua
+Search/Results/Rows/InlineDropdown.lua
+Search/Results/Rows/CalculatorWidgets.lua
+Search/Results/Rows/SettingWidgets.lua
+Search/Results/Rows/Interactions.lua
+Search/Results/RowCopy.lua
+Search/Results/RowActions.lua
+Search/Results/Rows/Tooltips.lua
+Search/Results/Rows/ResultButton.lua
+Search/Results/Navigation.lua
+Search/Results/Grids.lua
+Search/Results/ItemGrid.lua
+Search/Characters.lua
+Search/Upgrades.lua
+Search/ItemSources.lua
+Search/LevelPlaces.lua
+Guide/DirectOpen.lua
+MapSearch/Main.lua
+MapSearch/Zones/Highlight.lua
+MapSearch/Zones/Navigation.lua
+MapSearch/Zones/Breadcrumbs.lua
+MapSearch/Navigation.lua
+MapSearch/Pins.lua
+MapSearch/InstancePins.lua [AllowLoadGameType camelot, classic]
+MapSearch/Preview.lua
+MapSearch/UINavigation.lua
+MapSearch/Search/Core.lua
+MapSearch/Search/Sources.lua
+MapSearch/Search/Scanners.lua
+MapSearch/Search/Results.lua
+MapSearch/Npcs.lua
+MapSearch/Zones/Catalog.lua
+MapSearch/PlaceList.lua
+MapSearch/MapTab.lua
+Search/Rescaler.lua
+Core/Extensions.lua

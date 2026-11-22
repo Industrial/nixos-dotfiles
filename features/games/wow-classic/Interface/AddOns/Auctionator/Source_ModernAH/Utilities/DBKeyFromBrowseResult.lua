@@ -5,7 +5,7 @@ end
 
 function Auctionator.Utilities.DBKeyFromItemKey(itemKey, callback)
   if itemKey.battlePetSpeciesID ~= 0 then
-    return {"p:" .. tostring(itemKey.battlePetSpeciesID)}
+    callback({"p:" .. tostring(itemKey.battlePetSpeciesID)})
   elseif IsGear(itemKey.itemID) then
     local basicKey = tostring(itemKey.itemID)
     if Auctionator.Constants.IsForever then

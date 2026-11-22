@@ -18,7 +18,9 @@ frame:SetScript('OnUpdate', function() update() end)
 frame:Hide()
 
 frame.listing = gui.panel(frame)
-frame.listing:SetAllPoints(aux.frame.content)
+-- 0.9 build 4 (FB-055, Option A): leave 34px above Deals for the slim Watch bar
+frame.listing:SetPoint('TOPLEFT', aux.frame.content, 'TOPLEFT', 0, -34)
+frame.listing:SetPoint('BOTTOMRIGHT', aux.frame.content, 'BOTTOMRIGHT', 0, 0)
 
 frame.listing.list = CreateFrame('Frame', nil, frame.listing)
 -- exported for the gamepad: A on a deal moves the focus to the buy bar (gamepad.lua)
@@ -287,16 +289,324 @@ end
 
 gui.horizontal_line(frame, -40)
 
--- second row: the deals and what to do with them
+-- 0.9 build 4 (FB-055, approved Option A mockup): slim Watch bar with quick chips, More... menu
+-- (Forever Categories + Search Favorites), and minimum Quality picker.
+do
+    local CHIP_HEIGHT = 22
+    local CHIP_WIDTHS = {38, 86, 92, 62}
+    local MAX_FAVORITE_ROWS = 12
+    local MENU_ROW_H = 22
+
+    local watch_bar = CreateFrame('Frame', nil, frame)
+    watch_bar:SetPoint('TOPLEFT', frame, 'TOPLEFT', 0, -45)
+    watch_bar:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', 0, -45)
+    watch_bar:SetHeight(24)
+
+    local watch_label = gui.label(watch_bar, gui.font_size.small)
+    watch_label:SetPoint('LEFT', watch_bar, 'LEFT', 10, 0)
+    watch_label:SetText('Watch')
+    gui.text_color(watch_label, aux.color.label.enabled)
+
+    local chips = {}
+    local prev = watch_label
+    for i, entry in ipairs(QUICK_SCOPES) do
+        local btn = gui.button(watch_bar, gui.font_size.small)
+        gui.set_size(btn, CHIP_WIDTHS[i] or 76, CHIP_HEIGHT)
+        if i == 1 then
+            btn:SetPoint('LEFT', prev, 'RIGHT', 8, 0)
+        else
+            btn:SetPoint('LEFT', prev, 'RIGHT', 4, 0)
+        end
+        btn:SetText(entry.label)
+        btn.scope = entry
+        btn:SetScript('OnClick', function()
+            set_scope(entry)
+        end)
+        chips[i] = btn
+        prev = btn
+    end
+    M.watch_chips = chips
+
+    local more_btn = gui.button(watch_bar, gui.font_size.small)
+    gui.set_size(more_btn, 148, CHIP_HEIGHT)
+    more_btn:SetPoint('LEFT', prev, 'RIGHT', 4, 0)
+    more_btn:SetText('More... v')
+    M.more_button = more_btn
+
+    local quality_title = gui.label(watch_bar, gui.font_size.small)
+    quality_title:SetPoint('LEFT', more_btn, 'RIGHT', 16, 0)
+    quality_title:SetText('Quality')
+    gui.text_color(quality_title, aux.color.label.enabled)
+
+    local quality_btn = gui.button(watch_bar, gui.font_size.small)
+    gui.set_size(quality_btn, 96, CHIP_HEIGHT)
+    quality_btn:SetPoint('LEFT', quality_title, 'RIGHT', 6, 0)
+    quality_btn:SetText('Common+ v')
+    M.quality_button = quality_btn
+
+    local hint = gui.label(watch_bar, gui.font_size.small)
+    hint:SetPoint('LEFT', quality_btn, 'RIGHT', 12, 0)
+    hint:SetPoint('RIGHT', watch_bar, 'RIGHT', -10, 0)
+    hint:SetJustifyH('RIGHT')
+    hint:SetWordWrap(false)
+    gui.text_color(hint, aux.color.label.disabled)
+    M.scope_hint_label = hint
+
+    -- Grouped More... popup menu (Categories + Search Favorites)
+    local watch_menu = CreateFrame('Frame', nil, frame, 'BackdropTemplate')
+    gui.set_panel_style(watch_menu)
+    watch_menu:SetFrameStrata('DIALOG')
+    watch_menu:SetClampedToScreen(true)
+    watch_menu:EnableMouse(true)
+    watch_menu:SetPoint('TOPLEFT', more_btn, 'BOTTOMLEFT', 0, -3)
+    watch_menu:Hide()
+    M.watch_menu = watch_menu
+
+    local watch_menu_buttons, watch_menu_headers = {}, {}
+    M.watch_menu_buttons = watch_menu_buttons
+
+    local function menu_header(index, y, text)
+        local lbl = watch_menu_headers[index]
+        if not lbl then
+            lbl = gui.label(watch_menu, gui.font_size.small)
+            gui.text_color(lbl, aux.color.accent.background)
+            watch_menu_headers[index] = lbl
+        end
+        lbl:ClearAllPoints()
+        lbl:SetPoint('TOPLEFT', 10, y)
+        lbl:SetText(text)
+        lbl:Show()
+        return lbl
+    end
+
+    local function menu_button(index, y, width, text, selected, on_click, full_tip)
+        local btn = watch_menu_buttons[index]
+        if not btn then
+            btn = gui.button(watch_menu, gui.font_size.small)
+            local fs = btn:GetFontString()
+            if fs then
+                fs:SetJustifyH('LEFT')
+                fs:ClearAllPoints()
+                fs:SetPoint('LEFT', 8, 0)
+                fs:SetPoint('RIGHT', -8, 0)
+            end
+            watch_menu_buttons[index] = btn
+        end
+        btn:ClearAllPoints()
+        btn:SetPoint('TOPLEFT', 8, y)
+        gui.set_size(btn, width, MENU_ROW_H)
+        btn:SetText(text)
+        gui.style_choice(btn, selected)
+        btn:SetScript('OnClick', on_click)
+        if full_tip then
+            btn:SetScript('OnEnter', function(self)
+                GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
+                GameTooltip:AddLine(full_tip, 1, 1, 1, true)
+                GameTooltip:Show()
+            end)
+            btn:SetScript('OnLeave', function() GameTooltip:Hide() end)
+        else
+            btn:SetScript('OnEnter', nil)
+            btn:SetScript('OnLeave', nil)
+        end
+        btn:Show()
+        return btn
+    end
+
+    local empty_fav_note = gui.label(watch_menu, gui.font_size.small)
+    gui.text_color(empty_fav_note, aux.color.label.disabled)
+    empty_fav_note:SetText('Pin searches on Search tab')
+    empty_fav_note:Hide()
+
+    local function populate_watch_menu()
+        local MENU_W = 246
+        local BTN_W = MENU_W - 16
+        local current = get_scope()
+        local hi, bi = 0, 0
+        local y = -8
+
+        for _, h in ipairs(watch_menu_headers) do h:Hide() end
+        for _, b in ipairs(watch_menu_buttons) do b:Hide() end
+        empty_fav_note:Hide()
+
+        -- Section 1: Categories
+        hi = hi + 1
+        menu_header(hi, y, 'CATEGORIES')
+        y = y - 16
+        for _, cat_name in ipairs(available_categories()) do
+            local entry = {kind = 'category', name = cat_name}
+            bi = bi + 1
+            menu_button(bi, y, BTN_W, cat_name, same_scope(current, entry), function()
+                watch_menu:Hide()
+                set_scope(entry)
+            end)
+            y = y - (MENU_ROW_H + 2)
+        end
+
+        -- Section 2: Search Favorites
+        y = y - 6
+        hi = hi + 1
+        menu_header(hi, y, 'SEARCH FAVORITES')
+        y = y - 16
+        local favs = favorite_scopes()
+        if #favs == 0 then
+            empty_fav_note:ClearAllPoints()
+            empty_fav_note:SetPoint('TOPLEFT', 10, y - 2)
+            empty_fav_note:Show()
+            y = y - 20
+        else
+            local shown = min(#favs, MAX_FAVORITE_ROWS)
+            for i = 1, shown do
+                local fav = favs[i]
+                local label = #fav.name > 28 and (strsub(fav.name, 1, 26) .. '..') or fav.name
+                bi = bi + 1
+                menu_button(bi, y, BTN_W, label, same_scope(current, fav), function()
+                    watch_menu:Hide()
+                    set_scope(fav)
+                end, fav.filter_string)
+                y = y - (MENU_ROW_H + 2)
+            end
+        end
+
+        gui.set_size(watch_menu, MENU_W, max(40, -y + 8))
+    end
+
+    -- Minimum Quality popup menu
+    local quality_menu = CreateFrame('Frame', nil, frame, 'BackdropTemplate')
+    gui.set_panel_style(quality_menu)
+    quality_menu:SetFrameStrata('DIALOG')
+    quality_menu:SetClampedToScreen(true)
+    quality_menu:EnableMouse(true)
+    quality_menu:SetPoint('TOPLEFT', quality_btn, 'BOTTOMLEFT', 0, -3)
+    quality_menu:Hide()
+    M.quality_menu = quality_menu
+
+    local quality_menu_buttons = {}
+    for i, opt in ipairs(QUALITY_OPTIONS) do
+        local q_val, q_text = opt[1], opt[2]
+        local b = gui.button(quality_menu, gui.font_size.small)
+        gui.set_size(b, 108, MENU_ROW_H)
+        b:SetPoint('TOPLEFT', 8, -8 - (i - 1) * (MENU_ROW_H + 2))
+        b:SetText(q_text)
+        b:SetScript('OnClick', function()
+            quality_menu:Hide()
+            set_quality(q_val)
+        end)
+        quality_menu_buttons[i] = b
+    end
+    gui.set_size(quality_menu, 124, 16 + #QUALITY_OPTIONS * (MENU_ROW_H + 2) - 2)
+    M.quality_menu_buttons = quality_menu_buttons
+
+    local function bind_outside_close(menu_frame, anchor_btn)
+        menu_frame:SetScript('OnEvent', function(self)
+            if self:IsShown() and not self:IsMouseOver() and not anchor_btn:IsMouseOver() then
+                self:Hide()
+            end
+        end)
+        menu_frame:HookScript('OnShow', function(self)
+            pcall(self.RegisterEvent, self, 'GLOBAL_MOUSE_DOWN')
+        end)
+        menu_frame:HookScript('OnHide', function(self)
+            pcall(self.UnregisterEvent, self, 'GLOBAL_MOUSE_DOWN')
+        end)
+    end
+    bind_outside_close(watch_menu, more_btn)
+    bind_outside_close(quality_menu, quality_btn)
+
+    more_btn:SetScript('OnClick', function()
+        quality_menu:Hide()
+        if watch_menu:IsShown() then
+            watch_menu:Hide()
+        else
+            populate_watch_menu()
+            watch_menu:Show()
+        end
+    end)
+    more_btn:SetScript('OnEnter', function(self)
+        local current = get_scope()
+        local matched_chip = false
+        for _, chip in ipairs(chips) do
+            if same_scope(current, chip.scope) then
+                matched_chip = true
+                break
+            end
+        end
+        GameTooltip:SetOwner(self, 'ANCHOR_BOTTOM')
+        if not matched_chip and (current.kind == 'favorite' or current.kind == 'category') then
+            GameTooltip:AddLine('Watch: ' .. scope_label(current))
+            if current.filter_string then
+                GameTooltip:AddLine(current.filter_string, 1, 1, 1, true)
+            end
+        else
+            GameTooltip:AddLine('More categories and Search Favorites')
+            GameTooltip:AddLine('Watch any auction house category or any pinned Search Favorite.', 1, 1, 1, true)
+        end
+        GameTooltip:Show()
+    end)
+    more_btn:SetScript('OnLeave', function() GameTooltip:Hide() end)
+
+    quality_btn:SetScript('OnClick', function()
+        watch_menu:Hide()
+        if quality_menu:IsShown() then
+            quality_menu:Hide()
+        else
+            local cur_q = get_quality()
+            for i, opt in ipairs(QUALITY_OPTIONS) do
+                gui.style_choice(quality_menu_buttons[i], opt[1] == cur_q)
+            end
+            quality_menu:Show()
+        end
+    end)
+
+    frame:HookScript('OnHide', function()
+        watch_menu:Hide()
+        quality_menu:Hide()
+    end)
+
+    function M.update_scope_controls()
+        local current = get_scope()
+        local cur_q = get_quality()
+        local matched_chip = false
+        for _, chip in ipairs(chips) do
+            local active = same_scope(current, chip.scope)
+            if active then matched_chip = true end
+            gui.style_choice(chip, active)
+        end
+        if matched_chip then
+            more_btn:SetText('More... v')
+            gui.style_choice(more_btn, false)
+        else
+            local label = scope_label(current)
+            if #label > 17 then
+                label = strsub(label, 1, 15) .. '..'
+            end
+            more_btn:SetText(label .. ' v')
+            gui.style_choice(more_btn, true)
+        end
+        quality_btn:SetText(quality_label(cur_q) .. ' v')
+        gui.style_choice(quality_btn, cur_q > 1)
+        if current.kind == 'all' and cur_q <= 1 then
+            hint:SetText('Whole AH (grays skipped)')
+            gui.text_color(hint, aux.color.label.disabled)
+        else
+            hint:SetText('Narrow scope: ' .. watch_summary(current, cur_q))
+            gui.text_color(hint, aux.color.label.enabled)
+        end
+    end
+end
+
+gui.horizontal_line(frame, -74)
+
+-- third row: the deals and what to do with them (anchored above frame.listing)
 do
     local label = gui.label(frame, gui.font_size.large)
-    label:SetPoint('BOTTOMLEFT', aux.frame.content, 'TOPLEFT', 10, 10)
+    label:SetPoint('BOTTOMLEFT', frame.listing, 'TOPLEFT', 10, 10)
     label:SetJustifyH('LEFT')
     deals_label = label
 end
 do
     local btn = gui.button(frame, gui.font_size.small)
-    btn:SetPoint('BOTTOMRIGHT', aux.frame.content, 'TOPRIGHT', -10, 6)
+    btn:SetPoint('BOTTOMRIGHT', frame.listing, 'TOPRIGHT', -10, 6)
     btn:SetHeight(22)
     btn:SetWidth(60)
     btn:SetText('Clear')
@@ -380,9 +690,11 @@ function M.update_deals()
     if #shown > 0 then
         empty_label:SetText('')
     elseif running then
-        empty_label:SetText('No deals yet. The whole auction house is checked every round; gray items are left out.\nDeals against the usual price need ' .. MIN_DAYS .. ' days with a Full scan (or a Full search of the item).\nSniper works best with fresh Full scan data.')
+        local scope, q = get_scope(), get_quality()
+        local watching = (scope.kind == 'all' and q <= 1) and 'the auction house (gray items skipped)' or watch_summary(scope, q)
+        empty_label:SetText('No deals yet. Watching ' .. watching .. '.\nUsual-price deals need ' .. MIN_DAYS .. ' days of Full scans.')
     else
-        empty_label:SetText('Press Start to watch the whole auction house for deals.')
+        empty_label:SetText('Press Start to watch ' .. watch_summary() .. ' for deals.')
     end
 end
 
@@ -428,4 +740,5 @@ function aux.event.AUX_LOADED()
     percent_input:SetText(tostring(aux.account_data.sniper_percent))
     profit_input:SetText(money.to_string(aux.account_data.sniper_profit, nil, true, nil, true))
     gui.set_selected(sound_button, aux.account_data.sniper_sound)
+    update_scope_controls()
 end

@@ -1,6 +1,7 @@
 # Auctionator
 
-## [350](https://github.com/TheMouseNest/Auctionator/tree/350) (2026-11-21)
-[Full Changelog](https://github.com/TheMouseNest/Auctionator/compare/349...350) 
+## [351](https://github.com/TheMouseNest/Auctionator/tree/351) (2026-11-21)
+[Full Changelog](https://github.com/TheMouseNest/Auctionator/compare/350...351) 
 
-- Forever: Use suffixes when computing item value  
+- Remove final usages of DBKeyFromBrowseResult  
+- Retail+Forever: Fix full scan  

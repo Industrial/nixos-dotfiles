@@ -1,0 +1,363 @@
+-- Social Module
+local _, app = ...;
+
+-- Global locals
+local print, rawget, select, tonumber
+	= print, rawget, select, tonumber
+local C_ChatInfo, GetRealmName, IsInGuild, IsInGroup, IsInInstance, IsInRaid, UnitGUID, UnitInParty, UnitInRaid, UnitIsPlayer, UnitName,GetNumGroupMembers
+	= C_ChatInfo, GetRealmName, IsInGuild, IsInGroup, IsInInstance, IsInRaid, UnitGUID, UnitInParty, UnitInRaid, UnitIsPlayer, UnitName,GetNumGroupMembers
+local LE_PARTY_CATEGORY_INSTANCE, LE_PARTY_CATEGORY_HOME
+	= LE_PARTY_CATEGORY_INSTANCE, LE_PARTY_CATEGORY_HOME;
+local GetProgressColorText = app.Modules.Color.GetProgressColorText;
+local Callback = app.CallbackHandlers.Callback
+
+-- Addon Message Handling
+local function SendGroupMessage(msg)
+	if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) and IsInInstance() then
+		C_ChatInfo.SendAddonMessage("ATTC", msg, "INSTANCE_CHAT")
+		return true
+	elseif IsInRaid() then
+		C_ChatInfo.SendAddonMessage("ATTC", msg, "RAID")
+		return true
+	elseif IsInGroup(LE_PARTY_CATEGORY_HOME) then
+		C_ChatInfo.SendAddonMessage("ATTC", msg, "PARTY")
+		return true
+	end
+end
+local function SendGuildMessage(msg)
+	if IsInGuild() then
+		C_ChatInfo.SendAddonMessage("ATTC", msg, "GUILD");
+		return true
+	end
+end
+local function SendResponseMessage(msg, player)
+	local name,server = ("-"):split(player);
+	if not server or server == "" or server == GetRealmName() then
+		C_ChatInfo.SendAddonMessage("ATTC", msg, "WHISPER", name);
+	elseif UnitInRaid(player) or UnitInParty(player) then
+		SendGroupMessage("to\t" .. player .. "\t" .. msg);
+	else
+		C_ChatInfo.SendAddonMessage("ATTC", msg, "WHISPER", player);
+	end
+end
+
+-- Links from '? <link>' queries, by "type:id", so the answers can show the link instead of a bare ID
+local PendingQueryLinks = {};
+
+-- Player Progress Cache
+local PlayerProgressCacheByGUID = {};
+app.PlayerProgressCacheByGUID = PlayerProgressCacheByGUID;
+
+-- Version Cache
+local major,minor,build,versionString,versionUID;
+local VersionCache = setmetatable({
+	["Git"] = 999999,
+	["[Git]"] = 999999,
+}, {
+	__index = function(t, version)
+		versionString = version:match('%d[%d.,]*');
+		major,minor,build = ("."):split(versionString);
+		major = tonumber(major or "0");
+		minor = tonumber(minor or "0");
+		build = tonumber(build or "0");
+		versionUID = (major * 10000) + (minor * 100) + build;
+		--print("GenerateVersionUniqueID", versionString, major,minor,build, versionUID);
+		t[version] = versionUID;
+		return versionUID;
+	end
+});
+local CurrentVersion = VersionCache[app.Version];
+local MaxReportedVersion = CurrentVersion
+
+local function CHAT_MSG_ADDON(prefix, text, channel, sender, target, ...)
+	if not target then target = sender; end
+	if prefix ~= "ATTC" then return end
+
+	-- app.PrintDebug(prefix, text, channel, sender, target, ...)
+	local args = { ("\t"):split(text) };
+	local cmd = args[1];
+	if not cmd then return end
+
+	local a = args[2];
+	if cmd == "?" then		-- Query Request
+		local response;
+		if a then
+			if a == "a" then
+				response = a;
+				for i=3,#args,1 do
+					local b = tonumber(args[i]);
+					response = response .. "\t" .. b .. "\t" .. (app.CurrentCharacter.Achievements[b] and 1 or 0);
+				end
+			elseif a == "e" then
+				response = a;
+				for i=3,#args,1 do
+					local b = tonumber(args[i]);
+					response = response .. "\t" .. b .. "\t" .. (app.CurrentCharacter.Exploration[b] and 1 or 0);
+				end
+			elseif a == "f" then
+				response = a;
+				for i=3,#args,1 do
+					local b = tonumber(args[i]);
+					response = response .. "\t" .. b .. "\t" .. (app.CurrentCharacter.Factions[b] and 1 or 0);
+				end
+			elseif a == "fp" then
+				response = a;
+				for i=3,#args,1 do
+					local b = tonumber(args[i]);
+					response = response .. "\t" .. b .. "\t" .. (app.CurrentCharacter.FlightPaths[b] and 1 or 0);
+				end
+			elseif a == "p" then
+				response = a;
+				for i=3,#args,1 do
+					local b = tonumber(args[i]);
+					response = response .. "\t" .. b .. "\t" .. (app.CurrentCharacter.BattlePets[b] and 1 or 0);
+				end
+			elseif a == "q" then
+				response = a;
+				for i=3,#args,1 do
+					local b = tonumber(args[i]);
+					response = response .. "\t" .. b .. "\t" .. (app.CurrentCharacter.Quests[b] and 1 or 0);
+				end
+			elseif a == "s" then
+				response = a;
+				for i=3,#args,1 do
+					local b = tonumber(args[i]);
+					response = response .. "\t" .. b .. "\t" .. (ATTAccountWideData.Sources and ATTAccountWideData.Sources[b] or 0);
+				end
+			elseif a == "sp" then
+				response = a;
+				for i=3,#args,1 do
+					local b = tonumber(args[i]);
+					response = response .. "\t" .. b .. "\t" .. (app.CurrentCharacter.Spells[b] and 1 or 0);
+				end
+			elseif a == "t" then
+				response = a;
+				for i=3,#args,1 do
+					local b = tonumber(args[i]);
+					response = response .. "\t" .. b .. "\t" .. (app.CurrentCharacter.Titles[b] and 1 or 0);
+				end
+			elseif a == "toy" then
+				response = a;
+				for i=3,#args,1 do
+					local b = tonumber(args[i]);
+					response = response .. "\t" .. b .. "\t" .. (ATTAccountWideData.Toys[b] and 1 or 0);
+				end
+			end
+		else
+			local character = app.CurrentCharacter;
+			if character then
+				local data = character.PrimeData;
+				if data then
+					response = "ATTC\t" .. (data.progress or 0) .. "\t" .. (data.total or 0) .. "\t" .. data.modeString .. "\t" .. character.guid;
+				end
+			end
+		end
+		if response then SendResponseMessage("!\t" .. response, sender); end
+	elseif cmd == "!" then	-- Query Response
+		if a == "ATTC" then
+			local guid = args[6];
+			if guid then PlayerProgressCacheByGUID[guid] = { tonumber(args[3]), tonumber(args[4]), args[5] }; end
+			app.print(target .. ": " .. GetProgressColorText(tonumber(args[3]), tonumber(args[4])) .. " " .. args[5]);
+		elseif a then
+			-- Answers to a typed or linked query: show each Thing with whether the sender has it
+			for i=3,#args,2 do
+				local b = tonumber(args[i]);
+				local c = tonumber(args[i + 1]);
+				if b and c then
+					local link = PendingQueryLinks[a .. ":" .. b] or (a .. ":" .. b);
+					app.print(sender .. ": " .. link .. " " .. (c > 0 and app.L.COLLECTED or app.L.NOT_COLLECTED));
+				end
+			end
+		end
+	elseif cmd == "to" then	-- To Command
+		local myName = UnitName("player");
+		local name,server = ("-"):split(a);
+		if myName == name and (not server or server == "" or GetRealmName() == server) then
+			CHAT_MSG_ADDON(prefix, text:sub(5 + a:len()), "WHISPER", sender);
+		end
+	elseif cmd == "A" then -- Version Command
+		local guid = args[6];
+		if guid then PlayerProgressCacheByGUID[guid] = { tonumber(args[3]), tonumber(args[4]), args[5] }; end
+		-- don't report Git or the same Version more than once
+		if a ~= "[Git]" and not rawget(VersionCache, a) then
+			local otherVersion = VersionCache[a]
+			-- this doesn't account for alpha versions which are newer for someone using the same alpha version
+			-- only report if our version is lower, and the max reported version is also lower
+			if CurrentVersion < otherVersion and MaxReportedVersion < otherVersion then
+				MaxReportedVersion = otherVersion
+				local flavors = app.L.NEW_VERSION_FLAVORS;
+				print(app.L.NEW_VERSION_AVAILABLE:format(app.L.TITLE.." ("..a..")", flavors[math.random(#flavors)]));
+			end
+		end
+	end
+end
+-- Turns '? <link> [<link> ...]' into one query per type, e.g. "?\ts\t<sourceID>" for an item appearance.
+-- Returns nil when the command has no links, so typed queries ('? s:123', 's:123') keep working as before.
+local C_ToyBox_GetToyInfo = C_ToyBox and C_ToyBox.GetToyInfo
+local function BuildLinkQueries(cmd)
+	local links = cmd:match("^%?%s*(.*|H.+)$")
+	if not links then return end
+	local byType, order = {}, {}
+	local function Add(kind, id, link)
+		if not id then return end
+		if not byType[kind] then byType[kind] = {}; order[#order + 1] = kind end
+		byType[kind][#byType[kind] + 1] = id
+		PendingQueryLinks[kind .. ":" .. id] = link
+	end
+	for link in links:gmatch("|c[^|]*|H.-|h.-|h|r") do
+		local kind, id = link:match("|H(%a+):(%d+)")
+		id = tonumber(id)
+		if kind == "item" then
+			local sourceID = app.GetSourceID and app.GetSourceID(link)
+			if sourceID then
+				Add("s", sourceID, link)
+			elseif C_ToyBox_GetToyInfo and C_ToyBox_GetToyInfo(id) then
+				Add("toy", id, link)
+			else
+				app.print(link .. ": nothing to compare for this item (no appearance or toy).")
+			end
+		elseif kind == "battlepet" then
+			Add("p", id, link)
+		elseif kind == "quest" then
+			Add("q", id, link)
+		elseif kind == "achievement" then
+			Add("a", id, link)
+		elseif kind == "spell" then
+			Add("sp", id, link)
+		end
+	end
+	local queries = {}
+	for _,kind in ipairs(order) do
+		queries[#queries + 1] = "?\t" .. kind .. "\t" .. table.concat(byType[kind], "\t")
+	end
+	return queries
+end
+-- Builds the addon messages for a slash command's arguments (shared by /attguild, /attraid and /attu)
+local function BuildQueries(cmd)
+	if not cmd or cmd == "" then return { "?" } end
+	local linkQueries = BuildLinkQueries(cmd)
+	if linkQueries then return linkQueries end
+	if cmd:sub(1,1) ~= "?" then
+		cmd = "?\t" .. cmd:gsub(":","\t");
+	end
+	return { cmd }
+end
+SLASH_ALLTHETHINGSGUILD1 = "/attguild";
+SlashCmdList.ALLTHETHINGSGUILD = function(cmd)
+	for _,query in ipairs(BuildQueries(cmd)) do
+		SendGuildMessage(query);
+	end
+end
+SLASH_ALLTHETHINGSRAID1 = "/attraid";
+SLASH_ALLTHETHINGSRAID2 = "/attgroup";
+SLASH_ALLTHETHINGSRAID3 = "/attparty";
+SLASH_ALLTHETHINGSRAID4 = "/attinstance";
+SlashCmdList.ALLTHETHINGSRAID = function(cmd)
+	for _,query in ipairs(BuildQueries(cmd)) do
+		SendGroupMessage(query);
+	end
+end
+SLASH_ALLTHETHINGSYOU1 = "/attu";
+SlashCmdList.ALLTHETHINGSYOU = function(cmd)
+	local name,server = UnitName("target");
+	if name then
+		if UnitIsPlayer("target") then
+			local player = (server and server ~= "" and (name .. "-" .. server)) or name
+			for _,query in ipairs(BuildQueries(cmd)) do
+				SendResponseMessage(query, player);
+			end
+		else
+			local guid = UnitGUID("target");
+			if guid and not app.WOWAPI.issecretvalue(guid) then
+				local cmd = "creatureid:" .. select(6, ("-"):split(guid));
+				app.SetSkipLevel(2);
+				local group = app.GetCachedSearchResults(app.SearchForLink, cmd, nil, {SkipFill=true,IgnoreCache=true});
+				app.SetSkipLevel(0);
+				if group then app:CreateMiniListForGroup(group); end
+			else
+				app.print("Cannot open popout for Target!", EVENTTRACE_SECRET_FMT:format(guid))
+			end
+		end
+	end
+end
+if app.IsClassic then
+	-- Yell is only supported in Classic Game Clients.
+	SLASH_ALLTHETHINGSYELL1 = "/attyell";
+	SlashCmdList.ALLTHETHINGSYELL = function(cmd)
+		C_ChatInfo.SendAddonMessage("ATTC", "?", "YELL");
+	end
+end
+
+local lastProgressUpdateMessage;
+local function SendProgressAnnounce(onlyGroup)
+	-- Send a message to your party members with your current Prime progress
+	local currentCharacter = app.CurrentCharacter and app.CurrentCharacter;
+	local data = currentCharacter.PrimeData or app:GetDatabaseRoot();
+	local msg = "A\t" .. app.Version .. "\t" .. (data.progress or 0) .. "\t" .. (data.total or 0) .. "\t" .. data.modeString .. "\t" .. currentCharacter.guid;
+	if lastProgressUpdateMessage ~= msg or onlyGroup then
+		lastProgressUpdateMessage = msg;
+		local anySent
+		anySent = SendGroupMessage(msg)
+		anySent = not onlyGroup and SendGuildMessage(msg) or anySent
+		if not anySent then
+			-- self-call the chat function to refresh own data
+			CHAT_MSG_ADDON("ATTC", msg, "WHISPER", "player");
+		end
+	end
+end
+local function SendVersionAnnounce(onlyGroup)
+	-- Send a message to your party members with your current ATT version only
+	-- don't bother sending Git version
+	if app.IsGit then return end
+
+	local msg = "A\t" .. app.Version
+	SendGroupMessage(msg)
+	if not onlyGroup then SendGuildMessage(msg) end
+end
+app.AddEventHandler("OnWindowUpdated", function(window, suffix)
+	-- only the Prime window updates the 'PrimeData' cache
+	if not window or suffix ~= "Prime" then return end
+
+	-- announce the updated ATT info on the next frame following an update
+	Callback(SendProgressAnnounce)
+end)
+app.AddEventHandler("OnSavedVariablesAvailable", function()
+	local savedCache = AllTheThingsSavedVariables.PlayerProgressCacheByGUID;
+	if savedCache then
+		for guid,progress in pairs(PlayerProgressCacheByGUID) do
+			savedCache[guid] = progress;
+		end
+		PlayerProgressCacheByGUID = savedCache;
+		app.PlayerProgressCacheByGUID = savedCache;
+	else
+		AllTheThingsSavedVariables.PlayerProgressCacheByGUID = PlayerProgressCacheByGUID;
+	end
+end);
+app.AddEventRegistration("CHAT_MSG_ADDON", CHAT_MSG_ADDON)
+app.AddEventHandler("OnReady", function()
+	C_ChatInfo.RegisterAddonMessagePrefix("ATTC");
+	SendVersionAnnounce()
+end);
+local function TrySendSocialSync()
+	app.CallbackHandlers.AfterCombatCallback(SendVersionAnnounce, true)
+	app.CallbackHandlers.AfterCombatCallback(SendProgressAnnounce, true)
+end
+local GroupMemberCount = 0
+if app.IsClassic then	-- TODO: determine proper logic for Classic... maybe use WOWAPI
+-- 	app.AddEventRegistration("RAID_ROSTER_UPDATE", function(...)
+-- 		app.CallbackHandlers.DelayedCallback(TrySendSocialSync, 10)
+-- 	end)
+-- 	app.AddEventRegistration("PARTY_MEMBERS_CHANGED", function(...)
+-- 		app.CallbackHandlers.DelayedCallback(TrySendSocialSync, 10)
+-- 	end)
+elseif app.GameBuildVersion > 50400 then
+	app.AddEventRegistration("GROUP_ROSTER_UPDATE", function(...)
+		-- app.PrintDebug("GROUP_ROSTER_UPDATE",...)
+		local newCount = GetNumGroupMembers()
+		if newCount > GroupMemberCount then
+			-- app.PrintDebug("someone joined!")
+			app.CallbackHandlers.DelayedCallback(TrySendSocialSync, 10)
+		end
+		GroupMemberCount = newCount
+	end)
+end

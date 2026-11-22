@@ -285,12 +285,14 @@ if GameTooltip.SetItemKey then
       if C_Item.GetItemInfoInstant(itemLink) ~= itemID then
         itemLink = select(2, C_Item.GetItemInfo(itemID))
       end
-      Auctionator.Tooltip.ShowTipWithPricingDBKey(
-        tip,
-        Auctionator.Utilities.DBKeyFromBrowseResult({itemKey = {itemID = itemID, itemLevel = itemLevel, itemSuffix = itemSuffix, battlePetSpeciesID = 0}}),
-        itemLink,
-        1
-      )
+      Auctionator.Utilities.DBKeyFromItemKey({itemID = itemID, itemLevel = itemLevel, itemSuffix = itemSuffix, battlePetSpeciesID = 0}, function(allDBKeys)
+        Auctionator.Tooltip.ShowTipWithPricingDBKey(
+          tip,
+          allDBKeys,
+          itemLink,
+          1
+        )
+      end)
     end
   end
 end

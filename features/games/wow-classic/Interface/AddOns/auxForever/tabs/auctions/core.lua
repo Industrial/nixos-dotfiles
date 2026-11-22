@@ -244,9 +244,10 @@ do
             UIErrorsFrame:AddExternalErrorMessage(ERR_NOT_ENOUGH_MONEY)
             return
         end
+        local now = GetTime()
+        locked[record.auction_id] = now
+        cancelling[record.auction_id] = now
         C_AuctionHouse.CancelAuction(record.auction_id)
-        locked[record.auction_id] = GetTime()
-        cancelling[record.auction_id] = GetTime()
         listing:UpdateRows()
         return true
     end

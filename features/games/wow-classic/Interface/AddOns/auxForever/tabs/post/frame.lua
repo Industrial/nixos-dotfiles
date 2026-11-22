@@ -547,9 +547,9 @@ do
     end
     -- "Total, 6 items" and the total
     posting_summary, total_summary = row(-12)
-    -- the auction house cut, money going out
+    -- the auction house cut, money going out (0.9 build 3, Tyler: T2)
     cut_label, cut_summary = row(-32)
-    cut_label:SetText('Auction house cut ' .. AUCTION_CUT * 100 .. '%')
+    cut_label:SetText('AH cut (' .. AUCTION_CUT * 100 .. '%)')
     local line = frame.parameters:CreateTexture(nil, 'ARTWORK')
     gui.texture_color(line, aux.color.panel.border)
     line:SetHeight(1)
@@ -591,10 +591,10 @@ do
     gui.text_color(warning.amount, aux.color.text.enabled)
     warning:Hide()
     vendor_warning = warning
-    -- the deposit, just above Post: paid now, back if the item sells
+    -- the deposit, just above Post (0.9 build 3, Tyler: T1; hover tooltip explains how it works)
     deposit_label, deposit = row(-154)
     gui.text_color(deposit_label, aux.color.label.disabled)
-    deposit_label:SetText('Deposit now, back if it sells')
+    deposit_label:SetText('Deposit')
     -- the deposit explained on mouse over (a label cannot take the mouse, so a frame over the row)
     local hover = CreateFrame('Frame', nil, frame.parameters)
     hover:SetPoint('TOPLEFT', deposit_label, 'TOPLEFT')

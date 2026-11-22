@@ -54,7 +54,10 @@ function SlashCmdList.AUX(command)
 	if not command then return end
 	local arguments = aux.tokenize(command)
     local tooltip_settings = aux.character_data.tooltip
-    if arguments[1] == 'scale' and tonumber(arguments[2]) then
+    if arguments[1] == 'settings' or arguments[1] == 'config' or arguments[1] == 'options' then
+        -- 0.9 (FB-057, LLanwrst, jebbush): open Options > AddOns > auxForever anywhere
+        aux.open_settings()
+    elseif arguments[1] == 'scale' and tonumber(arguments[2]) then
 	    aux.change_window_scale(tonumber(arguments[2]))
 	    aux.print('scale ' .. aux.color.blue(floor(aux.account_data.scale * 100 + .5) .. '%') .. ' (70% to 150%)')
     elseif arguments[1] == 'debug' and arguments[2] == 'list' then
@@ -125,43 +128,98 @@ function SlashCmdList.AUX(command)
             aux.set_buy_confirm(not aux.account_data.buy_confirm)
         end
         aux.print('buy confirm ' .. status(aux.account_data.buy_confirm) .. (aux.account_data.buy_confirm and ': Buy shows the price, a second click on Confirm buys' or ': one click on Buy buys'))
+    elseif arguments[1] == 'buy' and arguments[2] == 'quantity' then
+        -- 0.9 build 4 (FB-066, user_ivpyccljovcjne72): default Search buy bar quantity (1 or stack)
+        local word = strlower(arguments[3] or '')
+        if word == '1' or word == 'one' or word == 'single' then
+            aux.set_buy_default('1')
+        elseif word == 'stack' or word == 'max' or word == 'full' then
+            aux.set_buy_default('stack')
+        else
+            aux.print('buy quantity [' .. aux.color.blue(aux.account_data.buy_default == 'stack' and 'stack' or '1') .. ']: type /aux buy quantity 1 or /aux buy quantity stack')
+            return
+        end
+        aux.print('buy quantity ' .. aux.color.blue(aux.account_data.buy_default == 'stack' and 'stack' or '1') .. (aux.account_data.buy_default == 'stack' and ': Search buy bar starts at a full stack' or ': Search buy bar starts at 1'))
+    elseif arguments[1] == 'right' and arguments[2] == 'click' and arguments[3] == 'post' then
+        -- 0.9 (FB-062, rokstar8872, deep_structure): right-click bag item always opens Post
+        local word = strlower(arguments[4] or '')
+        if word == 'on' or word == 'off' then
+            aux.set_right_click_post(word == 'on')
+        else
+            aux.set_right_click_post(not aux.account_data.right_click_post)
+        end
+        aux.print('right click post ' .. status(aux.account_data.right_click_post) .. (aux.account_data.right_click_post and ': right-clicking a bag item always opens Post' or ': right-clicking a bag item uses the current tab'))
+    elseif arguments[1] == 'auto' and arguments[2] == 'scan' then
+        -- 0.9 (FB-032, Chawitsch): auto Full scan when the auction house opens
+        local word = strlower(arguments[3] or '')
+        if word == 'on' or word == 'off' then
+            aux.set_auto_full_scan(word == 'on')
+        else
+            aux.set_auto_full_scan(not aux.account_data.auto_full_scan)
+        end
+        aux.print('auto scan ' .. status(aux.account_data.auto_full_scan) .. (aux.account_data.auto_full_scan and ': starts a Full scan when the auction house opens (if ready)' or ''))
+    elseif arguments[1] == 'crafting' and arguments[2] == 'cost' then
+        -- 0.9 (FB-061, LLanwrst): show or hide the Professions Materials / profit line
+        local word = strlower(arguments[3] or '')
+        if word == 'on' or word == 'off' then
+            aux.set_crafting_cost(word == 'on')
+        else
+            aux.set_crafting_cost(not aux.account_data.crafting_cost)
+        end
+        aux.print('crafting cost ' .. status(aux.account_data.crafting_cost))
     elseif arguments[1] == 'post' and arguments[2] == 'duration' and post_duration_code(arguments[3]) then
         -- Forever: accepts the hours of the auction house's options (e.g. 12, 24, 48)
         aux.account_data.post_duration = post_duration_code(arguments[3])
+        aux.refresh_settings()
         aux.print('post duration ' .. aux.color.blue(info.duration_hours(aux.account_data.post_duration) .. 'h'))
     elseif arguments[1] == 'tooltip' and arguments[2] == 'value' then
 	    tooltip_settings.value = not tooltip_settings.value
+        aux.refresh_settings()
         aux.print('tooltip value ' .. status(tooltip_settings.value))
     elseif arguments[1] == 'tooltip' and (arguments[2] == 'percent' or arguments[2] == 'usually') then
 	    tooltip_settings.usually = not tooltip_settings.usually
+        aux.refresh_settings()
         aux.print('tooltip percent of usual ' .. status(tooltip_settings.usually))
     elseif arguments[1] == 'tooltip' and arguments[2] == 'crate' then
 	    tooltip_settings.crate = not tooltip_settings.crate
+        aux.refresh_settings()
         aux.print('tooltip crate ' .. status(tooltip_settings.crate))
+    elseif arguments[1] == 'tooltip' and arguments[2] == 'stack' then
+        -- 0.9 (FB-058, jebbush; Tyler): full stack prices by default, hold Shift for 1 item
+        local word = strlower(arguments[3] or '')
+        if word == 'on' or word == 'off' then
+            tooltip_settings.stack = word == 'on'
+        else
+            tooltip_settings.stack = not tooltip_settings.stack
+        end
+        aux.refresh_settings()
+        aux.print('tooltip stack ' .. status(tooltip_settings.stack) .. (tooltip_settings.stack and ': full stack by default, hold Shift for 1 item' or ': 1 item by default, hold Shift for the stack'))
     elseif arguments[1] == 'tooltip' and arguments[2] == 'daily' then
 	    tooltip_settings.daily = not tooltip_settings.daily
+        aux.refresh_settings()
         aux.print('tooltip daily ' .. status(tooltip_settings.daily))
     elseif arguments[1] == 'tooltip' and arguments[2] == 'merchant' and arguments[3] == 'buy' then
 	    tooltip_settings.merchant_buy = not tooltip_settings.merchant_buy
+        aux.refresh_settings()
         aux.print('tooltip merchant buy ' .. status(tooltip_settings.merchant_buy))
     elseif arguments[1] == 'tooltip' and arguments[2] == 'merchant' and arguments[3] == 'sell' then
 	    tooltip_settings.merchant_sell = not tooltip_settings.merchant_sell
+        aux.refresh_settings()
         aux.print('tooltip merchant sell ' .. status(tooltip_settings.merchant_sell))
     elseif arguments[1] == 'tooltip' and arguments[2] == 'disenchant' and arguments[3] == 'value' then
 	    tooltip_settings.disenchant_value = not tooltip_settings.disenchant_value
+        aux.refresh_settings()
         aux.print('tooltip disenchant value ' .. status(tooltip_settings.disenchant_value))
     elseif arguments[1] == 'tooltip' and arguments[2] == 'disenchant' and arguments[3] == 'distribution' then
 	    tooltip_settings.disenchant_distribution = not tooltip_settings.disenchant_distribution
+        aux.refresh_settings()
         aux.print('tooltip disenchant distribution ' .. status(tooltip_settings.disenchant_distribution))
     elseif arguments[1] == 'tooltip' and arguments[2] == 'money'  and arguments[3] == 'icons' then
 	    tooltip_settings.money_icons = not tooltip_settings.money_icons
+        aux.refresh_settings()
         aux.print('tooltip money icons ' .. status(tooltip_settings.money_icons))
     elseif arguments[1] == 'clear' and arguments[2] == 'item' and arguments[3] == 'cache' then
-	    aux.account_data.items = {}
-        aux.account_data.item_ids = {}
-        aux.account_data.unused_item_ids = {}
-        aux.account_data.auctionable_items = {}
-        aux.print('Item cache cleared.')
+	    aux.clear_item_cache()
     elseif arguments[1] == 'opacity' and tonumber(arguments[2]) then
         aux.set_background_opacity(tonumber(arguments[2]) / 100)
         aux.print('background opacity ' .. aux.color.blue(floor(aux.account_data.background_opacity * 100 + .5) .. '%') .. ' (50% to 100%)')
@@ -176,18 +234,20 @@ function SlashCmdList.AUX(command)
         aux.print('For gear, buyers pick the listing themselves.')
         aux.print('Undercut mode [' .. status(aux.account_data.post_undercut) .. '] - /aux undercut on|off (it starts off each time the auction house opens)')
     elseif arguments[1] == 'clear' and arguments[2] == 'post' then
-        -- emptied in place: the Post tab keeps this same table, so a new one left it reading the old
-        -- prices and writing new ones where they were never saved (outside review 2026-11-10, R-06)
-        aux.wipe(aux.faction_data.post)
-        aux.print('Post data cleared.')
+        aux.clear_post_data()
 	else
 		aux.print('Usage:')
+        aux.print('- settings (open Options > AddOns > auxForever; aliases: config, options)')
         aux.print('- scale [' .. aux.color.blue(aux.account_data.scale) .. ']')
 		aux.print('- ignore owner [' .. status(aux.account_data.ignore_owner) .. ']')
         aux.print('- action shortcuts [' .. status(aux.account_data.action_shortcuts) .. ']')
         aux.print('- post full scan [' .. status(aux.account_data.post_full_scan) .. ']')
         aux.print('- post bid [' .. aux.color.blue(aux.account_data.post_bid or 'off') .. '] (on, off, unit or stack)')
         aux.print('- buy confirm [' .. status(aux.account_data.buy_confirm) .. ']')
+        aux.print('- buy quantity [' .. aux.color.blue(aux.account_data.buy_default == 'stack' and 'stack' or '1') .. '] (1 or stack)')
+        aux.print('- right click post [' .. status(aux.account_data.right_click_post) .. ']')
+        aux.print('- auto scan [' .. status(aux.account_data.auto_full_scan) .. ']')
+        aux.print('- crafting cost [' .. status(aux.account_data.crafting_cost) .. ']')
         aux.print('- post duration [' .. aux.color.blue(info.duration_hours(aux.account_data.post_duration) .. 'h') .. ']')
         aux.print('- undercut [' .. status(aux.account_data.post_undercut) .. ']')
         aux.print('- opacity [' .. aux.color.blue(floor(aux.account_data.background_opacity * 100 + .5) .. '%') .. ']')
@@ -195,6 +255,7 @@ function SlashCmdList.AUX(command)
 		aux.print('- tooltip percent [' .. status(tooltip_settings.usually) .. ']')
 		aux.print('- tooltip daily [' .. status(tooltip_settings.daily) .. ']')
 		aux.print('- tooltip crate [' .. status(tooltip_settings.crate) .. ']')
+		aux.print('- tooltip stack [' .. status(tooltip_settings.stack) .. ']')
 		aux.print('- tooltip merchant buy [' .. status(tooltip_settings.merchant_buy) .. ']')
 		aux.print('- tooltip merchant sell [' .. status(tooltip_settings.merchant_sell) .. ']')
 		aux.print('- tooltip disenchant value [' .. status(tooltip_settings.disenchant_value) .. ']')

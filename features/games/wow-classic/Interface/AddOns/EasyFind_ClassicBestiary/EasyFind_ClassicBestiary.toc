@@ -1,0 +1,15 @@
+## Interface: 11509, 16001
+## Title: EasyFind [Classic Bestiary]
+## Notes: Classic Bestiary's creature abilities on EasyFind's results: hover a creature's row to see what it casts. Requires Classic Bestiary.
+## Author: justawower
+## Version: 1.1.0
+## X-Curse-Project-ID: 1779665
+## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
+## Group: EasyFind
+## Category: UI
+## Dependencies: EasyFind
+## OptionalDeps: ClassicBestiary
+## DefaultState: enabled
+
+Locales\enUS.lua
+Bestiary.lua

@@ -1,0 +1,7 @@
+## Interface: 120105, 16001
+## Title: Bookmarks for EasyFind
+## Notes: An example EasyFind extension: save spots, find them by name, get directions.
+## Dependencies: EasyFind
+## SavedVariables: EasyFindBookmarksDB
+
+Bookmarks.lua

@@ -1,0 +1,16 @@
+## Interface: 120105, 50504, 20506, 11509, 16001
+## Title: EasyFind [ATT]
+## Notes: All The Things on EasyFind's results: where a thing comes from, whether you have it, and with the GPS extension directions there. Requires All The Things.
+## Author: justawower
+## Version: 1.0.2
+## X-Curse-Project-ID: 1781435
+## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
+## Group: EasyFind
+## Category: UI
+## Dependencies: EasyFind
+## OptionalDeps: AllTheThings, Questie, EasyFind_Questie
+## SavedVariables: EasyFindATTDB
+## DefaultState: enabled
+
+Locales/enUS.lua
+Things.lua

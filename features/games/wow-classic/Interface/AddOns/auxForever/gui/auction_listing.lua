@@ -688,8 +688,12 @@ local methods = {
             record.price_group, record.group_sellers, record.group_count = row_group(record), nil, nil
         end
         -- within one price, the auction kept for the row is the one with the lowest starting bid, by
-        -- value (review H-004, finding 3: compared as text, "1200" came before "200")
+        -- value (review H-004, finding 3: compared as text, "1200" came before "200").
+        -- 0.9: sort by group(record) first so bid-only auctions (whose price_group is search_signature)
+        -- stay adjacent to buyout auctions of the same gear ending instead of splitting into two rows.
         sort(records, function(a, b)
+            local ga, gb = group(a), group(b)
+            if ga ~= gb then return ga < gb end
             if a.price_group ~= b.price_group then return a.price_group < b.price_group end
             if (a.bid_price or 0) ~= (b.bid_price or 0) then return (a.bid_price or 0) < (b.bid_price or 0) end
             return a.search_signature < b.search_signature or a.search_signature == b.search_signature and tostring(a) < tostring(b)

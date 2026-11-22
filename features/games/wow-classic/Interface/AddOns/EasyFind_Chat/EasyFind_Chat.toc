@@ -1,0 +1,35 @@
+## Interface: 50504, 11509, 16001, 20506, 120105, 120100, 120007, 120001, 120000
+## Title: EasyFind [Chat]
+## Notes: A messenger for WoW's chat. Every whisper, friend, group and channel keeps its own conversation. Requires EasyFind.
+## Author: justawower
+## X-Curse-Project-ID: 1774043
+## Version: 1.1.0
+## IconTexture: Interface\AddOns\EasyFind\Textures\SpyglassMinimap
+## Group: EasyFind
+## Category: UI
+## Dependencies: EasyFind
+## SavedVariables: EasyFindChatDB
+## DefaultState: enabled
+
+Locales/enUS.lua
+Locales/deDE.lua [AllowLoadTextLocale deDE]
+Locales/esES.lua [AllowLoadTextLocale esES]
+Locales/esMX.lua [AllowLoadTextLocale esMX]
+Locales/frFR.lua [AllowLoadTextLocale frFR]
+Locales/itIT.lua [AllowLoadTextLocale itIT]
+Locales/koKR.lua [AllowLoadTextLocale koKR]
+Locales/ptBR.lua [AllowLoadTextLocale ptBR]
+Locales/ruRU.lua [AllowLoadTextLocale ruRU]
+Locales/zhCN.lua [AllowLoadTextLocale zhCN]
+Locales/zhTW.lua [AllowLoadTextLocale zhTW]
+Guard.lua
+
+Store.lua
+EmoteData.lua
+Emotes.lua
+Comm.lua
+Chat.lua
+GameLine.lua
+Avatars.lua
+Pins.lua
+Views.lua

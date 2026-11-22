@@ -83,6 +83,14 @@ function M.on_post_item(item_location)
         elseif C_Item.UnlockItem then
             C_Item.UnlockItem(item_location)
         end
+        -- 0.9 (FB-062, rokstar8872, deep_structure): optional default-AH habit where right-clicking
+        -- a bag item always switches to Post and loads it (Shift-click and Alt-click stay tab-aware).
+        if aux.account_data and aux.account_data.right_click_post then
+            local post_tab = aux.tab_index_by_name and aux.tab_index_by_name('Post')
+            if post_tab then
+                aux.set_tab(post_tab)
+            end
+        end
         use_item(info.parse_link(link))
     end
 end

@@ -32,7 +32,7 @@ local PawnUIIsShowingNoneWarning = false
 local PawnUITotalComparisonLines = 0
 local PawnUITotalGemLines = 0
 
--- Index n is the quest advisor overlay image for the reward with index n
+-- Pawn's quest advisor arrow annotations. The key is the frame being annotated, and the value is the overlay.
 local PawnQuestAdvisorOverlays = {}
 
 -- PlayerGetTimerunningSeasonID() returns nil when first executing this on a full load (not a /reload), so it gets set in PawnUI_EnsureLoaded instead.
@@ -67,9 +67,17 @@ local PawnUIFrameNeedsScaleSelector = { true, true, true, true, false, false, fa
 
 -- Moves the Pawn inventory sheet button and inspect button to the location specified by the user's current preferences.
 function PawnUI_InventoryPawnButton_Move()
+
+	if VgerCore.IsForever and PaperDollItemsFrame then
+		-- Forever's character model covers PaperDollFrame's own children, so reparent it.
+		PawnUI_InventoryPawnButton:SetParent(PaperDollItemsFrame)
+	end
+
 	if PawnCommon.ButtonPosition == PawnButtonPositionRight then
 		PawnUI_InventoryPawnButton:ClearAllPoints()
-		if VgerCore.IsCataclysm or VgerCore.IsMists or PaperDollFrame.ExpandButton then
+		if VgerCore.IsForever then
+			PawnUI_InventoryPawnButton:SetPoint("TOPRIGHT", "CharacterTrinket1Slot", "BOTTOMRIGHT", 4, -18)
+		elseif VgerCore.IsCataclysm or VgerCore.IsMists or PaperDollFrame.ExpandButton then
 			-- DejaCharacterStats compatibility
 			PawnUI_InventoryPawnButton:SetPoint("TOPRIGHT", "CharacterTrinket1Slot", "BOTTOMRIGHT", -25, -8)
 		else
@@ -78,7 +86,7 @@ function PawnUI_InventoryPawnButton_Move()
 		PawnUI_InventoryPawnButton:Show()
 		if PawnUI_InspectPawnButton then
 			PawnUI_InspectPawnButton:ClearAllPoints()
-			if VgerCore.IsMainline then
+			if VgerCore.IsWarWithinOrLater then
 				-- In The War Within, a Talents button was added where the Pawn button would normally be, so force Pawn to the left.
 				PawnUI_InspectPawnButton:SetPoint("TOPLEFT", "InspectWristSlot", "BOTTOMLEFT", 1, -8)
 			else
@@ -93,7 +101,11 @@ function PawnUI_InventoryPawnButton_Move()
 		end
 	elseif PawnCommon.ButtonPosition == PawnButtonPositionLeft then
 		PawnUI_InventoryPawnButton:ClearAllPoints()
-		PawnUI_InventoryPawnButton:SetPoint("TOPLEFT", "CharacterWristSlot", "BOTTOMLEFT", 1, -8)
+		if VgerCore.IsForever then
+			PawnUI_InventoryPawnButton:SetPoint("TOPLEFT", "CharacterWristSlot", "BOTTOMLEFT", -6, -18)
+		else
+			PawnUI_InventoryPawnButton:SetPoint("TOPLEFT", "CharacterWristSlot", "BOTTOMLEFT", 1, -8)
+		end
 		PawnUI_InventoryPawnButton:Show()
 		if PawnUI_InspectPawnButton then
 			PawnUI_InspectPawnButton:ClearAllPoints()
@@ -176,7 +188,7 @@ function PawnUI_AddInventoryTotalsToTooltip(Tooltip, Unit)
 	end
 	-- Add average item level information to the inspect window. (On Mainline it's not necessary for the current player's
 	-- character sheet because that's part of the default UI now.)
-	if AverageItemLevel and AverageItemLevel > 0 and (not VgerCore.IsMainline or Unit ~= "player") then
+	if AverageItemLevel and AverageItemLevel > 0 and (not VgerCore.IsShadowlandsOrLater or Unit ~= "player") then
 		if PawnCommon.AlignNumbersRight then
 			Tooltip:AddDoubleLine(PawnLocal.AverageItemLevelIgnoringRarityTooltipLine,  AverageItemLevel, VgerCore.Color.OrangeR, VgerCore.Color.OrangeG, VgerCore.Color.OrangeB, VgerCore.Color.OrangeR, VgerCore.Color.OrangeG, VgerCore.Color.OrangeB)
 		else
@@ -244,7 +256,6 @@ function PawnUIFrame_ScaleSelector_Refresh()
 	PawnUITotalScaleLines = 0
 
 	-- Get a sorted list of scale data and display it all.
-	local ScaleData
 	local ScaleList = PawnGetAllScalesEx()
 	PawnUIIsShowingNoneWarning = true
 	for _, ScaleData in pairs(ScaleList) do
@@ -598,14 +609,11 @@ function PawnUIFrame_DeleteScaleButton_OnClick()
 		-- If the user held down the shift key when clicking the Delete button, just do it immediately.
 		PawnUIFrame_DeleteScaleButton_OnOK(DELETE_ITEM_CONFIRM_STRING)
 	else
-		PawnUIGetString(format(PawnLocal.DeleteScaleConfirmation, PawnUICurrentScale, DELETE_ITEM_CONFIRM_STRING), "", PawnUIFrame_DeleteScaleButton_OnOK)
+		PawnUIGetString(format(PawnLocal.DeleteScaleConfirmation, PawnUICurrentScale, DELETE_ITEM_CONFIRM_STRING), "", PawnUIFrame_DeleteScaleButton_OnOK, nil, false, DELETE_ITEM_CONFIRM_STRING)
 	end
 end
 
 function PawnUIFrame_DeleteScaleButton_OnOK(ConfirmationText)
-	-- If they didn't type "DELETE" (ignoring case), just exit.
-	if strlower(ConfirmationText) ~= strlower(DELETE_ITEM_CONFIRM_STRING) then return end
-
 	PawnDeleteScale(PawnUICurrentScale)
 	PawnUICurrentScale = nil
 	PawnUIFrame_ScaleSelector_Refresh()
@@ -1769,13 +1777,12 @@ function PawnUI_ShowBestGems()
 	end
 
 	local ShownGems = false
-	local _
 
 	local GemQualityLevel = PawnGetGemQualityForItem(PawnGemQualityLevels, PawnUIGemQualityLevel)
 	if GemQualityLevel then
 
-		if not VgerCore.IsClassic and not VgerCore.IsMainline then
-			-- Classic starting in Burning Crusade: Divide by color
+		if VgerCore.IsBurningCrusade or VgerCore.IsWrath or VgerCore.IsCataclysm or VgerCore.IsMists then
+			-- Burning Crusade through Mists of Pandaria: Divide by color
 			if #(PawnScaleBestGems[PawnUICurrentScale].RedSocket[GemQualityLevel]) > 0 then
 				PawnUI_AddGemHeaderLine(format(PawnLocal.UI.GemsColorHeader, RED_GEM))
 				for _, GemData in pairs(PawnScaleBestGems[PawnUICurrentScale].RedSocket[GemQualityLevel]) do
@@ -1798,7 +1805,7 @@ function PawnUI_ShowBestGems()
 				ShownGems = true
 			end
 		else
-			-- Non-Classic WoW: All sockets are prismatic
+			-- Other WoW versions: All sockets are prismatic
 			if #(PawnScaleBestGems[PawnUICurrentScale].PrismaticSocket[GemQualityLevel]) > 0 then
 				for _, GemData in pairs(PawnScaleBestGems[PawnUICurrentScale].PrismaticSocket[GemQualityLevel]) do
 					PawnUI_AddGemLine(GemData.Name, GemData.Texture, GemData.ID)
@@ -2102,7 +2109,7 @@ function PawnUIAboutTabPage_OnShow()
 	if Version then
 		PawnUIFrame_AboutVersionLabel:SetText(format(PawnUIFrame_AboutVersionLabel_Text, Version))
 	end
-	if not VgerCore.IsMainline then
+	if not VgerCore.IsDraenorOrLater then
 		-- WoW Classic doesn't use the Mr. Robot scales, so hide that logo and information.
 		PawnUIFrame_MrRobotLogo:Hide()
 		PawnUIFrame_MrRobotLabel:SetPoint("TOPLEFT", 25, -210)
@@ -2125,6 +2132,7 @@ function PawnUI_OnSocketUpdate()
 	PawnUI_EnsureLoaded()
 	if StandardGemsUnavailable then return end
 	if not PawnCommon.ShowSocketingAdvisor then return end
+	if PawnIsIncompatible() then return end
 
 	-- Find out what item it is.
 	local _, ItemLink = ItemSocketingDescription:GetItem()
@@ -2228,6 +2236,7 @@ function PawnUI_OnReforgingUpdate()
 	if PawnReforgingTooltip then PawnReforgingTooltip:Hide() end
 
 	if not PawnCommon.ShowReforgingAdvisor then return end
+	if PawnIsIncompatible() then return end
 
 	-- Find out what item it is.
 	local Tooltip = _G[PawnPrivateTooltipName]
@@ -2247,7 +2256,6 @@ function PawnUI_OnReforgingUpdate()
 	local UpgradeInfo, BestItemFor, SecondBestItemFor = PawnIsItemAnUpgrade(Item)
 
 	-- Now, find out what to do for each scale.
-	local ScaleName
 	local InstructionsList = { }
 	local SuggestedAnyCappedStats
 	for ScaleName, _ in pairs(PawnCommon.Scales) do
@@ -2268,7 +2276,6 @@ function PawnUI_OnReforgingUpdate()
 			elseif UpgradeInfo then
 				-- Is this an upgrade for this scale?
 				local WasUpgrade = nil
-				local UpgradeData
 				for _, UpgradeData in pairs(UpgradeInfo) do
 					if UpgradeData[1] == ScaleName then
 						WasUpgrade = true
@@ -2292,7 +2299,6 @@ function PawnUI_OnReforgingUpdate()
 	PawnReforgingTooltip:SetPoint("TOPLEFT", ReforgingFrame, "BOTTOMLEFT", 12, -12)
 	PawnReforgingTooltip:SetText(PawnLocal.UI.ReforgeTitle, 1, 1, 1)
 
-	local Instructions
 	for _, Instructions in pairs(InstructionsList) do
 		PawnReforgingTooltip:AddLine(Instructions, 1, 1, 1)
 	end
@@ -2327,6 +2333,7 @@ function PawnUI_GroupLootFrame_OnShow(self)
 	local Index = self:GetID()
 	local LootAdvisor = _G["PawnUI_LootUpgradeAdvisor" .. Index]
 	if not PawnCommon.ShowLootUpgradeAdvisor then LootAdvisor:Hide() return end
+	if PawnIsIncompatible() then return end
 	LootAdvisor.ItemLink = nil
 
 	-- What item are they rolling for?
@@ -2349,11 +2356,11 @@ function PawnUI_GroupLootFrame_OnShow(self)
 				local UpgradeText
 				if ShowScaleNames then
 					UpgradeText = PawnLocal.LootUpgradeAdvisorHeader
-					local ThisUpgradeData, _
 					for _, ThisUpgradeData in pairs(UpgradeInfo) do
 						local ScaleName = ThisUpgradeData.ScaleName
 						if ScaleName then
 							local SetAnnotation = ""
+							local InvType = Item.InvType
 							if InvType == "INVTYPE_2HWEAPON" then
 								SetAnnotation = PawnLocal.TooltipUpgradeFor2H
 							elseif InvType == "INVTYPE_WEAPONMAINHAND" or InvType == "INVTYPE_WEAPON" or InvType == "INVTYPE_WEAPONOFFHAND" then
@@ -2467,6 +2474,7 @@ end
 -- When quest info is displayed, call other quest info hook functions as appropriate.
 function PawnUI_OnQuestInfo_Display(template)
 	if not PawnCommon or not PawnPlayerFullName then return end
+	if PawnIsIncompatible() then return end
 	VgerCore.Assert(QuestInfoFrame, "QuestInfoFrame should exist by the time that PawnUI_OnQuestInfo_Display is called.")
 
 	-- There are a variety of QUEST_TEMPLATE_* tables in QuestInfo.lua.  Instead of hooking QuestInfo_ShowRewards directly,
@@ -2482,18 +2490,17 @@ end
 -- When quest info is shown, annotate item rewards with upgrade and vendor icons.
 function PawnUI_OnQuestInfo_ShowRewards()
 	-- Before doing anything else, clear out our state from last time.
-	local i
-	for i = 1, MAX_NUM_ITEMS do
-		local Overlay = PawnQuestAdvisorOverlays[i]
-		if Overlay then Overlay:Hide() end
+	for _, Overlay in pairs(PawnQuestAdvisorOverlays) do
+		Overlay:Hide()
 	end
 
 	if not PawnCommon.ShowQuestUpgradeAdvisor then return end
+	if PawnIsIncompatible() then return end
 
 	-- Now, get information about this quest.
 	local QuestID
 	if C_QuestLog.GetSelectedQuest then QuestID = C_QuestLog.GetSelectedQuest() end
-	local IsInMap = VgerCore.IsMainline and WorldMapFrame:IsShown() -- we only care about the Shadowlands+ map (or maybe Legion+)
+	local IsInMap = VgerCore.IsLegionOrLater and WorldMapFrame:IsShown() -- we only care about the Shadowlands+ map (or maybe Legion+)
 	local StaticRewards, RewardChoices
 	local SetQuestRewardFunctionName, GetRewardInfoFunction, GetChoiceInfoFunction
 	if QuestInfoFrame.questLog then
@@ -2580,12 +2587,11 @@ function PawnUI_OnQuestInfo_ShowRewards()
 	-- Find the ones that are interesting (and should get an icon).
 	PawnFindInterestingItems(QuestRewards)
 
-	local Reward
 	for _, Reward in pairs(QuestRewards) do
 		local ItemButton = QuestInfo_GetRewardButton(QuestInfoFrame.rewardsFrame, Reward.Index)
 		local TextureName
 		if ItemButton then
-			local Overlay = PawnQuestAdvisorOverlays[Reward.Index]
+			local Overlay = PawnQuestAdvisorOverlays[ItemButton]
 			if not Overlay then
 				if IsInMap then
 					Overlay = ItemButton:CreateTexture(nil, "OVERLAY", "PawnUI_QuestAdvisorTexture_Map")
@@ -2595,7 +2601,7 @@ function PawnUI_OnQuestInfo_ShowRewards()
 				-- Mod compatibility: ElvUI
 				Overlay:SetDrawLayer("OVERLAY", 7)
 
-				PawnQuestAdvisorOverlays[Reward.Index] = Overlay
+				PawnQuestAdvisorOverlays[ItemButton] = Overlay
 			end
 			if Reward.Result == "upgrade" then
 				Overlay:SetTexture("Interface\\AddOns\\Pawn\\Textures\\UpgradeArrowBig")
@@ -2643,7 +2649,7 @@ end
 function PawnUICreateTabs()
 	local TabCount = #PawnUITabList
 	local TabTemplate
-	if VgerCore.IsDragonflightOrLater then
+	if VgerCore.IsDragonflightOrLater or VgerCore.IsForever then
 		TabTemplate = "PanelTabButtonTemplate"
 	else
 		TabTemplate = "CharacterFrameTabButtonTemplate"
@@ -2680,6 +2686,9 @@ function PawnUISwitchToTab(Tab)
 	end
 	PawnUI_EnsureLoaded()
 
+	local IncompatibilityDetails = PawnGetIncompatibilityInfo()
+	if IncompatibilityDetails then Tab = nil end
+
 	-- Loop through all tab frames, showing all but the current one.
 	local TabNumber
 	for i = 1, TabCount do
@@ -2691,7 +2700,7 @@ function PawnUISwitchToTab(Tab)
 			ThisTab:Hide()
 		end
 	end
-	VgerCore.Assert(TabNumber, "Oh noes, we couldn't find that tab.")
+	VgerCore.Assert(TabNumber or IncompatibilityDetails, "Oh noes, we couldn't find that tab.")
 	local ReloadingSameTab = (TabNumber == PawnUICurrentTabNumber)
 	PawnUICurrentTabNumber = TabNumber
 
@@ -2714,6 +2723,34 @@ function PawnUISwitchToTab(Tab)
 	-- Then, update the header text.
 	PawnUIUpdateHeader()
 
+	-- Now, if Pawn can't function due to addon incompatibility, show details and then bail.
+	if IncompatibilityDetails then
+		PawnUIScaleSelectorIncompatible:Show()
+		PawnUIIncompatibleTabPage:Show()
+
+		local ErrorText = "The following addons are preventing Pawn from working:\n\n"
+
+		for _, AddOn in pairs(IncompatibilityDetails.AddOns) do
+			ErrorText = ErrorText .. VgerCore.Color.Salmon .. AddOn.Name .. VgerCore.Color.Reset .. "\n"
+			if AddOn.Fix then
+				ErrorText = ErrorText .. AddOn.Fix
+			else
+				ErrorText = ErrorText .. "To fix it, disable " .. AddOn.Name .. " and /reload."
+			end
+			ErrorText = ErrorText .. "\n\n"
+		end
+
+		ErrorText = ErrorText .. VgerCore.Color.Silver .. "You're using Pawn " .. C_AddOns.GetAddOnMetadata("Pawn", "Version") .. " on WoW " .. GetBuildInfo() .. " " .. GetLocale() .. "." .. VgerCore.Color.Reset
+
+		PawnUIFrame_IncompatibiltyLabel:SetText(ErrorText)
+
+		for i = 1, TabCount do
+			_G["PawnUIFrameTab" .. i]:Hide()
+		end
+
+		return
+	end
+
 	-- If we're already on that tab, we don't need to do anything else.
 	if ReloadingSameTab then return end
 
@@ -2727,6 +2764,9 @@ function PawnUISwitchToTab(Tab)
 end
 
 function PawnUIUpdateHeader()
+	if PawnIsIncompatible() then
+		PawnUIHeader:SetText("Pawn needs your attention")
+	end
 	if not PawnUIHeaders[PawnUICurrentTabNumber] then return end
 	local ColoredName
 	if PawnUICurrentScale and PawnUICurrentScale ~= PawnLocal.NoScale then
@@ -2759,7 +2799,7 @@ end
 function PawnUI_EnsureLoaded()
 	if not PawnUIOpenedYet then
 		PawnUIOpenedYet = true
-		StandardGemsUnavailable = not not (VgerCore.IsClassic or (PlayerGetTimerunningSeasonID and PlayerGetTimerunningSeasonID()))
+		StandardGemsUnavailable = not not (VgerCore.IsClassic or VgerCore.IsForever or (PlayerGetTimerunningSeasonID and PlayerGetTimerunningSeasonID()))
 		PawnUIFrame_ScaleSelector_Refresh()
 		PawnUIFrame_ShowScaleCheck_Label:SetText(format(PawnUIFrame_ShowScaleCheck_Label_Text, UnitName("player")))
 		if StandardGemsUnavailable then
@@ -2826,8 +2866,9 @@ end
 -- Shows a dialog containing given prompt text, asking the user for a string.
 -- Calls OKCallbackFunction with the typed string as the only input if the user clicked OK.
 -- Calls CancelCallbackFunction if the user clicked Cancel.
-function PawnUIGetString(Prompt, DefaultValue, OKCallbackFunction, CancelCallbackFunction, IsMultiLine)
-	PawnUIGetStringCore(Prompt, DefaultValue, true, OKCallbackFunction, CancelCallbackFunction, IsMultiLine)
+-- If RequiredText is given, OK stays disabled until the user types exactly that (case-insensitive).
+function PawnUIGetString(Prompt, DefaultValue, OKCallbackFunction, CancelCallbackFunction, IsMultiLine, RequiredText)
+	PawnUIGetStringCore(Prompt, DefaultValue, true, OKCallbackFunction, CancelCallbackFunction, IsMultiLine, RequiredText)
 end
 
 -- Shows a dialog with a copyable string.
@@ -2839,7 +2880,7 @@ function PawnUIShowCopyableString(Prompt, Value, CallbackFunction, IsMultiLine)
 end
 
 -- Core function called by PawnUIGetString.
-function PawnUIGetStringCore(Prompt, DefaultValue, Cancelable, OKCallbackFunction, CancelCallbackFunction, IsMultiLine)
+function PawnUIGetStringCore(Prompt, DefaultValue, Cancelable, OKCallbackFunction, CancelCallbackFunction, IsMultiLine, RequiredText)
 	if PawnUIStringDialog and PawnUIStringDialog:IsVisible() then
 		PawnUIStringDialog_CancelButton_OnClick()
 	end
@@ -2849,6 +2890,7 @@ function PawnUIGetStringCore(Prompt, DefaultValue, Cancelable, OKCallbackFunctio
 		PawnUIStringDialog = PawnUIStringDialogSingleLine
 	end
 
+	PawnUIStringDialog.RequiredText = RequiredText
 	PawnUIStringDialog.PromptText:SetText(Prompt)
 	PawnUIStringDialog.TextBox:SetText("") -- Causes the insertion point to move to the end on the next SetText
 	PawnUIStringDialog.TextBox:SetText(DefaultValue)
@@ -2886,7 +2928,9 @@ function PawnUIStringDialog_CancelButton_OnClick()
 end
 
 function PawnUIStringDialog_TextBox_OnTextChanged()
-	if PawnUIStringDialog.TextBox:GetText() ~= "" then
+	local Text = PawnUIStringDialog.TextBox:GetText()
+	local RequiredText = PawnUIStringDialog.RequiredText
+	if Text ~= "" and (not RequiredText or strlower(Text) == strlower(RequiredText)) then
 		PawnUIStringDialog.OKButton:Enable()
 	else
 		PawnUIStringDialog.OKButton:Disable()

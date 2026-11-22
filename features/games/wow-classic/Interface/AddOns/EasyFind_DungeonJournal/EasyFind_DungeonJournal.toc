@@ -1,0 +1,28 @@
+## Interface: 16001
+## Title: EasyFind [DungeonJournal]
+## Notes: DungeonJournal's dungeons, bosses, loot and quests in EasyFind's search bar; a click opens the journal there. Requires DungeonJournal.
+## Author: justawower
+## Version: 1.0.0
+## X-Curse-Project-ID: 1778445
+## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
+## Group: EasyFind
+## Category: UI
+## Dependencies: EasyFind
+## OptionalDeps: ForeverDungeonJournal
+## SavedVariables: EasyFindDungeonJournalDB
+## DefaultState: enabled
+
+Locales/enUS.lua
+Locales/deDE.lua [AllowLoadTextLocale deDE]
+Locales/esES.lua [AllowLoadTextLocale esES]
+Locales/esMX.lua [AllowLoadTextLocale esMX]
+Locales/frFR.lua [AllowLoadTextLocale frFR]
+Locales/itIT.lua [AllowLoadTextLocale itIT]
+Locales/koKR.lua [AllowLoadTextLocale koKR]
+Locales/ptBR.lua [AllowLoadTextLocale ptBR]
+Locales/ruRU.lua [AllowLoadTextLocale ruRU]
+Locales/zhCN.lua [AllowLoadTextLocale zhCN]
+Locales/zhTW.lua [AllowLoadTextLocale zhTW]
+Journal.lua
+Rows.lua
+Quests.lua

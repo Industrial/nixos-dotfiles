@@ -1,0 +1,16 @@
+## Interface: 120105, 120100, 16001
+## Title: EasyFind [HandyNotes]
+## Notes: HandyNotes' map pins in EasyFind's search: find one by name, loot or zone, with directions through EasyFind's GPS. Requires HandyNotes.
+## Author: justawower
+## Version: 1.0.3
+## X-Curse-Project-ID: 1781530
+## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
+## Group: EasyFind
+## Category: UI
+## Dependencies: EasyFind
+## OptionalDeps: HandyNotes
+## SavedVariables: EasyFindHandyNotesDB
+## DefaultState: enabled
+
+Locales/enUS.lua
+Pins.lua

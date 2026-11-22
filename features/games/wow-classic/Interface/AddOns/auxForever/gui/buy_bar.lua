@@ -315,10 +315,12 @@ local function request_quote()
         -- never more than the player saw: the button showed current.estimate when it was pressed
         if quote_total > current.estimate then
             reset({'The price went up to ' .. money.to_string(quote_total, true), 'Nothing was bought. Listings refreshed.'}, aux.color.red)
+            update()
             do (current.on_refresh or pass)() end
             return
         elseif quote_total > GetMoney() then
             reset({'Not enough money for ' .. money.to_string(quote_total, true), 'Nothing was bought'}, aux.color.red)
+            update()
             return
         end
         current.quote_total = quote_total
@@ -336,14 +338,17 @@ local function request_quote()
     end)
     listen('COMMODITY_PRICE_UNAVAILABLE', function()
         reset({'That price is no longer available', 'Nothing was bought. Listings refreshed.'}, aux.color.red)
+        update()
         do (current.on_refresh or pass)() end
     end)
     listen('COMMODITY_PURCHASE_FAILED', function()
         reset({'The purchase failed', 'Nothing was bought'}, aux.color.red)
+        update()
     end)
     listen('AUCTION_HOUSE_SHOW_ERROR', function()
         if state ~= IDLE then
             reset({'The auction house refused the purchase', 'Nothing was bought'}, aux.color.red)
+            update()
         end
     end)
     -- 0.8.2.1 (outside review, R-20): the game drops a request sent too soon after another one. The
@@ -351,6 +356,7 @@ local function request_quote()
     listen('AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED', function()
         if state == QUOTING then
             reset({'The auction house was busy', 'Nothing was bought. Press Buy again.'}, aux.color.red)
+            update()
         end
     end)
     listen('COMMODITY_PURCHASE_SUCCEEDED', function()
@@ -363,6 +369,7 @@ local function request_quote()
         -- the purchase can change the selection, which may already have moved the bar on
         if mode == COMMODITY and current then
             current.tier_list = current.tiers()
+            update()
         end
     end)
 
@@ -386,7 +393,7 @@ local function update_item()
     local busy = current.busy()
     -- a row of several sellers at one price holds group_count auctions (0.8, review H-004, finding 5)
     local at_price = record.group_count or record.auction_count or 1
-    sub_label:SetText(at_price .. ' for sale at this price')
+    sub_label:SetText(at_price .. ' at this price')
     for _, chip in ipairs(chips) do chip:Hide() end
     -- a Confirm is only for the auction and price it showed
     if item_confirm and (item_confirm.record ~= record or item_confirm.price ~= record.buyout_price) then
@@ -499,6 +506,7 @@ function M.show_commodity(params)
         -- same item (e.g. the table refreshed after a purchase): keep the quantity and any message
         current.tiers, current.on_success, current.on_refresh = params.tiers, params.on_success, params.on_refresh
         current.tier_list = params.tiers()
+        update()
         return
     end
     reset()
@@ -507,10 +515,14 @@ function M.show_commodity(params)
     current = params
     current.tier_list = params.tiers()
     current.quantities = quantities(params.max_stack)
-    -- 1 to start (0.8.2.2, FB-050): a full stack was one click away from being bought by mistake.
-    -- The Sniper offers only a deal's own units (params.whole_deal), and starts at all of them, up
-    -- to a stack: those units are what the deal is.
-    local start = params.whole_deal and max(1, min(params.max_stack or 1, available())) or 1
+    local last_chip = chips[max(1, min(#chips, #current.quantities))]
+    other_input:ClearAllPoints()
+    other_input:SetPoint('LEFT', last_chip, 'RIGHT', 6, 0)
+    -- 1 by default (0.8.2.2, FB-050), or full stack when Settings > Buying > Default quantity is
+    -- set to 'stack' (0.9 build 4, FB-066, user_ivpyccljovcjne72). The Sniper always starts at the
+    -- deal's own units (params.whole_deal), up to a stack.
+    local want_stack = params.whole_deal or (aux.account_data and aux.account_data.buy_default == 'stack')
+    local start = want_stack and max(1, min(params.max_stack or 1, available())) or 1
     current.quantity = start
     other_input:Show()
     other_input:SetText(tostring(start))
@@ -559,7 +571,20 @@ function M.clear()
     line1:SetText('Select a row to buy it')
     line2:Show()
     line2:SetTextColor(aux.color.label.enabled())
-    line2:SetText('Gear is bought one at a time. Trade goods are bought cheapest first, in the amount you pick.')
+    line2:SetText('Gear: one at a time. Trade goods: cheapest first.')
+end
+
+-- 0.9: clear selection and buttons while keeping a fresh bought/status message visible (used when
+-- Sniper auto-deselects a bought deal so rounds can resume without wiping "Bought ...").
+function M.clear_keeping_message()
+    local saved, saved_color = message, message_color
+    local keep = saved and GetTime() < message_until
+    clear()
+    if keep then
+        line1:SetText(saved[1] or '')
+        line2:SetText(saved[2] or '')
+        line2:SetTextColor((saved_color or aux.color.label.enabled)())
+    end
 end
 
 -- auxForever: a note while there is nothing to buy yet, e.g. while an item's auctions are read
@@ -622,6 +647,77 @@ function M.bid_click()
         current.on_bid()
     end
     update()
+end
+
+function M.cancel_click()
+    if cancel_button and cancel_button:IsShown() and cancel_button:IsEnabled() then
+        reset({'Cancelled', 'Nothing was bought'}, aux.color.label.enabled)
+        update()
+        return true
+    end
+    return false
+end
+
+-- 0.9 (FB-063, khorrs): keybinds registered in auxForever/Bindings.xml (Options > Keybindings >
+-- auxForever). Acts on whichever buy bar (Search or Sniper) is visible while aux is open, ignores
+-- presses while typing in an edit box, and keeps Buy and Confirm separate so mashing Buy never
+-- accidentally confirms when "Confirm before buying" is on.
+_G.BINDING_HEADER_AUXFOREVER = 'auxForever'
+_G.BINDING_NAME_AUXFOREVER_BUY = 'Buy'
+_G.BINDING_NAME_AUXFOREVER_CONFIRM = 'Confirm purchase'
+_G.BINDING_NAME_AUXFOREVER_CANCEL = 'Cancel / decline purchase'
+_G.BINDING_NAME_AUXFOREVER_BUY_OR_CONFIRM = 'Buy or confirm'
+
+local function binding_bar_active()
+    if not (aux.frame and aux.frame:IsShown() and bar and bar:IsVisible()) then
+        return false
+    end
+    local p = bar:GetParent()
+    while p and p ~= aux.frame do
+        if p.IsShown and not p:IsShown() then
+            return false
+        end
+        p = p.GetParent and p:GetParent()
+    end
+    if GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus() then
+        return false
+    end
+    return true
+end
+
+function M.run_binding(action)
+    if not binding_bar_active() then
+        return false
+    end
+    if action == 'cancel' then
+        return cancel_click()
+    end
+    if not (primary_button and primary_button:IsShown() and primary_button:IsEnabled()) then
+        return false
+    end
+    local in_confirm = (mode == COMMODITY and state == QUOTED) or (mode == ITEM and item_confirm ~= nil)
+    if action == 'buy' then
+        if in_confirm then
+            return false
+        end
+        if (mode == COMMODITY and state == IDLE) or (mode == ITEM and not item_confirm) then
+            primary_click()
+            return true
+        end
+    elseif action == 'confirm' then
+        if in_confirm then
+            primary_click()
+            return true
+        end
+    elseif action == 'buy_or_confirm' then
+        primary_click()
+        return true
+    end
+    return false
+end
+
+_G.AuxForever_RunBinding = function(action)
+    return run_binding(action)
 end
 
 function M.primary_label()
@@ -730,7 +826,7 @@ function M.create(parent)
         highlight:SetAllPoints()
         highlight:SetColorTexture(1, 1, 1, .06)
         chip:SetScript('OnClick', function()
-            if current and current.quantities and current.quantities[i] then
+            if state == IDLE and current and current.quantities and current.quantities[i] then
                 set_quantity(current.quantities[i])
                 other_input:SetText(tostring(current.quantities[i]))
                 other_input.overlay:SetText(other_input.formatter(other_input:GetText()))
@@ -773,15 +869,19 @@ function M.create(parent)
     other_input.formatter = function(text)
         return text == '' and aux.color.label.enabled'type' or text
     end
-    M.other_input, M.chips = other_input, chips
+    M.other_input, M.chips, M.sub_label = other_input, chips, sub_label
     other_input.change = function(self)
         if state == IDLE and self:GetText() ~= '' then
             set_quantity(self:GetNumber())
             update()
         end
     end
-    -- Enter buys, as the button does
-    other_input.enter = function() primary_click() end
+    -- Enter buys, as the button does (unless the player cleared the box while idle)
+    other_input.enter = function()
+        if state ~= IDLE or other_input:GetText() ~= '' then
+            primary_click()
+        end
+    end
     other_input.escape = function()
         if state ~= IDLE then
             reset({'Cancelled', 'Nothing was bought'}, aux.color.label.enabled)

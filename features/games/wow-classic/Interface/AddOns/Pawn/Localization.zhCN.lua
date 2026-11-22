@@ -78,7 +78,6 @@ PawnLocal =
 		["AgilityInfo"] = "敏捷，为敏捷型职业增加攻击强度。",
 		["ApInfo"] = "攻击强度: 增加物理攻击所造成的伤害 (不包含力量和敏捷的加成)。",
 		["ArcaneResistInfo"] = "奥术抗性: 减少受到的奥术伤害。",
-		["ArcaneSpellDamage"] = "奥术法术伤害",
 		["ArcaneSpellDamageInfo"] = "奥术法术伤害: 提高奥术法术所造成的伤害。",
 		["ArmorInfo"] = "基础护甲值。 不包含额外护甲（一般是绿色文字颜色）和部分职业使用技能等增加的额外护甲。",
 		["ArmorPenetrationInfo"] = "护甲穿透。 使你的部分物理攻击伤害无视护甲。",
@@ -89,7 +88,6 @@ PawnLocal =
 		["Cloth"] = "布甲",
 		["ClothInfo"] = "物品类型为布甲。",
 		["CorruptionInfo"] = "恩佐斯的腐蚀。此项腐蚀的属性将根据装备腐蚀等级来扣除相应的评分。",
-		["Crit"] = "爆击",
 		["CritInfo"] = "爆击等级，影响近战、远程和法术的爆击几率。(在经典旧世中, 仅对物理攻击生效。)",
 		["DefenseInfo"] = "防御技能: 减少被首领攻击命中的几率。",
 		["DodgeInfo"] = "闪避: 增加完全闪避攻击的几率。",
@@ -97,16 +95,12 @@ PawnLocal =
 		["ExpertiseInfo"] = "精准: 使敌人失去躲闪和招架的机会。",
 		["FeralApInfo"] = "野性攻击强度: 增加德鲁伊在野性形态下的攻击伤害 (不包含力量和敏捷的加成)。",
 		["FireResistInfo"] = "火焰抗性: 减少受到的火焰伤害。",
-		["FireSpellDamage"] = "火焰法术伤害",
 		["FireSpellDamageInfo"] = "火焰法术伤害: 增加释放火焰法术所造成的伤害。",
 		["FrostResistInfo"] = "冰霜抗性: 减少受到的冰霜伤害。",
-		["FrostSpellDamage"] = "冰霜法术伤害",
 		["FrostSpellDamageInfo"] = "冰霜法术伤害: 增加释放冰霜法术所造成的伤害。",
 		["HasteInfo"] = "急速等级，影响近战、远程和法术的攻击速度",
-		["Healing"] = "治疗量",
 		["HealingInfo"] = "治疗量: 增加治疗法术的效果。",
 		["HitInfo"] = "命中: 增加物理攻击命中目标的几率 (对于首领而言尤为重要)。",
-		["HolySpellDamage"] = "神圣法术伤害",
 		["HolySpellDamageInfo"] = "神圣法术伤害: 增加释放神圣法术所造成的伤害。",
 		["Hp5Info"] = "每5秒恢复的生命值: 增加恢复率。",
 		["IndestructibleInfo"] = "永不磨损，你的装备不会有耐久度的损耗。",
@@ -125,7 +119,6 @@ PawnLocal =
 		["Mp5Info"] = "每5秒恢复的法力值: 影响法力的恢复速度 (战斗中同样生效)。",
 		["MultistrikeInfo"] = "Multistrike. Increases the chance that your attacks and healing spells will hit your target two extra times at reduced potency.",
 		["NatureResistInfo"] = "自然抗性: 减少受到的自然伤害。",
-		["NatureSpellDamage"] = "自然法术伤害",
 		["NatureSpellDamageInfo"] = "自然法术伤害: 增加释放自然法术所造成的伤害。",
 		["ParryInfo"] = "招架: 增加你招架敌人攻击的几率。",
 		["Plate"] = "板甲",
@@ -134,7 +127,6 @@ PawnLocal =
 		["RapInfo"] = "远程攻击强度: 增加远程攻击所造成的伤害 (不包含敏捷的加成)。",
 		["ResilienceInfo"] = "韧性: 降低你受到爆击的几率，并降低受到的爆击伤害。",
 		["ShadowResistInfo"] = "暗影抗性: 减少受到的暗影伤害。",
-		["ShadowSpellDamage"] = "暗影法术伤害",
 		["ShadowSpellDamageInfo"] = "暗影法术伤害: 增加释放暗影法术所造成的伤害。",
 		["Shield"] = "盾牌",
 		["ShieldInfo"] = "物品类型为盾牌。",
@@ -146,7 +138,6 @@ PawnLocal =
 		["SpeedInfo"] = "武器攻击速度，武器挥动时间间隔。(如果你喜欢快速武器，此数字应该为负数。前往 \"特殊武器属性\" 中的 \"速度基线\" 部分。)",
 		["SpeedIs"] = "1 |cffffffff攻击速度|r 价值：",
 		["SpellCritInfo"] = "法术爆击几率: 增加法术命中目标后造成爆击的几率",
-		["SpellDamage"] = "法术伤害",
 		["SpellDamageInfo"] = "法术伤害: 增加释放法术所造成的伤害。",
 		["SpellHitInfo"] = "法术命中: 增加法术攻击命中目标的几率 (对于首领而言尤为重要)。",
 		["SpellPenetrationInfo"] = "法术穿透: 消除敌人对你的法术的抵抗力。",
@@ -483,6 +474,7 @@ Pawn插件默认已经参考AskMrRobot给所有职业的专精建立了标准评
 
 PawnLocal.TooltipParsing = {
 	["Agility"] = "^%+?# 敏捷$",
+	["AllResist"] = "^%+?# 所有抗性$",
 	["AllStats"] = "^%+?# 所有属性$",
 	["Ap"] = "^%+?# 攻击强度$",
 	["Ap2"] = "^装备： ?%+# 攻击强度。$",
@@ -493,6 +485,7 @@ PawnLocal.TooltipParsing = {
 	["ArcaneSpellDamage3"] = "^%+# ?奥术伤害$",
 	["Armor"] = "^#点护甲$",
 	["Armor2"] = "^UNUSED$",
+	["Armor3"] = "^%+?#护甲$",
 	["ArmorPenetration"] = "^装备： 你的攻击无视目标的#点护甲值。$",
 	["ArmorPenetrationRating"] = "^装备： 护甲穿透等级提高#。$",
 	["ArmorPenetrationRating2"] = "^装备： 使你的护甲穿透提高#点。$",
@@ -505,6 +498,7 @@ PawnLocal.TooltipParsing = {
 	["BlockRating"] = "^装备： 使你的格挡等级提高#。$",
 	["BlockRating2"] = "^装备： 使你的盾牌格挡等级提高#点。$",
 	["BlockValue"] = "^装备： ?使你的盾牌的格挡值提高#点。$",
+	["BlockValueForever"] = "^装备：使你的盾牌格挡值提高#。$",
 	["Bow"] = "^弓$",
 	["ChanceOnHit"] = "击中时可能：",
 	["Charges"] = "^.+ Charges?$",
@@ -549,6 +543,7 @@ PawnLocal.TooltipParsing = {
 	["Equip"] = "装备：",
 	["Expertise"] = "^%+?# 精准$",
 	["ExpertiseClassic"] = "^装备： 使你的攻击被躲闪或招架的几率降低#%%。$",
+	["ExpertiseForever"] = "^装备：使你的攻击被躲闪或招架的几率降低#%%。$",
 	["ExpertiseRating"] = "^装备： 使你的精准等级提高#点。$",
 	["ExpertiseRatingShort"] = "^%+?# 精准等级$",
 	["FeralAp"] = "^装备： ?在猎豹、熊和巨熊形态下的攻击强度提高#点。$",
@@ -568,6 +563,7 @@ PawnLocal.TooltipParsing = {
 	["Haste"] = "^%+?# 急速$",
 	["Haste2"] = "^UNUSED$",
 	["HasteClassic"] = "^装备： 使你的攻击速度提高#%%。$",
+	["HasteCombined"] = "^装备：使你的攻击速度和施法速度提高#%%。$",
 	["HasteRating"] = "^装备： 急速等级提高#点。$",
 	["HasteRating2"] = "^UNUSED$",
 	["HasteRatingShort"] = "^%+?# 急速等级$",
@@ -575,6 +571,7 @@ PawnLocal.TooltipParsing = {
 	["Healing"] = "^%+# 治疗量$",
 	["Healing2"] = "^装备： ?提高法术所造成的治疗效果，最多#点。$",
 	["Healing3"] = "^%+# 治疗$",
+	["Healing4"] = "^装备：使法术和魔法效果的治疗效果提高最多#点。$",
 	["HeirloomLevelRange"] = "^需要等级 %d+ 到 (%d+)",
 	["HeirloomXpBoost"] = "^装备： ?获得的经验值提高",
 	["HeirloomXpBoost2"] = "^UNUSED$",
@@ -666,6 +663,7 @@ PawnLocal.TooltipParsing = {
 	["SpellDamageAndHealingEnchant"] = "^UNUSED$",
 	["SpellDamageAndHealingShort"] = "^%+# 法术治疗，%+# 法术伤害$",
 	["SpellDamageAndHealingShort2"] = "^UNUSED$",
+	["SpellDamageNoHealing"] = "^装备：使法术和魔法效果所造成的伤害提高最多#点。$",
 	["SpellHasteClassic"] = "^装备： 你的施法速度提高#%%。$",
 	["SpellHasteRating"] = "^装备： 法术急速等级提高#点。$",
 	["SpellHasteRatingShort"] = "^%+?# 法术急速等级$",
@@ -675,6 +673,7 @@ PawnLocal.TooltipParsing = {
 	["SpellHitRatingShort"] = "^%+?# 法术命中等级$",
 	["SpellPenetration"] = "^装备： 使你的法术穿透提高#。$",
 	["SpellPenetrationClassic"] = "^装备： 使你的法术目标的魔法抗性降低#点。$",
+	["SpellPenetrationForever"] = "^装备：你的法术可穿透目标的#点魔法抗性。$",
 	["SpellPenetrationShort"] = "^%+?# 法术穿透$",
 	["SpellPower"] = "^%+?# 法术强度$",
 	["SpellPower2"] = "^装备： 法术强度提高#点。$",
@@ -716,7 +715,7 @@ PawnLocal.TooltipParsing = {
 
 -- Special case: wands use different text on Classic.
 -- So, patch things up here.
-if VgerCore.IsClassic or VgerCore.IsBurningCrusade or VgerCore.IsWrath or VgerCore.IsCataclysm or VgerCore.IsMists then
+if VgerCore.IsClassic or VgerCore.IsForever or VgerCore.IsBurningCrusade or VgerCore.IsWrath or VgerCore.IsCataclysm or VgerCore.IsMists then
 
 	local TooltipParsing_Classic =
 	{
@@ -753,6 +752,31 @@ if VgerCore.IsBurningCrusade or VgerCore.IsWrath or VgerCore.IsCataclysm or Vger
 
 	local Key, NewString
 	for Key, NewString in pairs(TooltipParsing_BurningCrusade) do
+		PawnLocal.TooltipParsing[Key] = NewString
+	end
+end
+
+if VgerCore.IsForever then
+
+	local TooltipParsing_Forever =
+	{
+		["ArcaneSpellDamage2"] = "^装备：使奥术法术和效果所造成的伤害提高最多#点。$",
+		["CritPercentCombined"] = "^装备：使你造成爆击的几率提高#%%。$",
+		["DefenseSkill"] = "^装备：防御提高#。$",
+		["FireSpellDamage2"] = "^装备：使火焰法术和效果所造成的伤害提高最多#点。$",
+		["FrostSpellDamage2"] = "^装备：使冰霜法术和效果所造成的伤害提高最多#点。$",
+		["HolySpellDamage2"] = "^装备：使神圣法术和效果所造成的伤害提高最多#点。$",
+		["Hp5"] = "^装备：每5秒恢复#生命值。$",
+		["Mp5"] = "^装备：每5秒恢复#法力值。$",
+		["NatureSpellDamage2"] = "^装备：使自然法术和效果所造成的伤害提高最多#点。$",
+		["ParryPercent"] = "^装备：使你招架攻击的几率提高#%%。$",
+		["ShadowSpellDamage2"] = "^装备：使暗影法术和效果所造成的伤害提高最多#点。$",
+		["SpellDamageAndHealing"] = "^装备：使所有法术和魔法效果造成的治疗效果提高最多#点，伤害提高最多#点。$",
+		["SpellDamage3"] = "^装备：提高法术和魔法效果所造成的伤害和治疗效果，最多#点。$",
+	}
+
+	local Key, NewString
+	for Key, NewString in pairs(TooltipParsing_Forever) do
 		PawnLocal.TooltipParsing[Key] = NewString
 	end
 end

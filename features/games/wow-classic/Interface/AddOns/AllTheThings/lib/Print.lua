@@ -1,0 +1,122 @@
+-- Chat and Print functionality
+local appName, app = ...;
+
+--- @type function,function,function,function,function,function,function,
+local print, tostring, ipairs, pairs, type,math_floor,GetTimePreciseSec
+	= print, tostring, ipairs, pairs, type,math.floor,GetTimePreciseSec
+local issecretvalue = app.WOWAPI.issecretvalue
+
+app.print = function(...)
+	print(app.L.SHORTTITLE, ...);
+end
+app.report = function(...)
+	if select("#", ...) > 0 then
+		local addReport = app.Modules.Contributor.AddReportData
+		if addReport then
+			local data = {...}
+			local reportID = data[1]
+			tremove(data, 1)
+			data.ALLOWREPEAT = true
+			addReport("Report", reportID, data, reportID)
+		else
+			app.print(...);
+			app.print(app.Version..": "..app.L.PLEASE_REPORT_MESSAGE);
+		end
+	end
+end
+app.PrintMemoryUsage = function(...)
+	collectgarbage()
+	UpdateAddOnMemoryUsage();
+	app.print(... or "Memory", GetAddOnMemoryUsage(appName));
+end
+-- Consolidated debug-only print with preceding precise timestamp
+local DEBUG_PRINT_LAST;
+app.PrintDebug = function(...)
+	DEBUG_PRINT_LAST = GetTimePreciseSec();
+	if app.Debugging then print(DEBUG_PRINT_LAST,...) end
+end
+-- Consolidated debug-only print with precise frame duration since last successful print
+app.PrintDebugPrior = function(...)
+	if app.Debugging then
+		local now = GetTimePreciseSec();
+		if DEBUG_PRINT_LAST then
+			local diff = now - DEBUG_PRINT_LAST
+			print(now,...,"<>",math_floor(diff * 10000 / 10),"ms @", math.ceil(1 / diff),"FPS")
+		else
+			print(now,...)
+		end
+		DEBUG_PRINT_LAST = GetTimePreciseSec();
+	end
+end
+app.PrintGroup = function(group,depth)
+	depth = depth or 0;
+	if group then
+		local p = "";
+		for i=0,depth,1 do
+			p = p .. "-";
+		end
+		p = p .. tostring(group.key or group.text) .. ":" .. tostring(group.keyval);
+		print(p);
+		if group.g then
+			for i,sg in ipairs(group.g) do
+				app.PrintGroup(sg,depth + 1);
+			end
+		end
+	end
+	print("---")
+end
+local SkipTableFields = {
+	parent = 1,
+	sourceParent = 1,
+	symParent = 1,
+	__merge = 1,
+	window = 1,
+}
+app.PrintTable = function(t,depth,preface,...)
+	-- only allowing table prints when Debug print is active
+	if not app.Debugging then return; end
+	if preface then app.PrintDebug(preface,...) end
+	if t == nil then print("nil"); return; end
+	local secret = issecretvalue(t) and "<secret>" or ""
+	depth = depth or 0;
+	local p = "";
+	for i=1,depth,1 do
+		p = p .. "-";
+	end
+	if type(t) ~= "table" then print(p,type(t),secret,t); return; end
+	if issecretvalue(t) then
+		print(p,secret,tostring(t))
+		return
+	end
+	if depth == 0 then app._PrintTable = {}; end
+	-- dont accidentally recursively print the same table
+	if not app._PrintTable[t] then
+		app._PrintTable[t] = true;
+		print(p,tostring(t),"__type",t.__type," {");
+		for k,v in pairs(t) do
+			secret = issecretvalue(v) and "<secret>" or ""
+			if SkipTableFields[k] then
+				print(p,k,secret,":",tostring(v), "[SKIPPED]")
+			elseif type(v) == "table" then
+				if k == "g" then
+					print(p,k,secret,": #",v and #v)
+				else
+					print(p,k,":");
+					app.PrintTable(v,depth + 1);
+				end
+			else
+				print(p,k,secret,":",tostring(v))
+			end
+		end
+		if getmetatable(t) then
+			print(p,"__index:");
+			app.PrintTable(getmetatable(t).__index, depth + 1);
+		end
+		print(p,"}");
+	else
+		print(p,tostring(t),"RECURSIVE");
+	end
+end
+app.PrintError = function(err, source, co)
+	app.report("Stack Trace #"..app.UniqueCounter.errorID,"Source:",source,"Error:",err,"Stack:",co and debugstack(co) or debugstack())
+end

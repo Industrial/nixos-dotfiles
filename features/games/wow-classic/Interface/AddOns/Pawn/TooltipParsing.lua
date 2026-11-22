@@ -41,6 +41,7 @@ PawnKillLines =
 {
 	"^ \n$", -- The blank line before set items before WoW 2.3
 	" %(%d+/%d+%)$", -- The (1/8) on set items for all versions of WoW
+	"（%d+/%d+）$", -- The (1/8) on set items in Traditional Chinese
 }
 -- MobInfo-2 compatibility
 if MI_LightBlue and MI_TXT_DROPPED_BY then
@@ -61,8 +62,8 @@ PawnSeparatorIgnorePrefixes =
 PawnNormalizationRegexes =
 {
 	{"^|c........(.+)$", "%1"}, -- "|cFF 0FF 0Heroic" --> "Heroic"
-	{"^([%w%s%.]+) %+(%d+)%%?$", "+%2 %1"}, -- "Stamina +5" --> "+5 Stamina"
 	{L.NormalizationEnchant, "%1"}, -- "Enchanted: +50 Strength" --> "+50 Strength" (ENCHANTED_TOOLTIP_LINE)
+	{"^([%w%s%.]+) %+(%d+)%%?$", "+%2 %1"}, -- "Stamina +5" --> "+5 Stamina"
 }
 
 -- These regular expressions are used to parse item tooltips.
@@ -226,6 +227,7 @@ PawnRegexes =
 	{L.BlockRating2, "BlockRating"}, -- Burning Crusade, /pawn compare 29323
 	{L.Block, "BlockValue"}, -- Classic, /pawn compare 18499
 	{L.BlockValue, "BlockValue"}, -- Classic, /pawn compare 18499
+	{L.BlockValueForever, "BlockValue"}, -- Forever, /pawn compare 18499
 	{L.Dps}, -- Ignore this; DPS is calculated manually
 	{L.DpsAdd, "Dps"},
 	{L.EnchantmentFieryWeapon, "Dps", 4, PawnMultipleStatsFixed}, -- weapon enchantment
@@ -261,6 +263,7 @@ PawnRegexes =
 	{L.ExpertiseRating, "ExpertiseRating"}, -- Burning Crusade, /pawn compare 19351
 	{L.ExpertiseRatingShort, "ExpertiseRating"}, -- Wrath, Precise Bloodstone
 	{L.ExpertiseClassic, "ExpertiseRating"}, -- Classic SoD, /pawn compare 236019
+	{L.ExpertiseForever, "ExpertiseRating"}, -- Forever, /pawn compare 275971
 	{L.ArmorPenetration, "ArmorPenetration"},
 	{L.ArmorPenetrationRating, "ArmorPenetration"}, -- Burning Crusade, /pawn compare 34703
 	{L.ArmorPenetrationRating2, "ArmorPenetration"}, -- Burning Crusade, /pawn compare 41592 or 42642 or 44303 depending on locale
@@ -277,11 +280,13 @@ PawnRegexes =
 	{L.HasteRating2, "HasteRating"}, -- Burning Crusade esES, /pawn compare 32570
 	{L.HasteRatingShort, "HasteRating"}, -- Wrath, Quick Sun Crystal / Burning Crusade, random-stat items only
 	{L.HasteClassic, "HasteRating"}, -- Classic SoD, /pawn compare 236019
+	{L.HasteCombined, "HasteRating"}, -- Forever, /pawn compare 240128
 	{L.SpellHasteRating, "SpellHasteRating"}, -- /pawn compare 34360
 	{L.SpellHasteRatingShort, "SpellHasteRating"}, -- https://tbc.wowhead.com/item=35315/quick-dawnstone
 	{L.SpellHasteClassic, "SpellHasteRating"}, -- Classic SoD, /pawn compare 236062
 	{L.SpellPenetration, "SpellPenetration"}, -- Burning Crusade, /pawn compare 21563
 	{L.SpellPenetrationClassic, "SpellPenetration"}, -- Classic (pre-TBC), /pawn compare 21338
+	{L.SpellPenetrationForever, "SpellPenetration"}, -- Forever, /pawn compare both 944
 	{L.SpellPenetrationShort, "SpellPenetration"}, -- Burning Crusade, https://tbc.wowhead.com/item=24039/stormy-star-of-elune
 	{L.Mastery, "MasteryRating"}, -- Zen Dream Emerald
 	{L.Mastery2, "MasteryRating"}, -- unused in English
@@ -313,18 +318,21 @@ PawnRegexes =
 	{L.EnchantmentHealth2, "Stamina", 1/12.5, PawnSingleStatMultiplier}, -- +150 health enchantment (counting 1 HP = 1/12.5 Stamina)
 	{L.Armor, "Armor"}, -- normal armor and cloak armor enchantments
 	{L.Armor2, "Armor"}, -- unused in English
+	{L.Armor3, "Armor"}, -- Forever in French and some other languages but not English, /pawn compare both 16455
 	{L.EnchantmentArmorKit, "Armor"}, -- armor kits
 	{L.FireResist, "FireResist"}, -- /pawn compare 12609
 	{L.NatureResist, "NatureResist"}, -- /pawn compare 12609
 	{L.FrostResist, "FrostResist"}, -- /pawn compare 12609
 	{L.ShadowResist, "ShadowResist"}, -- /pawn compare 12609
 	{L.ArcaneResist, "ArcaneResist"}, -- /pawn compare 12609
+	{L.AllResist, "ArcaneResist", 1, PawnMultipleStatsExtract, "FireResist", 1, PawnMultipleStatsExtract, "FrostResist", 1, PawnMultipleStatsExtract, "NatureResist", 1, PawnMultipleStatsExtract, "ShadowResist", 1, PawnMultipleStatsExtract }, -- Forever, /pawn compare 12609
 	{L.SpellDamage, "SpellDamage", 1, PawnMultipleStatsExtract, "Healing", 1, PawnMultipleStatsExtract}, -- /pawn compare item:20686::::::2159 ("of Sorcery" on Classic)
 	{L.SpellDamage2, "SpellDamage", 1, PawnMultipleStatsExtract, "Healing", 1, PawnMultipleStatsExtract}, -- /pawn compare 16947
 	{L.SpellDamage3, "SpellDamage", 1, PawnMultipleStatsExtract, "Healing", 1, PawnMultipleStatsExtract}, -- French on Classic uses two different wordings:  /pawn compare 20641 vs. /pawn compare 10041
 	{L.SpellDamage4, "SpellDamage", 1, PawnMultipleStatsExtract, "Healing", 1, PawnMultipleStatsExtract}, -- Simplified Chinese on Classic uses many different wordings:  /pawn compare 16923 vs. /pawn compare 18608
 	{L.SpellDamage5, "SpellDamage", 1, PawnMultipleStatsExtract, "Healing", 1, PawnMultipleStatsExtract}, -- Burning Crusade, /pawn compare item:789::::::-36
 	{L.SpellDamage6, "SpellDamage", 1, PawnMultipleStatsExtract, "Healing", 1, PawnMultipleStatsExtract}, -- Burning Crusade, /pawn compare 33467
+	{L.SpellDamageNoHealing, "SpellDamage"}, -- Forever, /pawn compare 286427
 	{L.SpellDamageAndHealing, "Healing", 1, PawnMultipleStatsExtract, "SpellDamage", 2, PawnMultipleStatsExtract}, -- Burning Crusade, /pawn compare 34360
 	{L.SpellDamageAndHealing2, "Healing", 1, PawnMultipleStatsExtract, "SpellDamage", 2, PawnMultipleStatsExtract}, -- Burning Crusade, /pawn compare 28304
 	{L.SpellDamageAndHealingEnchant, "Healing", 1, PawnMultipleStatsExtract, "SpellDamage", 2, PawnMultipleStatsExtract}, -- Burning Crusade, /script PawnUIGetAllTextForItem("item:16943:2566") (matches Short in some locales; don't double-dip)
@@ -352,6 +360,7 @@ PawnRegexes =
 	{L.Healing, "Healing"}, -- /pawn compare item:789::::::2028
 	{L.Healing2, "Healing"}, -- /pawn compare 16947
 	{L.Healing3, "Healing"}, -- Burning Crusade, /pawn compare item:789::::::-38
+	{L.Healing4, "Healing"}, -- Forever, /pawn compare 2816
 	{L.SpellPower, "SpellPower"}, -- /pawn tooltip 39998
 	{L.SpellPower2, "SpellPower"}, -- /pawn compare 40585
 	{L.SpellPower3, "SpellPower"}, -- /pawn compare item:20686::::::2159
