@@ -3,6 +3,10 @@
   settings,
   ...
 }: {
+  # Leaving the /etc overlay (features/nixos/etc-overlay, GH-185) has to work in every
+  # generation that does not enable it, so that half lives here, on every host.
+  imports = [./etc-overlay/exit.nix];
+
   # Locale configuration - ensures locales are pre-generated at system level
   # (prevents pressure-vessel/steamrt from regenerating on every game launch)
   i18n = {

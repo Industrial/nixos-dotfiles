@@ -182,6 +182,7 @@
   ./nixos/vopt
   ./nixos/vfiles
   ./nixos/vgen
+  ./nixos/etc-overlay
   ./nixos/window-manager
 
   # performance
