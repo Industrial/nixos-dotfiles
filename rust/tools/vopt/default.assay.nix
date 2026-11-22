@@ -13,7 +13,7 @@ in
     nameIsTheCrateName = assay.eq pkg.pname manifest.package.name;
     versionIsTheCrateVersion = assay.eq pkg.version manifest.package.version;
     mainProgramIsVopt = assay.eq pkg.meta.mainProgram "vopt";
-    voltaicPinnedExactly = assay.eq manifest.build-dependencies.voltaic-driver "=0.2.1";
+    voltaicPinnedExactly = assay.eq manifest.build-dependencies.voltaic-driver "=0.3.0";
     idEffectPinnedExactly = assay.eq manifest.dependencies.id_effect "=0.13.0";
     isStandalone = assay.eq (manifest ? workspace) true;
   }

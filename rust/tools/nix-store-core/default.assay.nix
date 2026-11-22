@@ -30,7 +30,7 @@ in
     # One id_effect version per build, pinned exactly; Voltaic pinned past
     # 0.2.0's miscompiles.
     idEffectPinned = assay.eq manifest.dependencies.id_effect "=0.13.0";
-    voltaicPinned = assay.eq manifest.build-dependencies.voltaic-driver "=0.2.1";
+    voltaicPinned = assay.eq manifest.build-dependencies.voltaic-driver "=0.3.0";
 
     # The golden tests read tests/fixtures in checkPhase, so the source carries it.
     fixturesInSource = assay.eq (map (f: builtins.pathExists "${pkg.src}/tests/fixtures/${f}") ["paths.json" "drvs.json" "nar-tree.json"]) [true true true];

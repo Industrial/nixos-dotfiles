@@ -29,7 +29,7 @@ in
     # One id_effect version per build, pinned exactly; Voltaic pinned past
     # 0.2.0's miscompiles.
     idEffectPinned = assay.eq manifest.dependencies.id_effect "=0.13.0";
-    voltaicPinned = assay.eq manifest.build-dependencies.voltaic-driver "=0.2.1";
+    voltaicPinned = assay.eq manifest.build-dependencies.voltaic-driver "=0.3.0";
 
     # rusqlite (through nix-store-core) builds its bundled SQLite: without this
     # the fleet build fails with `ld: cannot find -lsqlite3`.

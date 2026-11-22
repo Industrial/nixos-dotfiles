@@ -15,7 +15,7 @@ in
     mainProgramIsVgc = assay.eq pkg.meta.mainProgram "vgc";
     # Voltaic and id_effect are pinned exactly: Voltaic's surface still moves between
     # minors, and two id_effect versions' types do not unify.
-    voltaicPinnedExactly = assay.eq manifest.build-dependencies.voltaic-driver "=0.2.1";
+    voltaicPinnedExactly = assay.eq manifest.build-dependencies.voltaic-driver "=0.3.0";
     idEffectPinnedExactly = assay.eq manifest.dependencies.id_effect "=0.13.0";
     # Standalone crate: its own lockfile, never a member of rust/Cargo.toml.
     isStandalone = assay.eq (manifest ? workspace) true;

@@ -30,7 +30,7 @@ in
     # 0.2.0's miscompiles.
     idEffectPinned =
       assay.eq [manifest.dependencies.id_effect manifest.dependencies.id_effect_cli manifest.dependencies.id_effect_platform] ["=0.13.0" "=0.13.0" "=0.13.0"];
-    voltaicPinned = assay.eq manifest.build-dependencies.voltaic-driver "=0.2.1";
+    voltaicPinned = assay.eq manifest.build-dependencies.voltaic-driver "=0.3.0";
 
     # Bundled SQLite, liblzma, zstd and aws-lc build their vendored sources: without
     # this the fleet build fails at `ld: cannot find -lsqlite3` while cargo passes.

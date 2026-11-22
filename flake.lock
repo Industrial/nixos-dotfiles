@@ -1334,11 +1334,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795237921,
-        "narHash": "sha256-PhyFoQd0obQCLtXRwh2L+Xm0QOZ5FZhPYzFJsanUHiM=",
+        "lastModified": 1795264644,
+        "narHash": "sha256-aSyMOBiSwN5HOca4r0laUNxJIOf8oqAsTvI3Rg/qPpU=",
         "owner": "Industrial",
         "repo": "voltaic",
-        "rev": "9d0159586caf621db1b8b4f2fb15a5da1c1098ca",
+        "rev": "bc9942b2e7da8143f14c3bf12d0fd38e381bed8b",
         "type": "github"
       },
       "original": {

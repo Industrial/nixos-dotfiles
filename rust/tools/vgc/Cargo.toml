@@ -32,8 +32,8 @@ nix = { version = "0.30", default-features = false, features = [
 # 0.2.0 has silent miscompiles that 0.2.1 fixes, and the surface still moves
 # between minors.
 [build-dependencies]
-voltaic-driver = "=0.2.1"
-voltaic-diag = "=0.2.1"
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
 
 [lib]
 name = "vgc"

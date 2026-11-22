@@ -29,8 +29,8 @@ tokio = { version = "1", features = ["process", "io-util"] }
 # Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
 # exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
 [build-dependencies]
-voltaic-driver = "=0.2.1"
-voltaic-diag = "=0.2.1"
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
 
 [lib]
 name = "vbuild"

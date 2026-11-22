@@ -15,8 +15,8 @@ sysinfo = "0.31"
 # Pinned exactly: the compiler decides what this daemon kills, and 0.2.0 has
 # silent miscompiles that 0.2.1 fixes. Bump deliberately, re-running the tests.
 [build-dependencies]
-voltaic-driver = "=0.2.1"
-voltaic-diag = "=0.2.1"
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
 
 [lib]
 name = "oomkiller"

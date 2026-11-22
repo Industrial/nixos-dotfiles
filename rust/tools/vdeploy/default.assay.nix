@@ -29,7 +29,7 @@ in
     # One id_effect version per build, pinned exactly; Voltaic pinned past
     # 0.2.0's miscompiles; vdiff and nix-store-core by path.
     idEffectPinned = assay.eq [manifest.dependencies.id_effect manifest.dependencies.id_effect_cli] ["=0.13.0" "=0.13.0"];
-    voltaicPinned = assay.eq [manifest.build-dependencies.voltaic-driver manifest.build-dependencies.voltaic-diag] ["=0.2.1" "=0.2.1"];
+    voltaicPinned = assay.eq [manifest.build-dependencies.voltaic-driver manifest.build-dependencies.voltaic-diag] ["=0.3.0" "=0.3.0"];
     vdiffByPath = assay.eq manifest.dependencies.vdiff {path = "../vdiff";};
     nixStoreCoreByPath = assay.eq manifest.dependencies.nix-store-core {path = "../nix-store-core";};
 
