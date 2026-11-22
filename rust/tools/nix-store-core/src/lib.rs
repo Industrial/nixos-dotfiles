@@ -38,6 +38,13 @@ pub mod db {
     include!(concat!(env!("OUT_DIR"), "/db.rs"));
 }
 
+// Store databases with Nix's schema, for tests: this crate's, and with the
+// `test-support` feature (taken as a dev-dependency feature) a consumer's.
+#[cfg(any(test, feature = "test-support"))]
+pub mod testdb {
+    include!(concat!(env!("OUT_DIR"), "/testdb.rs"));
+}
+
 // Profile generations and Nix's `--delete-older-than` rule: vgc's module,
 // lifted for vgen (GH-190). The allows are on the shape of Voltaic's emitted
 // loops and `if let`s, not on decisions in the source (see vgc's lib.rs).

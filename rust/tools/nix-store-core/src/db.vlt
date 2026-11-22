@@ -132,23 +132,8 @@ closure_of_all conn paths =
       out.extend c
   Ok out
 
--- A store database in memory, for tests: Nix's schema for the two tables
--- read here, and the rows given as (path, base-16 hash, references).
 #[cfg(test)]
-export memory_db : Vec<(&str, &str, Vec<&str>)> -> Connection
-memory_db rows =
-  conn = Connection::open_in_memory () |> .expect "an in-memory database"
-  conn.execute_batch "CREATE TABLE ValidPaths (id integer primary key autoincrement not null, path text unique not null, hash text not null, registrationTime integer not null, deriver text, narSize integer, ultimate integer, sigs text, ca text); CREATE TABLE Refs (referrer integer not null, reference integer not null, primary key (referrer, reference));" |> .expect "the schema"
-  for row in &rows
-    (path, hash, _) = row
-    added = conn.execute "INSERT INTO ValidPaths (path, hash, registrationTime, narSize) VALUES (?1, ?2, 0, 8)" ([*path, *hash]) |> .expect "a path"
-    assert_eq! \-> added \-> 1
-  for row in &rows
-    (path, _, refs) = row
-    for r in refs
-      linked = conn.execute "INSERT INTO Refs (referrer, reference) SELECT a.id, b.id FROM ValidPaths a, ValidPaths b WHERE a.path = ?1 AND b.path = ?2" ([*path, *r]) |> .expect "a reference"
-      assert_eq! \-> linked \-> 1
-  conn
+import crate::testdb::memory_db
 
 #[cfg(test)]
 const H : &str = "sha256:044b884fce3dd89e5cd04f725b59c2abf51f0c2b496830d3f186107269cda902"
@@ -201,3 +186,4 @@ test "a hash part no valid path has is not found"
     assert! \-> conn.is_ok ()
     found = conn.map (\c -> lookup (&c) "/nix/store" "00000000000000000000000000000000" |> .map (\o -> o.is_none ()) |> .unwrap_or false)
     assert! \-> found.unwrap_or false
+

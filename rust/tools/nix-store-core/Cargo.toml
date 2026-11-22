@@ -25,6 +25,12 @@ sha2 = "0.10"
 # socket and over any AsyncRead + AsyncWrite (an ssh `nix-daemon --stdio` pipe).
 tokio = { version = "1", features = ["io-util", "net", "sync"] }
 
+[features]
+# `testdb`: store databases with Nix's schema, for a consumer's own tests.
+# Take it as a dev-dependency feature, so the consumer's build keeps the plain
+# API.
+test-support = []
+
 [dev-dependencies]
 serde_json = "1"
 

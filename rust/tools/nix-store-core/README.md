@@ -167,6 +167,25 @@ them.
 
 None means "not a valid path". GC roots and the `DerivationOutputs` walk stay in vgc.
 
+### `testdb`: store databases for tests (`test-support` feature)
+
+Built for this crate's own tests, and for a consumer's with the
+`test-support` feature, taken as a dev-dependency feature so the consumer's
+build keeps the plain API (`Cargo.lock` does not change):
+
+```toml
+[dev-dependencies]
+nix-store-core = { path = "../nix-store-core", features = ["test-support"] }
+```
+
+| Item | Meaning |
+|---|---|
+| `SCHEMA : &str` | libstore's `schema.sql`: ValidPaths, Refs with IndexReferrer and IndexReference, DerivationOutputs |
+| `schema_db : &str -> Connection` | an empty store database at a file path or `:memory:`; the caller inserts rows with SQL |
+| `memory_db : Vec<(&str, &str, Vec<&str>)> -> Connection` | in memory, with (path, base-16 hash, references) rows, each at time 0 with narSize 8 |
+
+They panic on failure: they are fixtures.
+
 ### `generations`: profile generations and `--delete-older-than`
 
 vgc's module (`rust/tools/vgc/src/generations.vlt`), lifted unchanged with its
