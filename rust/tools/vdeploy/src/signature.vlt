@@ -48,7 +48,7 @@ split_signed raw =
       sig.push '\n'
     else
       more = if in_sig
-        line.strip_prefix " "
+        line.strip_prefix ' '
       else
         None
       case more of
