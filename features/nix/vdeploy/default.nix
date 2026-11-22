@@ -49,6 +49,13 @@
 # --collector.textfile.directory). The earlier "unless vverify is on" test missed vhealth,
 # which also adds the flag (GH-221).
 #
+# The wake (GH-246, deploy mode): `vdeploy wake` writes a byte into the FIFO /run/vdeploy/wake
+# (root:vdeploy-wake 0620; the group is the fleet's operator only) and the poller polls main
+# now instead of at the end of its interval. It carries nothing, so the pinned URL, the
+# verification, the debounce, the bad marks and the health gate still decide; the interval
+# poll stays the default. `fleet deploy` is `ssh <host> vdeploy wake --wait`. Rollback:
+# `features.nix.vdeploy.wake.enable = false;`.
+#
 # Observe-mode rollback: `features.nix.vdeploy.enable = lib.mkForce false;` removes the unit.
 #
 # Health probe (on the host, no root needed):
@@ -123,6 +130,9 @@
     then "users"
     else g;
   userHome = config.users.users.${user}.home or "/home/${user}";
+  # The wake FIFO (GH-246), in deploy mode only.
+  wakeFifo = "/run/vdeploy/wake";
+  wakes = deploy && cfg.wake.enable;
 in {
   imports = [../../monitoring/textfile-collector.nix];
 
@@ -179,6 +189,30 @@ in {
         How long main must stay on one commit before a plan starts (0: no wait). Give slow
         hosts a longer window. This never cancels a plan in flight.
       '';
+    };
+    # GH-246: let an operator make vdeploy poll main now (`vdeploy wake`, `fleet deploy`).
+    wake = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Deploy mode: the wake FIFO ${wakeFifo}. A write makes the poller poll main now
+          instead of at the end of its interval; it carries nothing, so the pinned URL,
+          the verification, the debounce, the bad marks and the health gate still decide.
+          The poll on `interval` stays the default and the fallback.
+        '';
+      };
+      operators = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        # The operator where it is a normal user on this host (every fleet host); a host
+        # without one (a test node) has nobody who may wake it, never a stand-in.
+        default = lib.filter (u: config.users.users.${u}.isNormalUser or false) [user];
+        defaultText = lib.literalExpression "[ settings.username ] (where it is a normal user)";
+        description = ''
+          Who may wake vdeploy (group vdeploy-wake): the fleet's operator, the user whose
+          keys features/fleet/operator-ssh authorises fleet-wide. Normal users only.
+        '';
+      };
     };
     dotfiles = {
       enable = lib.mkOption {
@@ -253,7 +287,8 @@ in {
                 "--systemd-run"
                 "${systemd}/bin/systemd-run"
               ]
-              ++ applyArgs)
+              ++ applyArgs
+              ++ lib.optionals wakes ["--wake-fifo" wakeFifo])
             ++ lib.optionals cfg.dotfiles.enable [
               "--dotfiles"
               cfg.dotfiles.path
@@ -286,7 +321,7 @@ in {
           ProtectSystem = "strict";
           ProtectHome = "read-only";
           # `-`: a host without the checkout still starts (it is reported missing).
-          ReadWritePaths = [textfileDir] ++ lib.optional cfg.dotfiles.enable "-${cfg.dotfiles.path}";
+          ReadWritePaths = [textfileDir] ++ lib.optional cfg.dotfiles.enable "-${cfg.dotfiles.path}" ++ lib.optional wakes "-/run/vdeploy";
           PrivateTmp = true;
           PrivateDevices = true;
           ProtectKernelTunables = true;
@@ -310,17 +345,33 @@ in {
     }
 
     (lib.mkIf deploy {
-      assertions = [
-        {
-          assertion = config.environment.etc ? "vhealth/probes.json";
-          message = "features.nix.vdeploy.mode = \"deploy\" decides keep or rollback with vhealth: enable features.nix.vhealth (and its probes) on this host.";
-        }
-      ];
+      assertions =
+        [
+          {
+            assertion = config.environment.etc ? "vhealth/probes.json";
+            message = "features.nix.vdeploy.mode = \"deploy\" decides keep or rollback with vhealth: enable features.nix.vhealth (and its probes) on this host.";
+          }
+        ]
+        # Only operators may wake vdeploy (GH-246): normal users, never a system user.
+        ++ lib.optionals wakes (map (u: {
+            assertion = (config.users.users.${u}.isNormalUser or false) && !(config.users.users.${u}.isSystemUser or false);
+            message = "features.nix.vdeploy.wake.operators: ${u} must be a normal (operator) user, not a system user.";
+          })
+          cfg.wake.operators);
 
       environment.systemPackages = [applyNow];
 
+      # The wake (GH-246): a FIFO the operators may write and nobody else may open. tmpfiles
+      # creates it at boot and on every switch, before vdeploy starts reading it.
+      users.groups.vdeploy-wake.members = lib.mkIf wakes cfg.wake.operators;
+
       # The candidate generation's GC root, while an apply decides on it.
-      systemd.tmpfiles.rules = ["d ${gcroots} 0755 root root - -"];
+      systemd.tmpfiles.rules =
+        ["d ${gcroots} 0755 root root - -"]
+        ++ lib.optionals wakes [
+          "d /run/vdeploy 0755 root root - -"
+          "p ${wakeFifo} 0620 root vdeploy-wake - -"
+        ];
 
       # comin's tombstone (see the header). Only where the real comin is off, so the rollback
       # option gets the real unit back.
