@@ -46,10 +46,11 @@
   vhealthOn = config.users.users ? vhealth;
   window = config.features.nix.vdeploy.healthWindow or "2m";
   # GH-243: the eval cache follows vdeploy's option (one rollback for both).
-  evalCache = config.features.nix.vdeploy.evalCache or {
-    enable = false;
-    caches = [];
-  };
+  evalCache =
+    config.features.nix.vdeploy.evalCache or {
+      enable = false;
+      caches = [];
+    };
   cacheFlags =
     if evalCache.enable && evalCache.caches != []
     then

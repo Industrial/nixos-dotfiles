@@ -33,7 +33,14 @@ let
   cacheOpt = enable: {
     options.features.nix.vdeploy.evalCache = {
       enable = lib.mkOption {default = enable;};
-      caches = lib.mkOption {default = [{url = "http://cache:5100"; publicKey = "c-1:k";}];};
+      caches = lib.mkOption {
+        default = [
+          {
+            url = "http://cache:5100";
+            publicKey = "c-1:k";
+          }
+        ];
+      };
     };
   };
   scriptWith = enable: (builtins.head (builtins.filter (p: (p.name or "") == "vswitch") (nixos.eval {modules = [./default.nix (cacheOpt enable)];}).environment.systemPackages)).text;

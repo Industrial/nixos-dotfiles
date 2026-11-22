@@ -222,12 +222,7 @@ test "golden: a record for another tree, flake.lock, commit, host or Nix is a mi
   info = narinfo_for "/nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-nixos-system-mimir" "vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir-nixos-system-mimir.drv"
   k = sample_key ()
   text = signed_text ()
-  mut others = Vec::new () : Vec<Key>
-  others.push (Key { tree = .to_string "4b825dc642cb6eb9a060e54bf8d69288fbee4905", ...k.clone () })
-  others.push (Key { lock = .to_string "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d5", ...k.clone () })
-  others.push (Key { commit = .to_string "20456cfc2d62540970eb9c40bc34a840da517ca8", ...k.clone () })
-  others.push (Key { host = .to_string "drakkar", ...k.clone () })
-  others.push (Key { nix = .to_string "nix (Nix) 2.32.0", ...k.clone () })
+  others = .to_vec ([Key { tree = .to_string "4b825dc642cb6eb9a060e54bf8d69288fbee4905", ...k.clone () }, Key { lock = .to_string "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d5", ...k.clone () }, Key { commit = .to_string "20456cfc2d62540970eb9c40bc34a840da517ca8", ...k.clone () }, Key { host = .to_string "drakkar", ...k.clone () }, Key { nix = .to_string "nix (Nix) 2.32.0", ...k.clone () }]) : Vec<Key>
   for other in &others
     assert_eq! \-> kind (&(judged (&trusted ()) other (Some (text.as_str ())) (Some (info.as_str ())))) \-> "miss"
 
