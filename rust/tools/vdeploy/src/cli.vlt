@@ -21,7 +21,7 @@
 
 import nix_store_core::db
 
-export const USAGE : &str = "usage: vdeploy --host NAME [--mode observe|deploy] [--once] [--url URL] [--branch NAME] [--repo DIR] [--interval DURATION] [--debounce DURATION] [--tick DURATION] [--state-dir DIR] [--textfile-dir DIR] [--db FILE] [--git PROG] [--nix PROG] [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP] [--dotfiles-home DIR]] [APPLY OPTIONS] [--systemd-run PROG]\n       vdeploy apply [--toplevel PATH] [--state-dir DIR] [--textfile-dir DIR] [APPLY OPTIONS]\nAPPLY OPTIONS: [--health-window DURATION] [--health-every DURATION] [--vhealth PROG] [--profile PATH] [--gcroot PATH] [--nix-env PROG] [--nix-store PROG] [--systemctl PROG] [--comin-unit UNIT] [--health-as USER [--health-group GROUP] [--setpriv PROG]]"
+export const USAGE : &str = "usage: vdeploy --host NAME [--mode observe|deploy] [--once] [--url URL] [--branch NAME] [--repo DIR] [--interval DURATION] [--debounce DURATION] [--tick DURATION] [--state-dir DIR] [--textfile-dir DIR] [--db FILE] [--git PROG] [--nix PROG] [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP] [--dotfiles-home DIR]] [APPLY OPTIONS] [--systemd-run PROG] [--wake-fifo PATH]\n       vdeploy wake [--wait] [--timeout DURATION] [--fifo PATH] [--state-dir DIR]\n       vdeploy apply [--toplevel PATH] [--state-dir DIR] [--textfile-dir DIR] [APPLY OPTIONS]\nAPPLY OPTIONS: [--health-window DURATION] [--health-every DURATION] [--vhealth PROG] [--profile PATH] [--gcroot PATH] [--nix-env PROG] [--nix-store PROG] [--systemctl PROG] [--comin-unit UNIT] [--health-as USER [--health-group GROUP] [--setpriv PROG]]"
 
 export const DEFAULT_URL : &str = "https://github.com/Industrial/nixos-dotfiles.git"
 
@@ -60,11 +60,12 @@ export data Options
   , export health_as Option<String>
   , export health_group Option<String>
   , export setpriv String
+  , export wake_fifo Option<String>
   }
   deriving (Clone, Debug, PartialEq)
 
 export defaults : Options
-defaults = Options { host = String::new (), once = false, url = DEFAULT_URL.to_string (), branch = .to_string "main", repo = .to_string "/var/lib/vdeploy/repo", interval = 60, debounce = 0, tick = 5, state_dir = None, textfile_dir = None, db = db::DEFAULT_DB.to_string (), git = .to_string "git", nix = .to_string "nix", dotfiles = None, dotfiles_user = None, dotfiles_group = None, dotfiles_home = None, help = false, deploy = false, apply = false, toplevel = None, health_window = 120, health_every = 2, systemd_run = .to_string "systemd-run", systemctl = .to_string "systemctl", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", profile = .to_string "/nix/var/nix/profiles/system", gcroot = .to_string "/nix/var/nix/gcroots/vdeploy/candidate", vhealth = None, comin_unit = .to_string "comin.service", health_as = None, health_group = None, setpriv = .to_string "setpriv" }
+defaults = Options { host = String::new (), once = false, url = DEFAULT_URL.to_string (), branch = .to_string "main", repo = .to_string "/var/lib/vdeploy/repo", interval = 60, debounce = 0, tick = 5, state_dir = None, textfile_dir = None, db = db::DEFAULT_DB.to_string (), git = .to_string "git", nix = .to_string "nix", dotfiles = None, dotfiles_user = None, dotfiles_group = None, dotfiles_home = None, help = false, deploy = false, apply = false, toplevel = None, health_window = 120, health_every = 2, systemd_run = .to_string "systemd-run", systemctl = .to_string "systemctl", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", profile = .to_string "/nix/var/nix/profiles/system", gcroot = .to_string "/nix/var/nix/gcroots/vdeploy/candidate", vhealth = None, comin_unit = .to_string "comin.service", health_as = None, health_group = None, setpriv = .to_string "setpriv", wake_fifo = None }
 
 -- A duration in seconds: bare seconds, or a number with s/m/h/d.
 export parse_duration : &str -> Option<u64>
@@ -140,6 +141,8 @@ parse_args args =
         o.health_as := Some ((value (it.next ()) "--health-as")?)
       "--setpriv" ->
         o.setpriv := (value (it.next ()) "--setpriv")?
+      "--wake-fifo" ->
+        o.wake_fifo := Some ((value (it.next ()) "--wake-fifo")?)
       "--health-group" ->
         o.health_group := Some ((value (it.next ()) "--health-group")?)
       "--host" ->
@@ -191,6 +194,29 @@ parse_args args =
     return Err (.to_string "--dotfiles-user, --dotfiles-group and --dotfiles-home need --dotfiles")
   Ok o
 
+-- `vdeploy wake [--wait] [--timeout DURATION] [--fifo PATH] [--state-dir DIR]`
+-- (GH-246): the operator's command, no root needed.
+export data WakeOptions { export wait bool, export timeout u64, export fifo String, export state_dir String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export wake_args : &[String] -> Result<WakeOptions, String>
+wake_args args =
+  mut o = WakeOptions { wait = false, timeout = 1800, fifo = crate::wake::WAKE_FIFO.to_string (), state_dir = .to_string "/var/lib/vdeploy" }
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "--wait" ->
+        o.wait := true
+      "--timeout" ->
+        o.timeout := (positive (it.next ()) "--timeout")?
+      "--fifo" ->
+        o.fifo := (value (it.next ()) "--fifo")?
+      "--state-dir" ->
+        o.state_dir := (value (it.next ()) "--state-dir")?
+      other ->
+        return Err "unknown argument to `vdeploy wake`: #{other}"
+  Ok o
+
 #[cfg(test)]
 args : &[&str] -> Vec<String>
 args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
@@ -227,3 +253,14 @@ test "deploy mode, and the apply subcommand with its options"
 
 test "durations"
   assert_eq! \-> (parse_duration "0", parse_duration "90", parse_duration "2m", parse_duration "1h", parse_duration "1d", parse_duration "1w") \-> (Some 0, Some 90, Some 120, Some 3600, Some 86400, None)
+
+test "vdeploy wake: defaults, every option, and refusals"
+  d = wake_args (&args (&[])) |> .expect "wake"
+  assert_eq! \-> d \-> WakeOptions { wait = false, timeout = 1800, fifo = .to_string "/run/vdeploy/wake", state_dir = .to_string "/var/lib/vdeploy" }
+  o = wake_args (&args (&["--wait", "--timeout", "5m", "--fifo", "/f", "--state-dir", "/s"])) |> .expect "wake"
+  assert_eq! \-> (o.wait, o.timeout, o.fifo.as_str (), o.state_dir.as_str ()) \-> (true, 300, "/f", "/s")
+  assert! \-> wake_args (&args (&["--toplevel", "/x"])) |> .is_err
+  assert! \-> wake_args (&args (&["--timeout", "0"])) |> .is_err
+  -- The daemon side: the FIFO it reads.
+  w = parse_args (&args (&["--host", "h", "--wake-fifo", "/run/vdeploy/wake"])) |> .expect "options"
+  assert_eq! \-> w.wake_fifo \-> Some (.to_string "/run/vdeploy/wake")

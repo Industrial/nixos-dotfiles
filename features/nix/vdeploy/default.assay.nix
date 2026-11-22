@@ -188,4 +188,34 @@ in
       LockPersonality = true;
       SystemCallArchitectures = "native";
     };
+
+    # GH-246, the wake: deploy mode only, a FIFO only the operators may write, and the poll on
+    # `interval` still the default (the flag adds a trigger, it removes nothing).
+    wakeInDeployModeOnly = assay.eq [(lib.hasInfix "--wake-fifo /run/vdeploy/wake" deployed.systemd.services.vdeploy.serviceConfig.ExecStart) (lib.hasInfix "--wake-fifo" cfg.systemd.services.vdeploy.serviceConfig.ExecStart)] [true false];
+    pollStaysTheDefault = assay.eq (lib.hasInfix "--interval " deployed.systemd.services.vdeploy.serviceConfig.ExecStart) true;
+    wakeFifoForTheOperatorsOnly = assay.eq (builtins.elem "p /run/vdeploy/wake 0620 root vdeploy-wake - -" deployed.systemd.tmpfiles.rules) true;
+    wakeGroupIsTheOperator = assay.eq deployed.users.groups.vdeploy-wake.members ["alice"];
+    # Never a service or system user: nobody, vhealth, vci, root, or anything isSystemUser.
+    wakeGroupHasNoSystemUser = let
+      inherit (deployed.users.groups.vdeploy-wake) members;
+      system = u: builtins.elem u ["root" "nobody" "vhealth" "vci" "vdeploy"] || (deployed.users.users.${u}.isSystemUser or false);
+    in
+      assay.eq (builtins.filter system members) [];
+    wakeRefusesASystemOperator = let
+      withNobody = nixos.eval {modules = [./default.nix base fleet probes {features.nix.vdeploy.mode = "deploy";} {features.nix.vdeploy.wake.operators = ["nobody"];}];};
+    in
+      assay.eq (builtins.any (lib.hasInfix "nobody must be a normal (operator) user") (failedAssertions withNobody)) true;
+    # What `vdeploy wake --wait` reads (status.json, plan.json, last.json) is readable by the
+    # operator: a 0755 state directory, 0644 files.
+    # A host with no such user (a test node) has no operator, never a stand-in, and evaluates.
+    noOperatorWithoutTheUser = let
+      bare = nixos.eval {modules = [./default.nix fleet probes {networking.hostName = "testhost";} {features.nix.vdeploy.mode = "deploy";} {features.nix.vdeploy.dotfiles.enable = false;}];};
+    in
+      assay.eq [bare.users.groups.vdeploy-wake.members (failedAssertions bare)] [[] []];
+    waitReadsReadableFiles = assay.eq [deployed.systemd.services.vdeploy.serviceConfig.StateDirectoryMode deployed.systemd.services.vdeploy.serviceConfig.UMask] ["0755" "0022"];
+    # The one rollback: wake.enable = false; no flag, no FIFO, the interval as before.
+    wakeRollsBack = let
+      off = nixos.eval {modules = [./default.nix base fleet probes {features.nix.vdeploy.mode = "deploy";} {features.nix.vdeploy.wake.enable = false;}];};
+    in
+      assay.eq [(lib.hasInfix "--wake-fifo" off.systemd.services.vdeploy.serviceConfig.ExecStart) (builtins.any (lib.hasInfix "/run/vdeploy/wake") off.systemd.tmpfiles.rules)] [false false];
   }

@@ -69,6 +69,43 @@ applies the take-over generation finishes that switch, then exits as it does whe
 unit file changes, and stays down. At start, the daemon waits on a Schedule until no
 `switch-to-configuration` is left in comin's cgroup, then stops the unit.
 
+## The wake (GH-246)
+
+```
+vdeploy wake [--wait] [--timeout DURATION] [--fifo PATH] [--state-dir DIR]
+```
+
+A wake makes the poller poll main **now** instead of at the end of `--interval`. It
+carries nothing: no commit, no toplevel, no flag. Everything after it is the ordinary
+path (fetch from the pinned URL, verify, debounce, bad marks, the health gate, rollback),
+so the worst a wake can do is make a host poll sooner. The poll on `--interval` stays the
+default and the fallback. `fleet deploy` is `ssh <host> vdeploy wake --wait`.
+
+- **The FIFO** `/run/vdeploy/wake` is created by systemd-tmpfiles as `root:vdeploy-wake
+  0620`, in deploy mode only. The group holds the fleet's operator alone
+  (`features.nix.vdeploy.wake.operators`, normal users only, asserted).
+- **The daemon** (`--wake-fifo`) reads it in cycles: open it read-write (so there is never
+  an end of file), wait up to 60 s for a write on the runtime's reactor, drain whatever is
+  there, close. Each cycle that read something is one offer to a sliding queue of one, so a
+  burst of writes is one poll. A missing, replaced or unreadable FIFO is logged once and
+  retried every cycle. Nothing on the FIFO can end the daemon, and no signal is involved.
+- **The poller** waits `sleep(interval).race_first(wakes.take())`. A wake during a plan is
+  held, never cancelling the plan (the worker is unchanged).
+- **`vdeploy wake`** opens the FIFO write-only and non-blocking and writes one byte,
+  retrying for up to 2 s, because the reader reopens between cycles. Exit codes:
+  - 0: woken;
+  - 69: no FIFO here (observe mode, or no wake support);
+  - 75: vdeploy is not reading it (starting or restarting), so it polls on its interval;
+  - 77: not in vdeploy-wake.
+- **`--wait`** follows the outcome as the operator, from files any user may read:
+  `status.json` (written after every poll: `head`, `done`, `polledAt`, `planning`,
+  `debounceLeft`), `plan.json` and `last.json`. It prints one line and exits 0 when the
+  host is on main (switched, already, or observe mode's "would switch") and 1 otherwise
+  (rolled back, refused, the plan failed, not settled in `--timeout`). A debounced main is
+  reported and left to the interval.
+
+Rollback: `features.nix.vdeploy.wake.enable = false;` (no flag, no FIFO, no group).
+
 ## One plan
 
 1. **Poll**: `git fetch` of `main` from `--url` into vdeploy's own clone (`--repo`, default

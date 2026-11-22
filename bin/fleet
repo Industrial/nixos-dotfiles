@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# Fleet push-deploy wrapper (deploy-rs).
+# Fleet deploy wrapper.
+#
+# `fleet deploy` wakes each host's vdeploy (GH-246): `vdeploy wake --wait` over ssh, as the
+# operator. The wake carries nothing; the host polls main from its pinned URL, verifies it,
+# and deploys it with vdeploy's own health check and rollback, so only merged main is ever
+# deployed (ADR-0006). deploy-rs is the one rollback, `fleet deploy --legacy`, pinned to the
+# flake's own deploy-rs input (no longer an unpinned `nix run` of its GitHub repository, #143).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -7,8 +13,9 @@ cd "$ROOT"
 
 HOSTS=(drakkar huginn mimir muninn)
 
+# deploy-rs, the rollback: from the flake's locked input, never an unpinned ref.
 deploy_cmd() {
-  nix run --accept-flake-config github:serokell/deploy-rs -- "$@"
+  nix run --accept-flake-config --inputs-from "$ROOT" deploy-rs -- "$@"
 }
 
 # Build a node's profile through vmon, the build monitor (GH-181), before deploy-rs
@@ -20,19 +27,31 @@ prebuild() {
   vmon -- nix build --no-link ".#deploy.nodes.$1.profiles.system.path"
 }
 
+# One host's wake, followed to its outcome. An offline host fails at the ssh connect (5 s);
+# a host that does not settle in time is cut off at its timeout plus a minute.
+wake_one() {
+  local host=$1 secs=$2
+  timeout "$((secs + 60))" ssh -o ConnectTimeout=5 -o BatchMode=yes "$host" \
+    vdeploy wake --wait --timeout "$secs"
+}
+
 usage() {
   cat <<EOF
-Usage: fleet <command> [host|all] [deploy-rs flags...]
+Usage: fleet <command> [host|all] [options]
 
 Commands:
-  status              SSH reachability probe for all hosts
-  check [host|all]    nix flake check; optional --dry-activate per host
-  deploy [host|all]   deploy-rs activate (pass --dry-activate to dry-run)
+  status                          SSH reachability probe for all hosts
+  check [host|all]                nix flake check; deploy-rs --dry-activate per host
+  deploy <host|all> [--timeout SECONDS]
+                                  wake vdeploy on the host(s): it polls main now and
+                                  deploys it, health-checked (one result line per host)
+  deploy <host|all> --legacy [deploy-rs flags...]
+                                  the rollback: deploy-rs from the flake's pinned input
 
 Examples:
-  fleet check huginn
-  fleet deploy huginn --dry-activate
-  fleet deploy all
+  fleet deploy mimir
+  fleet deploy all --timeout 900
+  fleet deploy huginn --legacy --dry-activate
 EOF
   exit 1
 }
@@ -69,21 +88,56 @@ case "$cmd" in
     target="${1:-}"
     [[ -n "$target" ]] || usage
     shift
-    if [[ "$target" == "all" ]]; then
-      # Per-host so one unreachable node does not block the rest.
-      failed=0
-      for h in "${HOSTS[@]}"; do
-        echo "> fleet deploy .#$h"
-        if ! prebuild "$h" || ! deploy_cmd ".#$h" --skip-checks "$@"; then
-          echo "> fleet deploy .#$h FAILED (continuing)"
-          failed=1
-        fi
-      done
-      exit "$failed"
-    else
-      prebuild "$target"
-      deploy_cmd ".#$target" --skip-checks "$@"
+    if [[ "${1:-}" == "--legacy" ]]; then
+      shift
+      if [[ "$target" == "all" ]]; then
+        # Per-host so one unreachable node does not block the rest.
+        failed=0
+        for h in "${HOSTS[@]}"; do
+          echo "> fleet deploy --legacy .#$h"
+          if ! prebuild "$h" || ! deploy_cmd ".#$h" --skip-checks "$@"; then
+            echo "> fleet deploy --legacy .#$h FAILED (continuing)"
+            failed=1
+          fi
+        done
+        exit "$failed"
+      else
+        prebuild "$target"
+        deploy_cmd ".#$target" --skip-checks "$@"
+      fi
+      exit 0
     fi
+    secs=1800
+    if [[ "${1:-}" == "--timeout" ]]; then
+      secs="${2:?--timeout needs seconds}"
+      shift 2
+    fi
+    [[ $# -eq 0 ]] || usage
+    if [[ "$target" == "all" ]]; then
+      hosts=("${HOSTS[@]}")
+    else
+      hosts=("$target")
+    fi
+    # Every host at once, each into its own log: one hung host cannot hold the others.
+    logs="$(mktemp -d)"
+    trap 'rm -rf "$logs"' EXIT
+    declare -A pids
+    for h in "${hosts[@]}"; do
+      wake_one "$h" "$secs" >"$logs/$h" 2>&1 &
+      pids[$h]=$!
+    done
+    failed=0
+    for h in "${hosts[@]}"; do
+      if wait "${pids[$h]}"; then
+        status=ok
+      else
+        status="FAILED ($?)"
+        failed=1
+      fi
+      last="$(tail -n 1 "$logs/$h" 2>/dev/null || true)"
+      printf '%-8s %-12s %s\n' "$h" "$status" "${last:-(no output)}"
+    done
+    exit "$failed"
     ;;
   *) usage ;;
 esac
