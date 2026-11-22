@@ -3,758 +3,588 @@
     {
       "kind": "added",
       "name": "X-Restart-Triggers-nfs-blkmap",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "X-Restart-Triggers-nfs-idmapd",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "X-Restart-Triggers-rpc-gssd",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "X-Restart-Triggers-rpc-statd",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "X-Restart-Triggers-userborn",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "X-Restart-Triggers-vfetch-serve",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "cfitsio",
-      "new": [
-        "4.7.0"
-      ],
+      "new": ["4.7.0"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "cgif",
-      "new": [
-        "0.5.4"
-      ],
+      "new": ["0.5.4"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "config.nu",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "config.toml",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "env.nu",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "etc-request-key.conf",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "havamal.nu",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "hdf5-cpp",
-      "new": [
-        "1.14.6"
-      ],
+      "new": ["1.14.6"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "home-directories.conf",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "hyprlock.conf",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "hyprtoolkit.conf",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "idmapd.conf",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "keybindings.json",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "libaec",
-      "new": [
-        "1.1.7"
-      ],
+      "new": ["1.1.7"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "libdicom",
-      "new": [
-        "1.3.0"
-      ],
+      "new": ["1.3.0"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "lowprio",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "matio",
-      "new": [
-        "1.5.30"
-      ],
+      "new": ["1.5.30"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "monitors.drakkar.lua",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "nfs.conf",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "nix-daemon-listen",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "openslide",
-      "new": [
-        "4.0.1"
-      ],
+      "new": ["4.0.1"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "rpcbind",
-      "new": [
-        "1.3.1",
-        "1.3.1_fish-completions"
-      ],
+      "new": ["1.3.1", "1.3.1_fish-completions"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "settings.json",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-auth-rpcgss-module.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-lock-root-password.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-nfs-blkmap.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-nfs-client.target",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-nfs-idmapd.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-nix-daemon-listen.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-rpc-gssd.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-rpc-statd.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-rpcbind.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-script-lock-root-password-start",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-script-rpc-statd-pre-start",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-systemd-zram-setup-.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-userborn-import-legacy.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-userborn.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vcache.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vdaemon-proxy-fallback.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vdaemon-proxy.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vdaemon-proxy.socket",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vdeploy.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vfetch-serve.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vgc-check.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vgc-check.timer",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vgc.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vgc.timer",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vgen-prune.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vhealth.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vopt.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vopt.timer",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vverify.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "userborn",
-      "new": [
-        "1.0.1"
-      ],
+      "new": ["1.0.1"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "userborn-import-legacy",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "userborn.json",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "vbuild",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vbump",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vcache",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vcache-ensure-key",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "vdaemon-proxy",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vdaemon-proxy-gave-up",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "vdeploy",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vdeploy-apply",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vdiff",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vfetch",
-      "new": [
-        "0.1.0",
-        "0.1.0"
-      ],
+      "new": ["0.1.0", "0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vfiles",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vfiles-spec.json",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "vgc",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vgen",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vhealth",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vhealth-probes.json",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "vips",
-      "new": [
-        "8.18.7"
-      ],
+      "new": ["8.18.7"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "vmon",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vopt",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vverify",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vwhy",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "zram-generator",
-      "new": [
-        "1.2.1"
-      ],
+      "new": ["1.2.1"],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "zram-generator.conf",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     }
@@ -763,23 +593,15 @@
     {
       "kind": "upgraded",
       "name": "appstream",
-      "new": [
-        "1.2.3"
-      ],
-      "old": [
-        "1.1.3"
-      ],
+      "new": ["1.2.3"],
+      "old": ["1.1.3"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "ashell",
-      "new": [
-        "0.12.1"
-      ],
-      "old": [
-        "0.11.0"
-      ],
+      "new": ["0.12.1"],
+      "old": ["0.11.0"],
       "selection": "*"
     },
     {
@@ -800,148 +622,92 @@
     {
       "kind": "upgraded",
       "name": "chromium-unwrapped",
-      "new": [
-        "158.0.8127.36",
-        "158.0.8127.36-sandbox"
-      ],
-      "old": [
-        "157.0.8103.78",
-        "157.0.8103.78-sandbox"
-      ],
+      "new": ["158.0.8127.36", "158.0.8127.36-sandbox"],
+      "old": ["157.0.8103.78", "157.0.8103.78-sandbox"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "claude-agent-acp",
-      "new": [
-        "0.107.0"
-      ],
-      "old": [
-        "0.100.0"
-      ],
+      "new": ["0.107.0"],
+      "old": ["0.100.0"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "claude-code",
-      "new": [
-        "2.1.328"
-      ],
-      "old": [
-        "2.1.325"
-      ],
+      "new": ["2.1.328"],
+      "old": ["2.1.325"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "cpupower",
-      "new": [
-        "6.18.64",
-        "6.18.64_fish-completions"
-      ],
-      "old": [
-        "6.18.63",
-        "6.18.63_fish-completions"
-      ],
+      "new": ["6.18.64", "6.18.64_fish-completions"],
+      "old": ["6.18.63", "6.18.63_fish-completions"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "cursor-cli",
-      "new": [
-        "0-unstable-2026-11-19"
-      ],
-      "old": [
-        "0-unstable-2026-11-05"
-      ],
+      "new": ["0-unstable-2026-11-19"],
+      "old": ["0-unstable-2026-11-05"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "delta",
-      "new": [
-        "0.21.2"
-      ],
-      "old": [
-        "0.20.1"
-      ],
+      "new": ["0.21.2"],
+      "old": ["0.20.1"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "docker-compose",
-      "new": [
-        "5.7.1"
-      ],
-      "old": [
-        "5.7.0"
-      ],
+      "new": ["5.7.1"],
+      "old": ["5.7.0"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "electron",
-      "new": [
-        "45.3.4"
-      ],
-      "old": [
-        "45.3.2"
-      ],
+      "new": ["45.3.4"],
+      "old": ["45.3.2"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "electron-unwrapped",
-      "new": [
-        "45.3.4"
-      ],
-      "old": [
-        "45.3.2"
-      ],
+      "new": ["45.3.4"],
+      "old": ["45.3.2"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "freerdp",
-      "new": [
-        "3.33.1"
-      ],
-      "old": [
-        "3.33.0"
-      ],
+      "new": ["3.33.1"],
+      "old": ["3.33.0"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "gnome-shell-extension-blur-my-shell",
-      "new": [
-        "78"
-      ],
-      "old": [
-        "77"
-      ],
+      "new": ["78"],
+      "old": ["77"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "gnome-shell-extension-clipboard-indicator",
-      "new": [
-        "74"
-      ],
-      "old": [
-        "72"
-      ],
+      "new": ["74"],
+      "old": ["72"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "gnome-shell-extensions",
-      "new": [
-        "51.0"
-      ],
-      "old": [
-        "50.2"
-      ],
+      "new": ["51.0"],
+      "old": ["50.2"],
       "selection": "*"
     },
     {
@@ -977,209 +743,112 @@
     {
       "kind": "upgraded",
       "name": "initrd-linux",
-      "new": [
-        "6.18.64"
-      ],
-      "old": [
-        "6.18.63"
-      ],
+      "new": ["6.18.64"],
+      "old": ["6.18.63"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "libnvme",
-      "new": [
-        "1.16.2"
-      ],
-      "old": [
-        "1.16.1"
-      ],
+      "new": ["1.16.2"],
+      "old": ["1.16.1"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "librewolf",
-      "new": [
-        "160.0.1-1"
-      ],
-      "old": [
-        "160.0-1"
-      ],
+      "new": ["160.0.1-1"],
+      "old": ["160.0-1"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "librewolf-unwrapped",
-      "new": [
-        "160.0.1-1"
-      ],
-      "old": [
-        "160.0-1"
-      ],
+      "new": ["160.0.1-1"],
+      "old": ["160.0-1"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "libslirp",
-      "new": [
-        "4.9.7"
-      ],
-      "old": [
-        "4.9.6"
-      ],
+      "new": ["4.9.7"],
+      "old": ["4.9.6"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "linux",
-      "new": [
-        "6.18.64",
-        "6.18.64-modules",
-        "6.18.64-modules"
-      ],
-      "old": [
-        "6.18.63",
-        "6.18.63-modules",
-        "6.18.63-modules"
-      ],
+      "new": ["6.18.64", "6.18.64-modules", "6.18.64-modules"],
+      "old": ["6.18.63", "6.18.63-modules", "6.18.63-modules"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "mesa",
-      "new": [
-        "26.3.1",
-        "26.3.1"
-      ],
-      "old": [
-        "26.3.0",
-        "26.3.0"
-      ],
+      "new": ["26.3.1", "26.3.1"],
+      "old": ["26.3.0", "26.3.0"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "nfs-utils",
-      "new": [
-        "3.2.1",
-        "3.2.1-lib",
-        "3.2.1-man"
-      ],
-      "old": [
-        "3.1.1",
-        "3.1.1-lib",
-        "3.1.1-man"
-      ],
+      "new": ["3.2.1", "3.2.1-lib", "3.2.1-man"],
+      "old": ["3.1.1", "3.1.1-lib", "3.1.1-man"],
       "selection": "*"
     },
     {
       "kind": "changed",
       "name": "nix-cmd",
-      "new": [
-        "2.35",
-        "2.35.6",
-        "2.36.0"
-      ],
-      "old": [
-        "2.35",
-        "2.35.6"
-      ],
+      "new": ["2.35", "2.35.6", "2.36.0"],
+      "old": ["2.35", "2.35.6"],
       "selection": "."
     },
     {
       "kind": "changed",
       "name": "nix-expr",
-      "new": [
-        "2.35",
-        "2.35.6",
-        "2.36.0"
-      ],
-      "old": [
-        "2.35",
-        "2.35.6"
-      ],
+      "new": ["2.35", "2.35.6", "2.36.0"],
+      "old": ["2.35", "2.35.6"],
       "selection": "."
     },
     {
       "kind": "changed",
       "name": "nix-fetchers",
-      "new": [
-        "2.35",
-        "2.35.6",
-        "2.36.0"
-      ],
-      "old": [
-        "2.35",
-        "2.35.6"
-      ],
+      "new": ["2.35", "2.35.6", "2.36.0"],
+      "old": ["2.35", "2.35.6"],
       "selection": "."
     },
     {
       "kind": "changed",
       "name": "nix-flake",
-      "new": [
-        "2.35",
-        "2.35.6",
-        "2.36.0"
-      ],
-      "old": [
-        "2.35",
-        "2.35.6"
-      ],
+      "new": ["2.35", "2.35.6", "2.36.0"],
+      "old": ["2.35", "2.35.6"],
       "selection": "."
     },
     {
       "kind": "changed",
       "name": "nix-main",
-      "new": [
-        "2.35",
-        "2.35.6",
-        "2.36.0"
-      ],
-      "old": [
-        "2.35",
-        "2.35.6"
-      ],
+      "new": ["2.35", "2.35.6", "2.36.0"],
+      "old": ["2.35", "2.35.6"],
       "selection": "."
     },
     {
       "kind": "changed",
       "name": "nix-store",
-      "new": [
-        "2.34.9",
-        "2.35",
-        "2.35.6",
-        "2.36.0"
-      ],
-      "old": [
-        "2.34.9",
-        "2.35",
-        "2.35.6"
-      ],
+      "new": ["2.34.9", "2.35", "2.35.6", "2.36.0"],
+      "old": ["2.34.9", "2.35", "2.35.6"],
       "selection": "."
     },
     {
       "kind": "changed",
       "name": "nix-util",
-      "new": [
-        "2.34.9",
-        "2.35",
-        "2.35.6",
-        "2.36.0"
-      ],
-      "old": [
-        "2.34.9",
-        "2.35",
-        "2.35.6"
-      ],
+      "new": ["2.34.9", "2.35", "2.35.6", "2.36.0"],
+      "old": ["2.34.9", "2.35", "2.35.6"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "nixos-system-drakkar",
-      "new": [
-        "26.11.20261120.9996594"
-      ],
+      "new": ["26.11.20261120.9996594"],
       "old": [
         "26.11.20261116.e21fec3",
         "26.11.20261116.e21fec3-activate-path",
@@ -1190,24 +859,14 @@
     {
       "kind": "upgraded",
       "name": "paseo",
-      "new": [
-        "0.16.2"
-      ],
-      "old": [
-        "0.16.0"
-      ],
+      "new": ["0.16.2"],
+      "old": ["0.16.0"],
       "selection": "*"
     },
     {
       "kind": "changed",
       "name": "perl",
-      "new": [
-        "5.42.3",
-        "5.42.3-env",
-        "5.42.3-env",
-        "5.42.3-env",
-        "5.42.3-man"
-      ],
+      "new": ["5.42.3", "5.42.3-env", "5.42.3-env", "5.42.3-env", "5.42.3-man"],
       "old": [
         "5.42.3",
         "5.42.3-env",
@@ -1221,353 +880,225 @@
     {
       "kind": "upgraded",
       "name": "podofo",
-      "new": [
-        "1.1.3"
-      ],
-      "old": [
-        "1.1.2"
-      ],
+      "new": ["1.1.3"],
+      "old": ["1.1.2"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "python3.14-coverage",
-      "new": [
-        "7.17.3"
-      ],
-      "old": [
-        "7.17.2"
-      ],
+      "new": ["7.17.3"],
+      "old": ["7.17.2"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "python3.14-cyclopts",
-      "new": [
-        "5.4.2"
-      ],
-      "old": [
-        "5.4.0"
-      ],
+      "new": ["5.4.2"],
+      "old": ["5.4.0"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "resvg",
-      "new": [
-        "0.50.0"
-      ],
-      "old": [
-        "0.49.0"
-      ],
+      "new": ["0.50.0"],
+      "old": ["0.49.0"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "rust-analyzer",
-      "new": [
-        "2026-11-16"
-      ],
-      "old": [
-        "2026-11-09"
-      ],
+      "new": ["2026-11-16"],
+      "old": ["2026-11-09"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "rust-analyzer-unwrapped",
-      "new": [
-        "2026-11-16"
-      ],
-      "old": [
-        "2026-11-09"
-      ],
+      "new": ["2026-11-16"],
+      "old": ["2026-11-09"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-apex",
-      "new": [
-        "0.0.0+rev=1a4baf2"
-      ],
-      "old": [
-        "0.0.0+rev=218083d"
-      ],
+      "new": ["0.0.0+rev=1a4baf2"],
+      "old": ["0.0.0+rev=218083d"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "tree-sitter-beancount",
-      "new": [
-        "0.0.0+rev=97e38a1"
-      ],
-      "old": [
-        "0.0.0+rev=c8a9780"
-      ],
+      "new": ["0.0.0+rev=97e38a1"],
+      "old": ["0.0.0+rev=c8a9780"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "tree-sitter-c_sharp",
-      "new": [
-        "0.0.0+rev=v0.24.0"
-      ],
-      "old": [
-        "0.0.0+rev=v0.23.5"
-      ],
+      "new": ["0.0.0+rev=v0.24.0"],
+      "old": ["0.0.0+rev=v0.23.5"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-fortran",
-      "new": [
-        "0.0.0+rev=d05165a"
-      ],
-      "old": [
-        "0.0.0+rev=72f8759"
-      ],
+      "new": ["0.0.0+rev=d05165a"],
+      "old": ["0.0.0+rev=72f8759"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "tree-sitter-liquidsoap",
-      "new": [
-        "0.0.0+rev=91ac373"
-      ],
-      "old": [
-        "0.0.0+rev=087fc44"
-      ],
+      "new": ["0.0.0+rev=91ac373"],
+      "old": ["0.0.0+rev=087fc44"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "tree-sitter-nix",
-      "new": [
-        "0.0.0+rev=64d4f78"
-      ],
-      "old": [
-        "0.0.0+rev=e9f1506"
-      ],
+      "new": ["0.0.0+rev=64d4f78"],
+      "old": ["0.0.0+rev=e9f1506"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-nu",
-      "new": [
-        "0.0.0+rev=0c3f6df"
-      ],
-      "old": [
-        "0.0.0+rev=4f577aa"
-      ],
+      "new": ["0.0.0+rev=0c3f6df"],
+      "old": ["0.0.0+rev=4f577aa"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-ocaml",
-      "new": [
-        "0.0.0+rev=a1c562e"
-      ],
-      "old": [
-        "0.0.0+rev=3b2e14e"
-      ],
+      "new": ["0.0.0+rev=a1c562e"],
+      "old": ["0.0.0+rev=3b2e14e"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-ocaml_interface",
-      "new": [
-        "0.0.0+rev=a1c562e"
-      ],
-      "old": [
-        "0.0.0+rev=3b2e14e"
-      ],
+      "new": ["0.0.0+rev=a1c562e"],
+      "old": ["0.0.0+rev=3b2e14e"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-perl",
-      "new": [
-        "0.0.0+rev=5e30b91"
-      ],
-      "old": [
-        "0.0.0+rev=80781e3"
-      ],
+      "new": ["0.0.0+rev=5e30b91"],
+      "old": ["0.0.0+rev=80781e3"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-scala",
-      "new": [
-        "0.0.0+rev=c1e2b1a"
-      ],
-      "old": [
-        "0.0.0+rev=5de5a82"
-      ],
+      "new": ["0.0.0+rev=c1e2b1a"],
+      "old": ["0.0.0+rev=5de5a82"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-sflog",
-      "new": [
-        "0.0.0+rev=1a4baf2"
-      ],
-      "old": [
-        "0.0.0+rev=218083d"
-      ],
+      "new": ["0.0.0+rev=1a4baf2"],
+      "old": ["0.0.0+rev=218083d"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-soql",
-      "new": [
-        "0.0.0+rev=1a4baf2"
-      ],
-      "old": [
-        "0.0.0+rev=218083d"
-      ],
+      "new": ["0.0.0+rev=1a4baf2"],
+      "old": ["0.0.0+rev=218083d"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-sosl",
-      "new": [
-        "0.0.0+rev=1a4baf2"
-      ],
-      "old": [
-        "0.0.0+rev=218083d"
-      ],
+      "new": ["0.0.0+rev=1a4baf2"],
+      "old": ["0.0.0+rev=218083d"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-sql",
-      "new": [
-        "0.0.0+rev=2d08852"
-      ],
-      "old": [
-        "0.0.0+rev=174cebb"
-      ],
+      "new": ["0.0.0+rev=2d08852"],
+      "old": ["0.0.0+rev=174cebb"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-swift",
-      "new": [
-        "0.0.0+rev=a1d4a7b"
-      ],
-      "old": [
-        "0.0.0+rev=9e3b87f"
-      ],
+      "new": ["0.0.0+rev=a1d4a7b"],
+      "old": ["0.0.0+rev=9e3b87f"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "tree-sitter-systemverilog",
-      "new": [
-        "0.0.0+rev=140d0a1"
-      ],
-      "old": [
-        "0.0.0+rev=08c5e37"
-      ],
+      "new": ["0.0.0+rev=140d0a1"],
+      "old": ["0.0.0+rev=08c5e37"],
       "selection": "."
     },
     {
       "kind": "downgraded",
       "name": "tree-sitter-tcl",
-      "new": [
-        "0.0.0+rev=90e87ed"
-      ],
-      "old": [
-        "0.0.0+rev=850a72a"
-      ],
+      "new": ["0.0.0+rev=90e87ed"],
+      "old": ["0.0.0+rev=850a72a"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "tree-sitter-zsh",
-      "new": [
-        "0.0.0+rev=77eee01"
-      ],
-      "old": [
-        "0.0.0+rev=7a59340"
-      ],
+      "new": ["0.0.0+rev=77eee01"],
+      "old": ["0.0.0+rev=7a59340"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "uv",
-      "new": [
-        "0.13.9"
-      ],
-      "old": [
-        "0.13.7"
-      ],
+      "new": ["0.13.9"],
+      "old": ["0.13.7"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "vimplugin-base16-nvim",
-      "new": [
-        "0-unstable-2026-11-17"
-      ],
-      "old": [
-        "0-unstable-2026-11-12"
-      ],
+      "new": ["0-unstable-2026-11-17"],
+      "old": ["0-unstable-2026-11-12"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "vimplugin-neogit",
-      "new": [
-        "3.0.0-unstable-2026-11-17"
-      ],
-      "old": [
-        "3.0.0-unstable-2026-11-11"
-      ],
+      "new": ["3.0.0-unstable-2026-11-17"],
+      "old": ["3.0.0-unstable-2026-11-11"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "vimplugin-nvim-treesitter",
-      "new": [
-        "0.10.0-unstable-2026-11-18"
-      ],
-      "old": [
-        "0.10.0-unstable-2026-11-07"
-      ],
+      "new": ["0.10.0-unstable-2026-11-18"],
+      "old": ["0.10.0-unstable-2026-11-07"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "voltaic",
-      "new": [
-        "0.2.1"
-      ],
-      "old": [
-        "0.2.0"
-      ],
+      "new": ["0.2.1"],
+      "old": ["0.2.0"],
       "selection": "*"
     },
     {
       "kind": "upgraded",
       "name": "vscode-extension-charliermarsh-ruff",
-      "new": [
-        "2026.98.0"
-      ],
-      "old": [
-        "2026.96.0"
-      ],
+      "new": ["2026.98.0"],
+      "old": ["2026.96.0"],
       "selection": "."
     },
     {
       "kind": "upgraded",
       "name": "vscode-extension-redhat-vscode-yaml",
-      "new": [
-        "2.1.2026112008"
-      ],
-      "old": [
-        "2.1.2026111808"
-      ],
+      "new": ["2.1.2026112008"],
+      "old": ["2.1.2026111808"],
       "selection": "."
     },
     {
@@ -1594,12 +1125,8 @@
     {
       "kind": "upgraded",
       "name": "zed-editor",
-      "new": [
-        "1.29.1"
-      ],
-      "old": [
-        "1.28.1"
-      ],
+      "new": ["1.29.1"],
+      "old": ["1.28.1"],
       "selection": "*"
     }
   ],
@@ -1625,263 +1152,203 @@
       "kind": "removed",
       "name": "X-Restart-Triggers-cron",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "activatable-nixos-system-drakkar",
       "new": [],
-      "old": [
-        "26.11.20261116.e21fec3"
-      ],
+      "old": ["26.11.20261116.e21fec3"],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "apparmor-closure-rules-security.wrappers.crontab",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "cheatsheet",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "-"
     },
     {
       "kind": "removed",
       "name": "comin",
       "new": [],
-      "old": [
-        "0.14.0"
-      ],
+      "old": ["0.14.0"],
       "selection": "-"
     },
     {
       "kind": "removed",
       "name": "comin.yaml",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "cron",
       "new": [],
-      "old": [
-        "4.1",
-        "4.1_fish-completions"
-      ],
+      "old": ["4.1", "4.1_fish-completions"],
       "selection": "-"
     },
     {
       "kind": "removed",
       "name": "crontabs",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "deploy-rs",
       "new": [],
-      "old": [
-        "1.0.0"
-      ],
+      "old": ["1.0.0"],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "du",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "-"
     },
     {
       "kind": "removed",
       "name": "git.config",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "nix-output-monitor",
       "new": [],
-      "old": [
-        "2.2.0"
-      ],
+      "old": ["2.2.0"],
       "selection": "-"
     },
     {
       "kind": "removed",
       "name": "nix-tree",
       "new": [],
-      "old": [
-        "0.8.0"
-      ],
+      "old": ["0.8.0"],
       "selection": "-"
     },
     {
       "kind": "removed",
       "name": "nixos-security.wrappers-crontab",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "nvd",
       "new": [],
-      "old": [
-        "0.2.4",
-        "0.2.4_fish-completions"
-      ],
+      "old": ["0.2.4", "0.2.4_fish-completions"],
       "selection": "-"
     },
     {
       "kind": "removed",
       "name": "perl5.42.3-JSON",
       "new": [],
-      "old": [
-        "4.10"
-      ],
+      "old": ["4.10"],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "security-wrapper-crontab-x86_64-unknown-linux-musl",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "tealdeer",
       "new": [],
-      "old": [
-        "1.9.1"
-      ],
+      "old": ["1.9.1"],
       "selection": "-"
     },
     {
       "kind": "removed",
       "name": "tealdeer-config.toml",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "tealdeer-pages-refresh",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "tldr-pages-v2.3-en",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "unit-cron.service",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "unit-nix-gc.timer",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "unit-script-cron-pre-start",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "unit-tealdeer-pages-refresh.service",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "unit-tealdeer-pages-refresh.timer",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "update-users-groups.pl",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "users-groups.json",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     },
     {
       "kind": "removed",
       "name": "vim",
       "new": [],
-      "old": [
-        "9.2.1252"
-      ],
+      "old": ["9.2.1252"],
       "selection": "."
     }
   ],
@@ -1890,18 +1357,8 @@
     {
       "kind": "changed",
       "name": "keyutils",
-      "new": [
-        "1.6.3",
-        "1.6.3-lib",
-        "1.6.3-lib",
-        "1.6.3-man"
-      ],
-      "old": [
-        "1.6.3",
-        "1.6.3-lib",
-        "1.6.3-lib",
-        "1.6.3-man"
-      ],
+      "new": ["1.6.3", "1.6.3-lib", "1.6.3-lib", "1.6.3-man"],
+      "old": ["1.6.3", "1.6.3-lib", "1.6.3-lib", "1.6.3-man"],
       "selection": "+"
     }
   ]

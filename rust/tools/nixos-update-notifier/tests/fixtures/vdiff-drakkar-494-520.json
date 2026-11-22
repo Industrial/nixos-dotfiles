@@ -3,64 +3,49 @@
     {
       "kind": "added",
       "name": "etc-overlay-carry-out",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vci.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "unit-vexporter.service",
-      "new": [
-        ""
-      ],
+      "new": [""],
       "old": [],
       "selection": "."
     },
     {
       "kind": "added",
       "name": "vci",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vexporter",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vlocate",
-      "new": [
-        "0.1.0"
-      ],
+      "new": ["0.1.0"],
       "old": [],
       "selection": "+"
     },
     {
       "kind": "added",
       "name": "vswitch",
-      "new": [
-        "",
-        "0.1.0"
-      ],
+      "new": ["", "0.1.0"],
       "old": [],
       "selection": "+"
     }
@@ -69,12 +54,8 @@
     {
       "kind": "upgraded",
       "name": "voltaic",
-      "new": [
-        "0.3.0"
-      ],
-      "old": [
-        "0.2.1"
-      ],
+      "new": ["0.3.0"],
+      "old": ["0.2.1"],
       "selection": "*"
     }
   ],
@@ -100,9 +81,7 @@
       "kind": "removed",
       "name": "command-not-found",
       "new": [],
-      "old": [
-        ""
-      ],
+      "old": [""],
       "selection": "."
     }
   ],
