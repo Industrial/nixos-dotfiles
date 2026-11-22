@@ -1,0 +1,186 @@
+-- The one capability vlocate needs, `World`, live and scripted:
+--
+--   systems   the systems to search: this host (/run/current-system) and,
+--             where vci runs (the cache host), each fleet host's main result
+--             (/var/lib/vci/roots/main-<host>);
+--   closure   a system's closure, from the store database (read-only);
+--   present   which of some store paths ship `bin/<name>`;
+--   nixpkgs   nix-locate's answer from its prebuilt nixpkgs-wide database
+--             (nothing when there is no nix-locate).
+--
+-- Each live step is one short blocking read inside `suspend`: vlocate is one
+-- lookup, with no fiber beside it.
+
+import std::fs
+import std::path::Path
+import std::process::{Command, Stdio}
+import std::sync::{Arc, Mutex}
+import id_effect::{Effect, HNil, Never, fail, succeed, suspend}
+import nix_store_core::db
+import crate::find::attrs_of
+
+export class World
+  systems : &self -> Effect<Vec<(String, String)>, Never, HNil>
+  closure : &self -> String -> Effect<Vec<String>, String, HNil>
+  present : &self -> Vec<String> -> String -> Effect<Vec<String>, Never, HNil>
+  nixpkgs : &self -> String -> Effect<Vec<String>, Never, HNil>
+
+export newtype WorldTool = WorldTool (export Arc<dyn World + Send + Sync>)
+
+instance Clone WorldTool
+  clone : &self -> Self
+  clone self = WorldTool (Arc::clone (&self.0))
+
+-- The live host.
+export data Live { export current String, export roots String, export db String, export nix_locate Option<String> }
+  deriving (Debug, Clone)
+
+canonical : &Path -> Option<String>
+canonical p = fs::canonicalize p |> .ok |> .map (\c -> c.to_string_lossy () |> .to_string)
+
+-- This host's system, then each fleet host's vci result (main-<host>).
+export systems_in : &str -> &str -> Vec<(String, String)>
+systems_in current roots =
+  mut out = Vec::new () : Vec<(String, String)>
+  if canonical (Path::new current) is Some here
+    out.push ((.to_string "this host", here))
+  mut fleet = Vec::new () : Vec<(String, String)>
+  if fs::read_dir roots is Ok entries
+    for e in entries |> .filter_map (\e -> e.ok ())
+      name = e.file_name ().to_string_lossy () |> .to_string
+      if name.strip_prefix "main-" is Some host
+        if canonical (&e.path ()) is Some target
+          fleet.push ((host.to_string (), target))
+  fleet.sort ()
+  out.extend fleet
+  out
+
+closure_in : &str -> &str -> Result<Vec<String>, String>
+closure_in path root =
+  conn = (db::open path |> .map_err (\e -> "opening #{path}: #{e}"))?
+  found = (db::closure (&conn) root |> .map_err (\e -> "the closure of #{root}: #{e}"))?
+  found |> .ok_or ("#{root} is not a valid store path")
+
+-- The paths that have `bin/<name>` (a file or a link to one).
+export with_bin : &[String] -> &str -> Vec<String>
+with_bin paths name =
+  paths.iter () |> .filter (\p -> Path::new (p.as_str ()) |> .join "bin" |> .join name |> .exists) |> .cloned |> .collect
+
+located : &Option<String> -> &str -> Vec<String>
+located program name =
+  case program of
+    None -> Vec::new ()
+    Some p ->
+      want = "/bin/#{name}"
+      out = Command::new p |> .args ([.to_string "--minimal", .to_string "--top-level", .to_string "--whole-name", .to_string "--at-root", want]) |> .stdin (Stdio::null ()) |> .stderr (Stdio::null ()) |> .output ()
+      case out of
+        Ok o -> if o.status.success ()
+          attrs_of (&String::from_utf8_lossy (&o.stdout))
+        else
+          Vec::new ()
+        Err _ -> Vec::new ()
+
+instance World Live
+  systems : &self -> Effect<Vec<(String, String)>, Never, HNil>
+  systems self =
+    current = self.current.clone ()
+    roots = self.roots.clone ()
+    suspend (move \-> succeed (systems_in (&current) (&roots)))
+  closure : &self -> String -> Effect<Vec<String>, String, HNil>
+  closure self root =
+    path = self.db.clone ()
+    suspend (move \-> done_or (closure_in (&path) (&root)))
+  present : &self -> Vec<String> -> String -> Effect<Vec<String>, Never, HNil>
+  present self paths name =
+    suspend (move \-> succeed (with_bin (&paths) (&name)))
+  nixpkgs : &self -> String -> Effect<Vec<String>, Never, HNil>
+  nixpkgs self name =
+    program = self.nix_locate.clone ()
+    suspend (move \-> succeed (located (&program) (&name)))
+
+done_or : Result<Vec<String>, String> -> Effect<Vec<String>, String, HNil>
+done_or r =
+  case r of
+    Ok v -> succeed v
+    Err e -> fail e
+
+-- A scripted host, for tests: `systems` and their `closures` (a system whose
+-- root is in `broken` fails to read), the paths that ship the command, and
+-- nix-locate's attributes. Every call is logged.
+export data Scripted
+  { export systems Vec<(String, String)>
+  , export closures Vec<(String, Vec<String>)>
+  , export broken Vec<String>
+  , export with_bin Vec<String>
+  , export nixpkgs Vec<String>
+  , export log Arc<Mutex<Vec<String>>>
+  }
+  deriving (Clone, Default)
+
+noted : &Arc<Mutex<Vec<String>>> -> String -> ()
+noted log line =
+  if log.lock () is Ok held
+    mut v = held
+    v.push line
+  ()
+
+export log_of : &Scripted -> Vec<String>
+log_of w = w.log.lock () |> .map (\v -> v.clone ()) |> .unwrap_or_default
+
+instance World Scripted
+  systems : &self -> Effect<Vec<(String, String)>, Never, HNil>
+  systems self = succeed (self.systems.clone ())
+  closure : &self -> String -> Effect<Vec<String>, String, HNil>
+  closure self root =
+    noted (&self.log) ("closure #{root}")
+    if self.broken.contains (&root)
+      fail (.to_string "scripted: unreadable")
+    else
+      succeed (self.closures.iter () |> .find (\c -> c.0 == root) |> .map (\c -> c.1.clone ()) |> .unwrap_or_default)
+  present : &self -> Vec<String> -> String -> Effect<Vec<String>, Never, HNil>
+  present self paths name =
+    noted (&self.log) ("present #{paths.len ()} #{name}")
+    succeed (paths.into_iter () |> .filter (\p -> self.with_bin.contains p) |> .collect)
+  nixpkgs : &self -> String -> Effect<Vec<String>, Never, HNil>
+  nixpkgs self name =
+    noted (&self.log) ("nixpkgs #{name}")
+    succeed (self.nixpkgs.clone ())
+
+test "the systems: this host first, then the fleet's vci results by name; other roots ignored"
+  dir = std::env::temp_dir () |> .join ("vlocate-systems-#{std::process::id ()}")
+  fs::remove_dir_all (&dir) |> .ok
+  sys = dir.join "sys"
+  roots = dir.join "roots"
+  fs::create_dir_all (&sys) |> .ok
+  fs::create_dir_all (&roots) |> .ok
+  std::os::unix::fs::symlink (&sys) (roots.join "main-mimir") |> .ok
+  std::os::unix::fs::symlink (&sys) (roots.join "main-drakkar") |> .ok
+  std::os::unix::fs::symlink (&sys) (roots.join "pull-7-drakkar") |> .ok
+  current = dir.join "current"
+  std::os::unix::fs::symlink (&sys) (&current) |> .ok
+  found = systems_in (&current.to_string_lossy ()) (&roots.to_string_lossy ())
+  names = found.iter () |> .map (\s -> s.0.clone ()) |> .collect : Vec<String>
+  assert_eq! \-> names \-> .to_vec ([.to_string "this host", .to_string "drakkar", .to_string "mimir"])
+  -- No vci on this host: only this host's system.
+  alone = systems_in (&current.to_string_lossy ()) "/nonexistent/vci/roots"
+  assert_eq! \-> alone.len () \-> 1
+  fs::remove_dir_all (&dir) |> .ok
+
+test "a path ships the command when bin/<name> exists, as a file or a link"
+  dir = std::env::temp_dir () |> .join ("vlocate-bin-#{std::process::id ()}")
+  fs::remove_dir_all (&dir) |> .ok
+  a = dir.join "a"
+  b = dir.join "b"
+  fs::create_dir_all (a.join "bin") |> .ok
+  fs::create_dir_all (b.join "bin") |> .ok
+  fs::write (a.join "bin" |> .join "hello") "" |> .ok
+  std::os::unix::fs::symlink (a.join "bin" |> .join "hello") (b.join "bin" |> .join "hi") |> .ok
+  paths = .to_vec ([(a.to_string_lossy () |> .to_string), (b.to_string_lossy () |> .to_string)]) : Vec<String>
+  assert_eq! \-> with_bin (&paths) "hello" \-> .to_vec ([paths[0].clone ()])
+  assert_eq! \-> with_bin (&paths) "hi" \-> .to_vec ([paths[1].clone ()])
+  assert! \-> with_bin (&paths) "nope" |> .is_empty
+  fs::remove_dir_all (&dir) |> .ok
+
+test "no nix-locate: no nixpkgs answer, never an error"
+  assert! \-> located (&None) "hello" |> .is_empty
+  assert! \-> located (&Some (.to_string "/nonexistent/nix-locate")) "hello" |> .is_empty

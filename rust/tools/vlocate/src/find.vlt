@@ -1,0 +1,133 @@
+-- The pure core: which names are commands, which store paths of which
+-- systems ship one, what nix-locate said, and the hint the shells print.
+
+import std::collections::BTreeMap
+import serde_json::{Map, Value}
+
+-- A command name a shell could have meant: no slash, not `.` or `..`, not
+-- empty, printable. Anything else is not looked up.
+export command_ok : &str -> bool
+command_ok name =
+  !(name.is_empty ()) && name != "." && name != ".." && !(name.contains '/') && (name.chars () |> .all (\c -> !(c.is_control ()) && !(c.is_whitespace ())))
+
+-- One store path of the fleet's systems that ships `bin/<name>`, and whose
+-- systems carry it (`this host`, or fleet host names).
+export data Hit { export path String, export systems Vec<String> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The answer for one name.
+export data Found { export name String, export hits Vec<Hit>, export nixpkgs Vec<String> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- `/nix/store/<hash>-hello-2.12` -> `hello-2.12`.
+export package_of : &str -> String
+package_of path =
+  base = path.rsplit '/' |> .next |> .unwrap_or path
+  case base.split_once '-' of
+    Some (hash, rest) -> if hash.len () == 32
+      rest.to_string ()
+    else
+      base.to_string ()
+    None -> base.to_string ()
+
+-- The hits, from each system's closure and the paths that ship the command:
+-- one per path, its systems in the order the systems were given.
+export hits_of : &[(String, Vec<String>)] -> &[String] -> Vec<Hit>
+hits_of systems present =
+  mut by_path = BTreeMap::new () : BTreeMap<String, Vec<String>>
+  for s in systems
+    (label, closure) = s
+    for p in closure
+      if present.contains p
+        by_path.entry (p.clone ()) |> .or_default |> .push (label.clone ())
+  by_path.into_iter () |> .map (\kv -> Hit { path = kv.0, systems = kv.1 }) |> .collect
+
+-- `nix-locate --minimal` prints one attribute per line (`hello.out`): the
+-- package attributes, without the output, once each.
+export attrs_of : &str -> Vec<String>
+attrs_of text =
+  mut out = Vec::new () : Vec<String>
+  for line in text.lines ()
+    l = line.trim ()
+    attr = l.strip_suffix ".out" |> .unwrap_or l
+    if !(attr.is_empty ()) && !(attr.starts_with '(') && !(out.contains (&attr.to_string ()))
+      out.push (attr.to_string ())
+  out
+
+-- The hint the shells print for a command that was not found, or None when
+-- nothing anywhere ships it (then the shell's own message is all there is).
+export hint_of : &Found -> Option<String>
+hint_of f =
+  if f.hits.is_empty () && f.nixpkgs.is_empty ()
+    None
+  else
+    mut out = "#{f.name}: command not found.\n"
+    if !(f.hits.is_empty ())
+      out.push_str "  In the fleet's systems:\n"
+      for h in &f.hits
+        line = "    #{package_of (&h.path)}  (#{h.systems.join ", "})  #{h.path}/bin/#{f.name}\n"
+        out.push_str (&line)
+    if !(f.nixpkgs.is_empty ())
+      shown = f.nixpkgs.iter () |> .take 5 |> .map (\a -> "nixpkgs##{a}") |> .collect : Vec<String>
+      more = if f.nixpkgs.len () > 5
+        " (+#{f.nixpkgs.len () - 5} more)"
+      else
+        String::new ()
+      line = "  In nixpkgs: #{shown.join ", "}#{more}\n"
+      out.push_str (&line)
+      comma = "  Try it once: , #{f.name}\n"
+      out.push_str (&comma)
+    Some out
+
+-- The answer as JSON (schema 1).
+export json_of : &Found -> String
+json_of f =
+  mut m = Map::new ()
+  m.insert (.to_string "schema") (Value::from 1)
+  m.insert (.to_string "name") (Value::from (f.name.clone ()))
+  hits = f.hits.iter () |> .map (\h -> hit_json h) |> .collect : Vec<Value>
+  m.insert (.to_string "fleet") (Value::Array hits)
+  m.insert (.to_string "nixpkgs") (Value::Array (f.nixpkgs.iter () |> .map (\a -> Value::from (a.clone ())) |> .collect))
+  Value::Object m |> .to_string
+
+hit_json : &Hit -> Value
+hit_json h =
+  mut m = Map::new ()
+  m.insert (.to_string "path") (Value::from (h.path.clone ()))
+  m.insert (.to_string "package") (Value::from (package_of (&h.path)))
+  m.insert (.to_string "systems") (Value::Array (h.systems.iter () |> .map (\s -> Value::from (s.clone ())) |> .collect))
+  Value::Object m
+
+test "command names: what a shell could have meant"
+  for ok in ["hello", "g++", "nix-store", "python3.12"]
+    assert! \-> command_ok ok
+  for bad in ["", ".", "..", "./x", "/bin/x", "a b", "x\n"]
+    assert! \-> !(command_ok bad)
+
+test "a store path names its package"
+  assert_eq! \-> package_of "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-hello-2.12" \-> "hello-2.12"
+  assert_eq! \-> package_of "/tmp/x-y" \-> "x-y"
+
+test "a hit per path, with every system that carries it, in their order"
+  a = .to_string "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello-2.12"
+  b = .to_string "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-hello-2.13"
+  c = .to_string "/nix/store/cccccccccccccccccccccccccccccccc-glibc"
+  systems = .to_vec ([(.to_string "this host", .to_vec ([a.clone (), c.clone ()])), (.to_string "mimir", .to_vec ([a.clone (), b.clone (), c.clone ()]))]) : Vec<(String, Vec<String>)>
+  present = .to_vec ([a.clone (), b.clone ()]) : Vec<String>
+  assert_eq! \-> hits_of (&systems) (&present) \-> .to_vec ([Hit { path = a.clone (), systems = .to_vec ([.to_string "this host", .to_string "mimir"]) }, Hit { path = b.clone (), systems = .to_vec ([.to_string "mimir"]) }])
+
+test "nix-locate's attributes, once each, without the output"
+  assert_eq! \-> attrs_of "hello.out\nhello.out\npkgsStatic.hello.out\n\n(nothing)\n" \-> .to_vec ([.to_string "hello", .to_string "pkgsStatic.hello"])
+
+test "the hint names the fleet's paths, nixpkgs and comma; nothing found is no hint"
+  hit = Hit { path = .to_string "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello-2.12", systems = .to_vec ([.to_string "drakkar", .to_string "mimir"]) }
+  f = Found { name = .to_string "hello", hits = .to_vec ([hit]), nixpkgs = .to_vec ([.to_string "hello"]) }
+  h = hint_of (&f) |> .expect "hint"
+  assert! \-> h.starts_with "hello: command not found.\n"
+  assert! \-> h.contains "    hello-2.12  (drakkar, mimir)  /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello-2.12/bin/hello\n"
+  assert! \-> h.contains "  In nixpkgs: nixpkgs#hello\n" && h.contains "  Try it once: , hello\n"
+  many = Found { hits = Vec::new (), nixpkgs = (1 .. 9) |> .map (\i -> "p#{i}") |> .collect, ...f.clone () }
+  assert! \-> hint_of (&many) |> .map (\t -> t.contains "(+3 more)" && !(t.contains "fleet")) |> .unwrap_or false
+  assert_eq! \-> hint_of (&Found { hits = Vec::new (), nixpkgs = Vec::new (), ...f.clone () }) \-> None
+  j = json_of (&f)
+  assert! \-> j.contains "\"package\":\"hello-2.12\"" && j.contains "\"schema\":1"
