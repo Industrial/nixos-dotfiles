@@ -33,9 +33,9 @@ in
     gnomeWithoutHyprland = assay.eq [(has "window-manager.gnome") (has "window-manager.hyprland")] [true false];
 
     # vdeploy deploys mimir (GH-160): the vdeploy role in common/fleet.nix, with vhealth
-    # for its health checks. comin stays the host's own choice, which deploy mode forces
-    # off (hosts/fleet.assay.nix checks the evaluated services).
-    deploysWithVdeploy = assay.eq [(has "nix.vdeploy") (has "nix.vhealth") (has "fleet.comin")] [true true true];
+    # for its health checks. comin is gone (GH-225; hosts/fleet.assay.nix checks the
+    # evaluated services).
+    deploysWithVdeploy = assay.eq [(has "nix.vdeploy") (has "nix.vhealth") (has "fleet.comin")] [true true false];
     aDeployHost = assay.eq ((import ../../common/fleet.nix).hasRole "vdeploy" "mimir") true;
     vdeployRollsBack = let
       off = features.evalSelection {
@@ -47,5 +47,5 @@ in
       };
       on = f: builtins.elem f (features.enabledFeatures off);
     in
-      assay.eq [(on "nix.vdeploy") (on "fleet.comin")] [false true];
+      assay.eq [(on "nix.vdeploy") (on "fleet.comin")] [false false];
   }

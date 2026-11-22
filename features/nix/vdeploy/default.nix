@@ -3,31 +3,29 @@
 # /run/current-system with vdiff.
 #
 #   mode = "observe" (GH-159, the default): it logs the switch it WOULD make, and never
-#     switches. comin stays the deployer.
+#     switches. Something else deploys the host.
 #   mode = "deploy" (GH-160, the take-over): every plan that switches runs `vdeploy apply` in
 #     a transient unit (vdeploy-apply): switch-to-configuration test, vhealth on the new
 #     generation's own probes, then `nix-env -p /nix/var/nix/profiles/system --set` and
 #     switch-to-configuration boot, or a rollback with `test` to the previous generation.
-#     Nothing is written to the boot entries until the health check passes. comin is forced
-#     off, and its unit is replaced by a TOMBSTONE (below).
+#     Nothing is written to the boot entries until the health check passes.
 #
-# Taking over from comin, live: the generation that turns deploy mode on is applied BY
-# comin, which runs switch-to-configuration as its own child, with its output piped into
-# itself. If that generation simply dropped comin.service, the switch would stop comin and
-# kill itself halfway. So deploy mode keeps a comin.service unit that is a tombstone:
-# restartIfChanged = false (the switch neither stops nor restarts it, so comin finishes the
-# switch), Restart = "no" and no wantedBy (comin then exits, as it does whenever its unit
-# file changes, and stays down; it never starts at boot). vdeploy waits until no
-# switch-to-configuration is left in comin's cgroup, then stops the unit itself. Going back
-# (the rollback option) is safe by construction: vdeploy's switch runs in vdeploy-apply, not
-# in vdeploy.service, and comin starts again from its own wantedBy.
+# comin is gone (GH-225). The take-over (GH-160) kept a do-nothing comin.service here, a
+# TOMBSTONE, so that comin could finish the switch that retired it (comin ran that switch as
+# its own piped child). drakkar and mimir are both past that switch, so the tombstone is
+# removed: a deploy-mode host has no comin.service at all. Deploy mode no longer forces comin
+# off either; it asserts that comin is off, since two deployers on one host is a
+# configuration error, not something to paper over. The daemon's start-up check for a comin
+# switch in flight (src/takeover.vlt) finds no unit and goes straight on.
 #
 # Which hosts deploy: those with the `vdeploy` role in common/fleet.nix (a host fact, so no
 # host file names the mode).
 #
-# Take-over rollback: `features.nix.vdeploy.mode = lib.mkForce "observe";` (or dropping the
-# role) brings comin back: the host keeps `features.fleet.comin.enable = true`, which
-# deploy mode overrides.
+# Deploy-mode rollback, the one option: `fleet deploy <host> --legacy` (bin/fleet): deploy-rs,
+# pinned to the flake's own input (GH-246, #258), run from the operator's checkout. It
+# activates a generation with no vdeploy involved, so it works when vdeploy is what broke.
+# (`mode = lib.mkForce "observe"` is no longer a rollback: with comin gone it leaves the
+# host with no deployer.)
 #
 # No starvation (what comin gets wrong): a plan in flight is never cancelled because main
 # moved. When it finishes, the next plan is for the newest commit (latest-wins). `debounce`
@@ -75,7 +73,6 @@
 {
   config,
   lib,
-  options,
   pkgs,
   ...
 } @ args: let
@@ -86,9 +83,7 @@
   deploysHere = fleet.hosts ? ${cfg.host} && fleet.hasRole "vdeploy" cfg.host;
   systemd = config.systemd.package;
   gcroots = "/nix/var/nix/gcroots/vdeploy";
-  # features.fleet.comin exists on hosts (lib/features.nix declares it); a suite that
-  # evaluates this module alone has no such option, and nothing to force off.
-  cominOption = lib.hasAttrByPath ["features" "fleet" "comin" "enable"] options;
+  # services.comin exists only where comin's module is imported (features/fleet/comin).
   cominOn = config.services.comin.enable or false;
   # What `vdeploy apply` is told, by the daemon (from these same flags) and by the
   # vdeploy-apply wrapper.
@@ -165,10 +160,10 @@ in {
         else "observe";
       defaultText = lib.literalExpression ''if the host has the "vdeploy" role in common/fleet.nix then "deploy" else "observe"'';
       description = ''
-        observe: plan and log the switch, never make it (comin deploys). deploy: switch,
-        health-check with vhealth, keep or roll back; comin is retired. Hosts with the
-        `vdeploy` role in common/fleet.nix deploy. The take-over's rollback is
-        lib.mkForce "observe" (or dropping the role).
+        observe: plan and log the switch, never make it (something else deploys). deploy:
+        switch, health-check with vhealth, keep or roll back; comin must be off. Hosts with
+        the `vdeploy` role in common/fleet.nix deploy. The rollback is
+        `fleet deploy <host> --legacy` (deploy-rs).
       '';
     };
     healthWindow = lib.mkOption {
@@ -407,6 +402,11 @@ in {
             assertion = config.environment.etc ? "vhealth/probes.json";
             message = "features.nix.vdeploy.mode = \"deploy\" decides keep or rollback with vhealth: enable features.nix.vhealth (and its probes) on this host.";
           }
+          # comin is gone (GH-225): no tombstone, and no forcing it off behind the host's back.
+          {
+            assertion = !cominOn;
+            message = "features.nix.vdeploy.mode = \"deploy\" deploys this host: turn comin off (features.fleet.comin.enable = false), or two deployers race.";
+          }
         ]
         # Only operators may wake vdeploy (GH-246): normal users, never a system user.
         ++ lib.optionals wakes (map (u: {
@@ -428,23 +428,6 @@ in {
           "d /run/vdeploy 0755 root root - -"
           "p ${wakeFifo} 0620 root vdeploy-wake - -"
         ];
-
-      # comin's tombstone (see the header). Only where the real comin is off, so the rollback
-      # option gets the real unit back.
-      systemd.services.comin = lib.mkIf (!cominOn) {
-        description = "comin, retired by vdeploy (a tombstone: features/nix/vdeploy)";
-        restartIfChanged = false;
-        wantedBy = lib.mkForce [];
-        serviceConfig = {
-          Type = "simple";
-          ExecStart = "${pkgs.coreutils}/bin/true";
-          Restart = lib.mkForce "no";
-        };
-      };
-    })
-
-    (lib.optionalAttrs cominOption {
-      features.fleet.comin.enable = lib.mkIf deploy (lib.mkForce false);
     })
   ];
 }

@@ -22,13 +22,11 @@
   profiles.development.enable = true;
   # profiles.gaming.enable = true;
 
-  features.fleet.comin.enable = true;
   # vdeploy (Voltaic) deploys mimir (GH-160): the `vdeploy` role in common/fleet.nix
   # puts it in deploy mode; every switch is health-checked with vhealth and rolled back
-  # when unhealthy, and comin is retired (forced off, its unit a tombstone). It waits for
-  # main to go quiet first (deployDebounce in common/fleet.nix), and fast-forwards
-  # ~/.dotfiles. Rollback to comin: drop the role, or
-  # features.nix.vdeploy.mode = lib.mkForce "observe".
+  # when unhealthy. comin is gone (GH-225). It waits for main to go quiet first
+  # (deployDebounce in common/fleet.nix), and fast-forwards ~/.dotfiles. Rollback:
+  # `fleet deploy mimir --legacy` (deploy-rs).
   features.nix.vdeploy.enable = true;
   # vhealth (GH-180): the probes vdeploy decides on (nix-daemon as the vhealth user, sshd,
   # node_exporter, and whatever mimir's features declare).

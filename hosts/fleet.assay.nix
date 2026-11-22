@@ -67,10 +67,17 @@ in
         drakkar = "deploy";
         mimir = "deploy";
       });
-    cominTombstoneOnDrakkar = assay.eq (forAll (c: c.systemd.services.comin.serviceConfig.Restart)) (onAll "always"
+    # comin is gone where vdeploy deploys (GH-225): no comin.service at all, not even the
+    # take-over's tombstone. huginn and muninn (offline) still run the real comin.
+    cominUnitOnlyWhereCominRuns = assay.eq (forAll (c: c.systemd.services ? comin)) (onAll true
       // {
-        drakkar = "no";
-        mimir = "no";
+        drakkar = false;
+        mimir = false;
+      });
+    cominIsTheRealOneWhereItRuns = assay.eq (forAll (c: c.systemd.services.comin.serviceConfig.Restart or null)) (onAll "always"
+      // {
+        drakkar = null;
+        mimir = null;
       });
     cominTracksOwnHost = assay.eq (forAll (c: c.services.comin.hostname)) (lib.genAttrs hosts (h: h));
 

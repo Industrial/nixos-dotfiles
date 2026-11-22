@@ -45,8 +45,8 @@ in
       };
     in
       assay.eq [(builtins.elem "nix.vdaemon-proxy" (features.enabledFeatures off)) off.features.nix.vdaemon-proxy.native] [true []];
-    # vdeploy observes next to comin, which still deploys (GH-159); one option removes it.
-    observesWithVdeploy = assay.eq [(has "nix.vdeploy") (has "fleet.comin")] [true true];
+    # vdeploy deploys drakkar (its `vdeploy` role, GH-160) and comin is gone (GH-225).
+    deploysWithVdeployNotComin = assay.eq [(has "nix.vdeploy") (has "fleet.comin")] [true false];
     vdeployRollsBack = let
       off = features.evalSelection {
         modules = [
@@ -57,5 +57,5 @@ in
       };
       on = f: builtins.elem f (features.enabledFeatures off);
     in
-      assay.eq [(on "nix.vdeploy") (on "fleet.comin")] [false true];
+      assay.eq [(on "nix.vdeploy") (on "fleet.comin")] [false false];
   }
