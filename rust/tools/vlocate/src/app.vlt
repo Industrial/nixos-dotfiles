@@ -1,0 +1,189 @@
+-- The program: one lookup.
+--
+--   1. the systems (this host, and the fleet's vci results where vci runs);
+--   2. each system's closure from the store database, one after another (a
+--      system that cannot be read is skipped, with a note);
+--   3. which of those paths ship `bin/<name>`;
+--   4. nix-locate's nixpkgs-wide answer;
+--   5. printed as asked: a listing (`bin`), the shells' hint on stdout
+--      (`hint`, for nushell) or on stderr with exit 127 (`not-found`, for fish
+--      and zsh).
+--
+-- Exit codes: 0 found; 1 found nowhere (bin, hint) or a usage error; 127 for
+-- not-found, always, as a shell expects of its handler.
+
+import std::sync::Arc
+import id_effect::{Effect, HNil, Never, succeed}
+import crate::cli::{Mode, Options, USAGE, parse_args}
+import crate::find::{Found, command_ok, hint_of, hits_of, json_of, package_of}
+import crate::world::{Live, WorldTool}
+
+-- Step 2, over the systems one after another.
+closures_from : WorldTool -> Vec<(String, String)> -> Vec<(String, Vec<String>)> -> Effect<Vec<(String, Vec<String>)>, Never, HNil>
+closures_from w rest acc =
+  case rest.split_first () of
+    None -> succeed acc
+    Some (s, tail) ->
+      w2 = w.clone ()
+      more = tail.to_vec ()
+      label = s.0.clone ()
+      w.0.closure (s.1.clone ()) |> .map (\c -> Some c) |> .catch (\e -> noted e) |> .map (move \c -> with_closure acc label c) |> .flat_map (move \acc2 -> closures_from w2 more acc2)
+
+noted : String -> Effect<Option<Vec<String>>, Never, HNil>
+noted e =
+  eprintln! \-> "vlocate: skipped a system: #{e}"
+  succeed None
+
+with_closure : Vec<(String, Vec<String>)> -> String -> Option<Vec<String>> -> Vec<(String, Vec<String>)>
+with_closure acc label c =
+  mut out = acc
+  if c is Some paths
+    out.push ((label, paths))
+  out
+
+-- Every path of every system, once.
+union_of : &[(String, Vec<String>)] -> Vec<String>
+union_of systems =
+  mut all = systems.iter () |> .flat_map (\s -> s.1.iter () |> .cloned) |> .collect : Vec<String>
+  all.sort ()
+  all.dedup ()
+  all
+
+-- The whole lookup against a world.
+export lookup : WorldTool -> String -> Effect<Found, Never, HNil>
+lookup w name =
+  w2 = w.clone ()
+  n2 = name.clone ()
+  w.0.systems () |> .flat_map (move \ss -> closures_from w2 ss (Vec::new ())) |> .flat_map (move \cs -> scanned w n2 cs)
+
+scanned : WorldTool -> String -> Vec<(String, Vec<String>)> -> Effect<Found, Never, HNil>
+scanned w name systems =
+  w2 = w.clone ()
+  n2 = name.clone ()
+  all = union_of (&systems)
+  w.0.present all (name.clone ()) |> .flat_map (move \present -> with_nixpkgs w2 n2 (hits_of (&systems) (&present)))
+
+with_nixpkgs : WorldTool -> String -> Vec<crate::find::Hit> -> Effect<Found, Never, HNil>
+with_nixpkgs w name hits =
+  n2 = name.clone ()
+  w.0.nixpkgs (name.clone ()) |> .map (move \attrs -> Found { name = n2, hits, nixpkgs = attrs })
+
+-- A listing for `bin`.
+export listing_of : &Found -> String
+listing_of f =
+  mut out = String::new ()
+  for h in &f.hits
+    line = "#{package_of (&h.path)}\t#{h.path}/bin/#{f.name}\t#{h.systems.join ", "}\n"
+    out.push_str (&line)
+  for a in &f.nixpkgs
+    line = "nixpkgs##{a}\t(nixpkgs)\n"
+    out.push_str (&line)
+  out
+
+found_anything : &Found -> bool
+found_anything f = !(f.hits.is_empty ()) || !(f.nixpkgs.is_empty ())
+
+-- What a mode prints, and the exit code.
+export answer_of : Mode -> bool -> &Found -> (String, String, u8)
+answer_of mode json f =
+  case mode of
+    Mode::Bin -> if json
+      ("#{json_of f}\n", String::new (), if found_anything f
+        0
+      else
+        1)
+    else
+      (listing_of f, String::new (), if found_anything f
+        0
+      else
+        1)
+    Mode::Hint -> case hint_of f of
+      Some h -> (h, String::new (), 0)
+      None -> (String::new (), String::new (), 1)
+    Mode::NotFound -> case hint_of f of
+      Some h -> (String::new (), h, 127)
+      None -> (String::new (), "#{f.name}: command not found\n", 127)
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  case parse_args (&args) of
+    Err why ->
+      eprintln! \-> "#{why}\n#{USAGE}"
+      std::process::ExitCode::from 1
+    Ok o -> if o.help
+      println! \-> "#{USAGE}"
+      std::process::ExitCode::SUCCESS
+    else
+      run o
+
+run : Options -> std::process::ExitCode
+run o =
+  if !(command_ok (&o.name))
+    if o.mode == Mode::NotFound
+      eprintln! \-> "#{o.name}: command not found"
+      std::process::ExitCode::from 127
+    else
+      std::process::ExitCode::from 1
+  else
+    w = WorldTool (Arc::new (Live { current = o.current.clone (), roots = o.roots.clone (), db = o.db.clone (), nix_locate = o.nix_locate.clone () }))
+    -- The edge: one lookup on the process-wide runtime, its value back for the exit code.
+    exit = (lookup w (o.name.clone ())).block_on () |> .into_result
+    case exit of
+      Err _ -> std::process::ExitCode::from 101
+      Ok f ->
+        (out, err, code) = answer_of o.mode o.json (&f)
+        print! \-> "#{out}"
+        eprint! \-> "#{err}"
+        std::process::ExitCode::from code
+
+#[cfg(test)]
+import crate::world::{Scripted, log_of}
+
+#[cfg(test)]
+path : char -> String
+path c =
+  hash = std::iter::repeat_n c 32 |> .collect : String
+  "/nix/store/#{hash}-hello-2.12"
+
+#[cfg(test)]
+found_in : Scripted -> String -> Found
+found_in w name = id_effect::testing::run_test (lookup (WorldTool (Arc::new w)) name) |> .into_result |> .expect "lookup"
+
+test "a lookup: each system's closure, the paths that ship it, then nixpkgs"
+  a = path 'a'
+  b = path 'b'
+  w = Scripted { systems = .to_vec ([(.to_string "this host", .to_string "/r/here"), (.to_string "mimir", .to_string "/r/mimir")]), closures = .to_vec ([(.to_string "/r/here", .to_vec ([a.clone ()])), (.to_string "/r/mimir", .to_vec ([a.clone (), b.clone ()]))]), with_bin = .to_vec ([a.clone (), b.clone ()]), nixpkgs = .to_vec ([.to_string "hello"]), ...Scripted::default () }
+  f = found_in (w.clone ()) (.to_string "hello")
+  assert_eq! \-> f.hits.len () \-> 2
+  assert_eq! \-> f.hits[0].systems \-> .to_vec ([.to_string "this host", .to_string "mimir"])
+  assert_eq! \-> f.nixpkgs \-> .to_vec ([.to_string "hello"])
+  -- Two systems, one present check over their union (two paths), one nix-locate.
+  assert_eq! \-> log_of (&w) \-> .to_vec ([.to_string "closure /r/here", .to_string "closure /r/mimir", .to_string "present 2 hello", .to_string "nixpkgs hello"])
+
+test "a system that cannot be read is skipped; the others still answer"
+  a = path 'a'
+  w = Scripted { systems = .to_vec ([(.to_string "this host", .to_string "/r/bad"), (.to_string "mimir", .to_string "/r/mimir")]), closures = .to_vec ([(.to_string "/r/mimir", .to_vec ([a.clone ()]))]), broken = .to_vec ([.to_string "/r/bad"]), with_bin = .to_vec ([a.clone ()]), ...Scripted::default () }
+  f = found_in w (.to_string "hello")
+  assert_eq! \-> f.hits.len () \-> 1
+  assert_eq! \-> f.hits[0].systems \-> .to_vec ([.to_string "mimir"])
+
+test "each mode's output and exit code"
+  hit = crate::find::Hit { path = path 'a', systems = .to_vec ([.to_string "this host"]) }
+  f = Found { name = .to_string "hello", hits = .to_vec ([hit]), nixpkgs = .to_vec ([.to_string "hello"]) }
+  none = Found { hits = Vec::new (), nixpkgs = Vec::new (), ...f.clone () }
+  (out, _, code) = answer_of Mode::Bin false (&f)
+  assert! \-> out.contains "hello-2.12\t" && out.contains "nixpkgs#hello\t(nixpkgs)" && code == 0
+  (_, _, nocode) = answer_of Mode::Bin false (&none)
+  assert_eq! \-> nocode \-> 1
+  (hint, _, hcode) = answer_of Mode::Hint false (&f)
+  assert! \-> hint.starts_with "hello: command not found." && hcode == 0
+  (nohint, _, nhcode) = answer_of Mode::Hint false (&none)
+  assert! \-> nohint.is_empty () && nhcode == 1
+  (stdout, stderr, ncode) = answer_of Mode::NotFound false (&f)
+  assert! \-> stdout.is_empty () && stderr.contains "Try it once: , hello" && ncode == 127
+  (_, plain, pcode) = answer_of Mode::NotFound false (&none)
+  assert_eq! \-> (plain.as_str (), pcode) \-> ("hello: command not found\n", 127)
+  (js, _, _) = answer_of Mode::Bin true (&f)
+  assert! \-> js.contains "\"fleet\":[" && js.ends_with "\n"

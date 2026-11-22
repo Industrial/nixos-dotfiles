@@ -82,6 +82,21 @@ in
     in
       assay.eq [(builtins.elem "cli.vswitch" off) (builtins.elem "cli.nh" off)] [false true];
 
+    # vlocate complements nix-index (GH-245): both are on, and one option turns vlocate off
+    # with nix-index left as it was.
+    vlocateBesideNixIndex = assay.eq [(has "cli.vlocate") (has "cli.nix-index")] [true true];
+    vlocateRollsBackAlone = let
+      off = features.enabledFeatures (features.evalSelection {
+        modules = [
+          ({lib, ...}: {
+            profiles.cli-core.enable = true;
+            features.cli.vlocate.enable = lib.mkForce false;
+          })
+        ];
+      });
+    in
+      assay.eq [(builtins.elem "cli.vlocate" off) (builtins.elem "cli.nix-index" off)] [false true];
+
     # cli-core is CLI only: nothing outside features/cli.
     onlyCliFeatures = assay.eq (builtins.filter (f: builtins.substring 0 4 f != "cli.") on) [];
   }

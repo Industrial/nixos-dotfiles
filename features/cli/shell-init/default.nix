@@ -174,6 +174,7 @@ with lib; let
     mkdir -p "$scratch" $out
     ${concatMapStringsSep "\n" emit cfg.hooks}
     ${concatMapStringsSep "\n" emitCompleter cfg.completers}
+    ${concatStringsSep "\n" (mapAttrsToList (name: source: "cp ${source} $out/${name}") cfg.extraAutoload)}
 
     # Every file in here is sourced by every interactive shell, on the REPL path only, so a
     # file that does not parse prints its error on every shell start and nowhere else — not in
@@ -233,6 +234,19 @@ in {
         per-file costs in the completer table.
       '';
       example = ["git" "nix"];
+    };
+
+    # Files other features contribute (features/cli/vlocate's command-not-found hook): a
+    # name, with its numeric prefix for the load order, and a source. They go through the
+    # same nu-check as every other file here.
+    extraAutoload = mkOption {
+      type = types.attrsOf types.path;
+      default = {};
+      description = ''
+        Extra `.nu` files for `$nu.data-dir/vendor/autoload`, by file name (the numeric prefix
+        fixes the load order). Checked with nu-check at build time like the rest.
+      '';
+      example = literalExpression ''{"60-vlocate.nu" = ./vlocate.nu;}'';
     };
   };
 

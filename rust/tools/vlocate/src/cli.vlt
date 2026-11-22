@@ -1,0 +1,99 @@
+-- The command line.
+--
+--   vlocate [bin] NAME [--json]      where NAME comes from (exit 1 when nowhere)
+--   vlocate hint NAME                the shells' hint on stdout (exit 1 when none: nushell)
+--   vlocate not-found NAME           the hint on stderr, exit 127 (fish, zsh)
+--   options: [--current PATH] [--roots DIR] [--db FILE] [--nix-locate PROG | --no-nixpkgs]
+
+export const USAGE : &str = "usage: vlocate [bin] NAME [--json]\n       vlocate hint NAME\n       vlocate not-found NAME\noptions: [--current PATH] [--roots DIR] [--db FILE] [--nix-locate PROG | --no-nixpkgs]"
+
+export data Mode = Bin | Hint | NotFound
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+export data Options
+  { export mode Mode
+  , export name String
+  , export json bool
+  , export current String
+  , export roots String
+  , export db String
+  , export nix_locate Option<String>
+  , export help bool
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export defaults : Options
+defaults = Options { mode = Mode::Bin, name = String::new (), json = false, current = .to_string "/run/current-system", roots = .to_string "/var/lib/vci/roots", db = nix_store_core::db::DEFAULT_DB.to_string (), nix_locate = Some (.to_string "nix-locate"), help = false }
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+-- The options in `args` (argv without the program name).
+export parse_args : &[String] -> Result<Options, String>
+parse_args args =
+  mut o = defaults ()
+  mut words = Vec::new () : Vec<String>
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "--json" ->
+        o.json := true
+      "--current" ->
+        o.current := (value (it.next ()) "--current")?
+      "--roots" ->
+        o.roots := (value (it.next ()) "--roots")?
+      "--db" ->
+        o.db := (value (it.next ()) "--db")?
+      "--nix-locate" ->
+        o.nix_locate := Some ((value (it.next ()) "--nix-locate")?)
+      "--no-nixpkgs" ->
+        o.nix_locate := None
+      "-h" ->
+        o.help := true
+      "--help" ->
+        o.help := true
+      other ->
+        if other.starts_with "--"
+          return Err "unknown argument: #{other}"
+        words.push (other.to_string ())
+  if o.help
+    return Ok o
+  (mode, name) = (mode_and_name (&words))?
+  o.mode := mode
+  o.name := name
+  Ok o
+
+mode_and_name : &[String] -> Result<(Mode, String), String>
+mode_and_name words =
+  case words.len () of
+    1 -> Ok ((Mode::Bin, words[0].clone ()))
+    2 -> case words[0].as_str () of
+      "bin" -> Ok ((Mode::Bin, words[1].clone ()))
+      "hint" -> Ok ((Mode::Hint, words[1].clone ()))
+      "not-found" -> Ok ((Mode::NotFound, words[1].clone ()))
+      other -> Err "unknown command: #{other} (bin, hint or not-found)"
+    0 -> Err (.to_string "a command name is required")
+    _ -> Err (.to_string "one command name at a time")
+
+#[cfg(test)]
+args : &[&str] -> Vec<String>
+args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "a name alone is `bin`; the shells' modes take one name"
+  o = parse_args (&args (&["hello"])) |> .expect "options"
+  assert_eq! \-> (o.mode, o.name.as_str (), o.json, o.nix_locate.clone ()) \-> (Mode::Bin, "hello", false, Some (.to_string "nix-locate"))
+  assert_eq! \-> (o.current.as_str (), o.roots.as_str ()) \-> ("/run/current-system", "/var/lib/vci/roots")
+  h = parse_args (&args (&["hint", "cowsay"])) |> .expect "options"
+  assert_eq! \-> (h.mode, h.name.as_str ()) \-> (Mode::Hint, "cowsay")
+  n = parse_args (&args (&["--no-nixpkgs", "not-found", "x", "--roots", "/r", "--current", "/c", "--db", "/d"])) |> .expect "options"
+  assert_eq! \-> (n.mode, n.nix_locate.clone (), n.roots.as_str (), n.current.as_str (), n.db.as_str ()) \-> (Mode::NotFound, None, "/r", "/c", "/d")
+
+test "bad command lines are refused with the reason"
+  assert_eq! \-> parse_args (&args (&[])) \-> Err (.to_string "a command name is required")
+  assert_eq! \-> parse_args (&args (&["frob", "x"])) \-> Err (.to_string "unknown command: frob (bin, hint or not-found)")
+  assert_eq! \-> parse_args (&args (&["a", "b", "c"])) \-> Err (.to_string "one command name at a time")
+  assert_eq! \-> parse_args (&args (&["x", "--frob"])) \-> Err (.to_string "unknown argument: --frob")
+  assert! \-> parse_args (&args (&["--help"])) |> .map (\o -> o.help) |> .unwrap_or false

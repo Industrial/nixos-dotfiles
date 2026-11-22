@@ -413,6 +413,9 @@
       # features/nix/vci (GH-242): main and open PRs built on the cache host, substituted by
       # a client with zero local builds; switched in and out live.
       // {vci-vm = import ./features/nix/vci/test.nix {inherit pkgs;};}
+      # features/cli/vlocate (GH-245): the fleet's systems and the command-not-found hint in
+      # nushell, fish and zsh, as a normal user.
+      // {vlocate-vm = import ./features/cli/vlocate/test.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;

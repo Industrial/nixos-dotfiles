@@ -64,6 +64,9 @@
     features.cli.vswitch.enable = true;
     features.cli.nh.enable = true;
     features.cli.nix-index.enable = true;
+    # vlocate complements nix-index (GH-245): the fleet's own systems, and the
+    # command-not-found hint in nushell, fish and zsh. Rollback: lib.mkForce false on a host.
+    features.cli.vlocate.enable = true;
     features.cli.nixdrv.enable = true;
     features.cli.nixfetch.enable = true;
     features.cli.nixq.enable = true;
