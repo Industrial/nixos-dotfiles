@@ -30,8 +30,8 @@ nix = { version = "0.30", default-features = false, features = [
 # Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Exact pin —
 # the surface still moves between minors.
 [build-dependencies]
-voltaic-driver = "=0.2.1"
-voltaic-diag = "=0.2.1"
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
 
 [lib]
 name = "vopt"
