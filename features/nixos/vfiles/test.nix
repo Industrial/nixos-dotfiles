@@ -10,6 +10,9 @@
 #   - a link whose out-of-store source (a checkout) is missing uses its fallback, and
 #     moves to the source once it exists.
 #
+# It also reports the switch time with vfiles on (GH-188's "after"): the running
+# generation re-activated three times, and the vfiles step on its own.
+#
 # A second machine, `fresh`, boots under userborn for the first time (GH-205): the
 # activation runs before userborn.service has written alice, so the vfiles step defers,
 # and vfiles.service places her files once userborn has.
@@ -134,6 +137,16 @@ in
 
       with subtest("nothing failed along the way"):
           assert report()["failed"] == [], report()
+
+      with subtest("switch time with vfiles on (GH-188 after)"):
+          def timed(cmd):
+              out = machine.succeed(f"bash -c 'TIMEFORMAT=%R; {{ time {cmd} >/dev/null 2>&1; }} 2>&1'")
+              return float(out.strip().splitlines()[-1])
+
+          switches = [timed(f"{base}/bin/switch-to-configuration test") for _ in range(3)]
+          steps = [timed("vfiles --spec /etc/vfiles/spec.json --state-dir /var/lib/vfiles") for _ in range(3)]
+          print(f"GH-188 after: switch-to-configuration test, re-activating the running generation: {switches} s")
+          print(f"GH-188 after: the vfiles step alone ({len(json.loads(machine.succeed('cat /etc/vfiles/spec.json'))['files'])} files): {steps} s")
 
       with subtest("a fresh userborn boot defers to vfiles.service, which places the files (GH-205)"):
           fresh.wait_for_unit("vfiles.service")
