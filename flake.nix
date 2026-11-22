@@ -407,6 +407,9 @@
       // lib.listToAttrs (map (variant: lib.nameValuePair "etc-overlay-${variant}" (import ./features/nixos/etc-overlay/test.nix {inherit pkgs inputs variant;})) ["stock" "on"])
       # features/nixos/etc-overlay: switched into and out of, live and cold, state kept.
       // {etc-overlay-live-switch = import ./features/nixos/etc-overlay/test-live-switch.nix {inherit pkgs inputs;};}
+      # features/cli/vswitch (GH-241): a local switch as a non-root user, health-checked,
+      # rolled back when unhealthy, refused when marked bad; test and boot.
+      // {vswitch-vm = import ./features/cli/vswitch/test.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;

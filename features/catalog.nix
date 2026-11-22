@@ -97,6 +97,7 @@
   ./cli/vmon
   ./cli/vfetch
   ./cli/vwhy
+  ./cli/vswitch
   ./cli/yazi
   ./cli/zellij
   ./cli/zoxide

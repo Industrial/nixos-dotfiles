@@ -1,0 +1,20 @@
+-- What every vswitch module shares: the error type and the Result-to-Effect lift.
+
+import id_effect::{Effect, HNil, fail, succeed}
+
+-- Why vswitch stopped. `Usage` is the operator's; `Build` is the build (or the
+-- dry run) that failed; `Activate` is an activation that did not leave the
+-- host where it was asked to be (vdeploy's apply rolled back or refused, or a
+-- `test`/`boot` that failed); `Declined` is a "no" to `--ask`.
+export errors SwitchError
+  Usage String     "#{0}"
+  Build String     "#{0}"
+  Activate String  "#{0}"
+  Declined String  "#{0}"
+
+-- An effect for a computed result: the planned failure stays typed.
+export lifted : given <A: Send + 'static> Result<A, SwitchError> -> Effect<A, SwitchError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e

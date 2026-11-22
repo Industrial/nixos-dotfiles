@@ -1,0 +1,245 @@
+-- The pure half of vswitch: the verbs, what to build, the command lines that
+-- build and activate it, and which activation a verb needs given where the
+-- host is. Nothing here runs anything.
+
+import std::path::Path
+import vdeploy::caps::nix_args
+
+-- What vswitch was asked for: nixos-rebuild's verbs.
+export data Verb = Switch | Boot | Test | Build | Dry
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+export verb_of : &str -> Option<Verb>
+verb_of word =
+  case word of
+    "switch" -> Some Verb::Switch
+    "boot" -> Some Verb::Boot
+    "test" -> Some Verb::Test
+    "build" -> Some Verb::Build
+    "dry" -> Some Verb::Dry
+    "dry-build" -> Some Verb::Dry
+    _ -> None
+
+export verb_name : Verb -> &'static str
+verb_name v =
+  case v of
+    Verb::Switch -> "switch"
+    Verb::Boot -> "boot"
+    Verb::Test -> "test"
+    Verb::Build -> "build"
+    Verb::Dry -> "dry"
+
+-- The transient unit every activation runs in. It is vdeploy's own: systemd
+-- refuses a second unit of one name, so a local switch and the deploy agent
+-- never switch at once, and vdeploy's daemon waits while this one runs.
+export const UNIT : &str = "vdeploy-apply"
+
+-- The programs vswitch runs. Activation runs under the elevation program
+-- (sudo resets PATH), so the NixOS feature passes absolute paths, and bare
+-- names are resolved on the caller's PATH first (`absolute`).
+export data Tools
+  { export nix String
+  , export vmon Option<String>
+  , export systemd_run String
+  , export systemctl String
+  , export nix_env String
+  , export nix_store String
+  , export setpriv String
+  , export elevate String
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- A host's toplevel in a flake.
+export toplevel_of : &str -> &str -> String
+toplevel_of flake host = "#{flake}#nixosConfigurations.\"#{host}\".config.system.build.toplevel"
+
+-- The build: `nix build --out-link LINK INSTALLABLE`, through vmon when there
+-- is one (vmon adds `--log-format internal-json -v` itself), else with the
+-- build logs printed.
+export build_command : &Tools -> &str -> &str -> Vec<String>
+build_command t installable link =
+  mut nix = .to_vec ([t.nix.clone (), .to_string "build"]) : Vec<String>
+  nix.extend (nix_args (&["--out-link", link, installable]))
+  case &t.vmon of
+    Some v ->
+      mut all = .to_vec ([v.clone (), .to_string "--"]) : Vec<String>
+      all.extend nix
+      all
+    None ->
+      nix.push (.to_string "--print-build-logs")
+      nix
+
+-- `dry`: what would be built and fetched, and nothing else.
+export dry_command : &Tools -> &str -> Vec<String>
+dry_command t installable =
+  mut nix = .to_vec ([t.nix.clone (), .to_string "build"]) : Vec<String>
+  nix.extend (nix_args (&["--dry-run", installable]))
+  nix
+
+-- One activation: the verb, the toplevel, and what vdeploy's transaction is told.
+export data Activation
+  { export verb Verb
+  , export toplevel String
+  , export program String
+  , export state_dir String
+  , export health_window String
+  , export health_as Option<String>
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- What the unit runs: `vswitch apply` (vdeploy's transaction, with its health
+-- check and rollback) for switch, `vswitch activate boot|test` otherwise.
+export unit_args : &Tools -> &Activation -> Vec<String>
+unit_args t a =
+  case a.verb of
+    Verb::Switch ->
+      mut args = .to_vec ([a.program.clone (), .to_string "apply", .to_string "--toplevel", a.toplevel.clone (), .to_string "--state-dir", a.state_dir.clone (), .to_string "--health-window", a.health_window.clone (), .to_string "--systemctl", t.systemctl.clone (), .to_string "--nix-env", t.nix_env.clone (), .to_string "--nix-store", t.nix_store.clone ()]) : Vec<String>
+      if &a.health_as is Some u
+        args.extend (.to_vec ([.to_string "--health-as", u.clone (), .to_string "--setpriv", t.setpriv.clone ()]) : Vec<String>)
+      args
+    other ->
+      .to_vec ([a.program.clone (), .to_string "activate", (verb_name other).to_string (), a.toplevel.clone (), .to_string "--nix-env", t.nix_env.clone ()]) : Vec<String>
+
+-- The whole activation command line: elevated unless already root, in the
+-- transient unit, with its output on this terminal.
+export activation_command : &Tools -> &Activation -> bool -> Vec<String>
+activation_command t a root =
+  mut cmd = Vec::new () : Vec<String>
+  if !root
+    cmd.push (t.elevate.clone ())
+  unit = "--unit=#{UNIT}"
+  description = "--description=vswitch #{verb_name a.verb}: #{a.toplevel}"
+  cmd.extend (.to_vec ([t.systemd_run.clone (), unit, description, .to_string "--service-type=exec", .to_string "--collect", .to_string "--wait", .to_string "--pipe", .to_string "--quiet"]) : Vec<String>)
+  cmd.extend (unit_args t a)
+  cmd
+
+-- Which activation a verb needs, given the toplevel X, the running system and
+-- the boot default. None: nothing to do. A switch to the generation that
+-- already runs only fixes the boot default when that moved.
+export activation_of : Verb -> &str -> &str -> &str -> Option<Verb>
+activation_of verb x current profile =
+  case verb of
+    Verb::Switch -> if x != current
+      Some Verb::Switch
+    else if x != profile
+      Some Verb::Boot
+    else
+      None
+    Verb::Test -> if x != current
+      Some Verb::Test
+    else
+      None
+    Verb::Boot -> if x != profile
+      Some Verb::Boot
+    else
+      None
+    _ -> None
+
+-- What is said when there is nothing to activate.
+export idle_line : Verb -> &str -> String
+idle_line verb x =
+  case verb of
+    Verb::Build -> "vswitch: built #{x}"
+    Verb::Boot -> "vswitch: #{x} is already the boot default: nothing to do"
+    _ -> "vswitch: already running #{x}: nothing to switch"
+
+-- The effective uid in /proc/self/status (`Uid: real effective saved fs`).
+export euid_of : &str -> Option<u32>
+euid_of status =
+  line = status.lines () |> .find (\l -> l.starts_with "Uid:")
+  field = line |> .and_then (\l -> l.split_whitespace () |> .nth 2)
+  field |> .and_then (\u -> (u.parse () : Result<u32, std::num::ParseIntError>) |> .ok)
+
+-- A program name on PATH, as an absolute path. Anything with a slash is kept.
+export on_path : &str -> &str -> Option<String>
+on_path path name =
+  if name.contains '/'
+    Some (name.to_string ())
+  else
+    path.split ':' |> .filter (\d -> !(d.is_empty ())) |> .map (\d -> Path::new d |> .join name) |> .find (\p -> p.is_file ()) |> .map (\p -> p.to_string_lossy () |> .to_string)
+
+-- The tools with every bare name resolved on PATH (kept as is when not found:
+-- the run then says which one is missing).
+export absolute : &Tools -> &str -> Tools
+absolute t path =
+  vmon = t.vmon.as_ref () |> .map (\v -> abs_of path v)
+  Tools { nix = abs_of path (&t.nix), vmon, systemd_run = abs_of path (&t.systemd_run), systemctl = abs_of path (&t.systemctl), nix_env = abs_of path (&t.nix_env), nix_store = abs_of path (&t.nix_store), setpriv = abs_of path (&t.setpriv), elevate = abs_of path (&t.elevate) }
+
+abs_of : &str -> &str -> String
+abs_of path name = on_path path name |> .unwrap_or_else (\-> name.to_string ())
+
+#[cfg(test)]
+tools : Tools
+tools = Tools { nix = .to_string "/n/nix", vmon = None, systemd_run = .to_string "/s/systemd-run", systemctl = .to_string "/s/systemctl", nix_env = .to_string "/n/nix-env", nix_store = .to_string "/n/nix-store", setpriv = .to_string "/u/setpriv", elevate = .to_string "/w/sudo" }
+
+#[cfg(test)]
+activation : Verb -> Option<String> -> Activation
+activation verb health_as = Activation { verb, toplevel = .to_string "/nix/store/x-new", program = .to_string "/v/vswitch", state_dir = .to_string "/var/lib/vdeploy", health_window = .to_string "2m", health_as }
+
+test "the verbs are nixos-rebuild's"
+  for w in ["switch", "boot", "test", "build", "dry"]
+    assert_eq! \-> verb_of w |> .map verb_name \-> Some w
+  assert_eq! \-> verb_of "dry-build" \-> Some Verb::Dry
+  assert_eq! \-> verb_of "repl" \-> None
+
+test "the build goes through vmon when there is one, and names the host's toplevel"
+  x = toplevel_of "/home/tom/.dotfiles" "drakkar"
+  assert_eq! \-> x \-> "/home/tom/.dotfiles#nixosConfigurations.\"drakkar\".config.system.build.toplevel"
+  plain = build_command (&tools ()) (&x) "/r/result"
+  assert_eq! \-> plain \-> .to_vec ([.to_string "/n/nix", .to_string "build", .to_string "--extra-experimental-features", .to_string "nix-command flakes", .to_string "--out-link", .to_string "/r/result", x.clone (), .to_string "--print-build-logs"])
+  watched = build_command (&Tools { vmon = Some (.to_string "/m/vmon"), ...tools () }) (&x) "/r/result"
+  head4 = watched.iter () |> .take 4 |> .cloned |> .collect : Vec<String>
+  assert_eq! \-> head4 \-> .to_vec ([.to_string "/m/vmon", .to_string "--", .to_string "/n/nix", .to_string "build"])
+  assert! \-> !(watched.contains (&.to_string "--print-build-logs"))
+  assert_eq! \-> dry_command (&tools ()) (&x) |> .last |> .cloned \-> Some x
+
+test "a switch is vdeploy's apply transaction, elevated, in vdeploy's unit"
+  c = activation_command (&tools ()) (&activation Verb::Switch (Some (.to_string "vhealth"))) false
+  head3 = c.iter () |> .take 3 |> .cloned |> .collect : Vec<String>
+  assert_eq! \-> head3 \-> .to_vec ([.to_string "/w/sudo", .to_string "/s/systemd-run", .to_string "--unit=vdeploy-apply"])
+  for flag in ["--wait", "--pipe", "--collect", "--service-type=exec"]
+    assert! \-> c.contains (&flag.to_string ())
+  i = c.iter () |> .position (\a -> a == "apply") |> .expect "apply"
+  assert_eq! \-> c[i - 1].as_str () \-> "/v/vswitch"
+  -- What the unit is handed, vdeploy's own parser reads back as its apply options.
+  mut back = .to_vec ([.to_string "apply"]) : Vec<String>
+  back.extend (c.iter () |> .skip (i + 1) |> .cloned)
+  o = vdeploy::cli::parse_args (&back) |> .expect "vdeploy apply options"
+  assert_eq! \-> (o.apply, o.toplevel.clone (), o.health_window, o.health_as.clone (), o.setpriv.as_str (), o.nix_env.as_str (), o.systemctl.as_str ()) \-> (true, Some (.to_string "/nix/store/x-new"), 120, Some (.to_string "vhealth"), "/u/setpriv", "/n/nix-env", "/s/systemctl")
+  assert_eq! \-> (vdeploy::app::apply_of (&o)).state_dir \-> .to_string "/var/lib/vdeploy"
+
+test "root is not elevated; boot and test are vswitch activate"
+  c = activation_command (&tools ()) (&activation Verb::Boot None) true
+  assert_eq! \-> c.first () |> .cloned \-> Some (.to_string "/s/systemd-run")
+  i = c.iter () |> .position (\a -> a == "activate") |> .expect "activate"
+  tail = c.iter () |> .skip i |> .cloned |> .collect : Vec<String>
+  assert_eq! \-> tail \-> .to_vec ([.to_string "activate", .to_string "boot", .to_string "/nix/store/x-new", .to_string "--nix-env", .to_string "/n/nix-env"])
+  -- No probes user: no --health-as at all.
+  s = activation_command (&tools ()) (&activation Verb::Switch None) true
+  assert! \-> !(s.contains (&.to_string "--health-as"))
+
+test "only what moved is activated"
+  assert_eq! \-> activation_of Verb::Switch "/x" "/old" "/old" \-> Some Verb::Switch
+  assert_eq! \-> activation_of Verb::Switch "/x" "/x" "/old" \-> Some Verb::Boot
+  assert_eq! \-> activation_of Verb::Switch "/x" "/x" "/x" \-> None
+  assert_eq! \-> activation_of Verb::Test "/x" "/old" "/x" \-> Some Verb::Test
+  assert_eq! \-> activation_of Verb::Test "/x" "/x" "/old" \-> None
+  assert_eq! \-> activation_of Verb::Boot "/x" "/x" "/old" \-> Some Verb::Boot
+  assert_eq! \-> activation_of Verb::Boot "/x" "/old" "/x" \-> None
+  assert_eq! \-> activation_of Verb::Build "/x" "/old" "/old" \-> None
+  assert! \-> idle_line Verb::Build "/x" |> .contains "built /x"
+
+test "the effective uid, and names resolved on PATH"
+  assert_eq! \-> euid_of "Name:\tx\nUid:\t1000\t0\t0\t0\nGid:\t100\n" \-> Some 0
+  assert_eq! \-> euid_of "Name:\tx\n" \-> None
+  assert_eq! \-> on_path "/nonexistent" "/abs/sudo" \-> Some (.to_string "/abs/sudo")
+  assert_eq! \-> on_path "/nonexistent:" "sudo" \-> None
+  dir = std::env::temp_dir () |> .join ("vswitch-path-#{std::process::id ()}")
+  std::fs::create_dir_all (&dir) |> .ok
+  std::fs::write (dir.join "systemd-run") "" |> .ok
+  d = dir.to_string_lossy () |> .to_string
+  t = absolute (&Tools { systemd_run = .to_string "systemd-run", ...tools () }) (&d)
+  want = "#{d}/systemd-run"
+  assert_eq! \-> t.systemd_run \-> want
+  assert_eq! \-> t.nix \-> .to_string "/n/nix"
+  std::fs::remove_dir_all (&dir) |> .ok
