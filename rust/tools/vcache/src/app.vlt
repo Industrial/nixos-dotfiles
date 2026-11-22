@@ -24,15 +24,17 @@ export errors AppError
 
 -- VCACHE_DB, VCACHE_STORE_DIR (/nix/store), VCACHE_PRIORITY (30) and
 -- VCACHE_SIGN_KEY_FILE (unset: narinfos carry only the store's own
--- signatures). The listener is the host's HOST and PORT.
+-- signatures), VCACHE_TEXTFILE_DIR (unset: no counters file) and
+-- VCACHE_VEVAL_DIR (unset: no veval records, GH-243). The listener is the
+-- host's HOST and PORT.
 export settings_config : Config<Settings>
 settings_config =
-  Config::all ((Config::string "VCACHE_DB" |> .with_default (db::DEFAULT_DB.to_string ()), Config::string "VCACHE_STORE_DIR" |> .with_default (.to_string "/nix/store"), Config::integer "VCACHE_PRIORITY" |> .with_default 30, Config::optional_string "VCACHE_SIGN_KEY_FILE", Config::optional_string "VCACHE_TEXTFILE_DIR")) |> .map settings_of
+  Config::all ((Config::string "VCACHE_DB" |> .with_default (db::DEFAULT_DB.to_string ()), Config::string "VCACHE_STORE_DIR" |> .with_default (.to_string "/nix/store"), Config::integer "VCACHE_PRIORITY" |> .with_default 30, Config::optional_string "VCACHE_SIGN_KEY_FILE", Config::optional_string "VCACHE_TEXTFILE_DIR", Config::optional_string "VCACHE_VEVAL_DIR")) |> .map settings_of
 
-settings_of : (String, String, i64, Option<String>, Option<String>) -> Settings
+settings_of : (String, String, i64, Option<String>, Option<String>, Option<String>) -> Settings
 settings_of fields =
-  (db, store_dir, priority, sign_key_file, textfile_dir) = fields
-  Settings { db, store_dir, priority, sign_key_file, textfile_dir, meter = Arc::new (Counters::default ()) }
+  (db, store_dir, priority, sign_key_file, textfile_dir, veval_dir) = fields
+  Settings { db, store_dir, priority, sign_key_file, textfile_dir, veval_dir, meter = Arc::new (Counters::default ()) }
 
 -- The counters' flusher (GH-248), forked beside the server when there is a
 -- textfile directory; without one, nothing is written.

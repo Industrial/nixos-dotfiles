@@ -2,12 +2,15 @@
 -- store path is lives in nix-store-core's `storepath`.
 
 import nix_store_core::storepath::is_hash_part
+import nix_store_core::veval::is_key_id
 
--- What a request asks for.
+-- What a request asks for. `Veval` is a shared evaluation record (GH-243),
+-- named by its key id.
 export data Route
   = CacheInfo
   | NarInfo String
   | Nar String
+  | Veval String
   | Missing
   deriving (Debug, Clone, PartialEq)
 
@@ -20,10 +23,13 @@ route target =
     None -> target
   nar = path.strip_prefix "/nar/" |> .and_then (\p -> p.strip_suffix ".nar") |> .filter (\h -> is_hash_part h)
   info = path.strip_prefix "/" |> .and_then (\p -> p.strip_suffix ".narinfo") |> .filter (\h -> is_hash_part h)
+  veval = path.strip_prefix "/veval/" |> .and_then (\p -> p.strip_suffix ".veval") |> .filter (\k -> is_key_id k)
   if path == "/nix-cache-info"
     CacheInfo
   else if nar is Some h
     Nar (h.to_string ())
+  else if veval is Some k
+    Veval (k.to_string ())
   else if info is Some h
     NarInfo (h.to_string ())
   else
@@ -40,6 +46,13 @@ test "a nar route, with a query string"
 
 test "a hash part with a letter base-32 never produces is refused"
   assert_eq! \-> route "/ej1c3wf9c11a0qs6p3ymfvrnsdgsdcbq.narinfo" \-> Missing
+
+test "a veval record route, by key id only"
+  id = "1f733edb1b68506ea61f19f22a43e51f00b109cf81786ae68f9050be05783426"
+  assert_eq! \-> route (&"/veval/#{id}.veval") \-> Veval (id.to_string ())
+  assert_eq! \-> route "/veval/../../var/lib/vcache/secret-key.veval" \-> Missing
+  assert_eq! \-> route (&"/veval/#{id.to_uppercase ()}.veval") \-> Missing
+  assert_eq! \-> route (&"/veval/#{id}") \-> Missing
 
 test "path traversal is not a route"
   assert_eq! \-> route "/nar/../../etc/passwd.nar" \-> Missing
