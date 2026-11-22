@@ -146,6 +146,7 @@
   ./monitoring/homepage-dashboard
   ./monitoring/prometheus
   ./monitoring/prometheus-exporter
+  ./monitoring/vexporter
 
   # network
   ./network/chromium

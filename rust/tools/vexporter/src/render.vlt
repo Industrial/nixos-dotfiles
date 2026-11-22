@@ -1,0 +1,114 @@
+-- The pure half: the readings, and the textfile made of them. A reading that
+-- failed is None, and only its own gauges are left out; its source says 0 in
+-- `vexporter_source_up`, so a failed source never blanks the file.
+
+export data Store { export paths u64, export nar_bytes u64 }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Fs { export size_bytes u64, export free_bytes u64 }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Roots { export roots u64, export unreadable u64 }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The system profile's generations: how many, the newest's and the oldest's
+-- link time, and whether the booted, the running and the default agree.
+export data Gens { export count u64, export newest i64, export oldest i64, export booted_is_current bool, export profile_is_current bool }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Where this host is against main, from vdeploy's files: on main, and if not,
+-- since when main's head has been waiting (its commit time).
+export data Deploy { export on_main bool, export head_time Option<u64> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Readings
+  { export store Result<Store, String>
+  , export fs Result<Fs, String>
+  , export roots Result<Roots, String>
+  , export gens Result<Gens, String>
+  , export deploy Result<Deploy, String>
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+gauge : &str -> &str -> String -> String
+gauge name help value = "# HELP #{name} #{help}\n# TYPE #{name} gauge\n#{name} #{value}\n"
+
+flag : bool -> String
+flag b =
+  if b
+    .to_string "1"
+  else
+    .to_string "0"
+
+up : &str -> bool -> String
+up source ok = "vexporter_source_up{source=\"#{source}\"} #{flag ok}\n"
+
+age : u64 -> i64 -> String
+age now t =
+  n = i64::try_from now |> .unwrap_or i64::MAX
+  "#{(n - t).max 0}"
+
+-- The textfile for `r` at `now` (Unix seconds), having taken `took_ms`.
+export metrics : &Readings -> u64 -> u64 -> String
+metrics r now took_ms =
+  mut out = String::new ()
+  if &r.store is Ok s
+    out.push_str (&gauge "vexporter_store_paths" "Valid paths in the Nix store database." (s.paths.to_string ()))
+    out.push_str (&gauge "vexporter_store_nar_bytes" "Sum of the valid paths' NAR sizes." (s.nar_bytes.to_string ()))
+  if &r.fs is Ok f
+    out.push_str (&gauge "vexporter_nix_fs_size_bytes" "Size of the file system holding /nix." (f.size_bytes.to_string ()))
+    out.push_str (&gauge "vexporter_nix_fs_free_bytes" "Bytes available to unprivileged users on the file system holding /nix." (f.free_bytes.to_string ()))
+  if &r.roots is Ok g
+    out.push_str (&gauge "vexporter_gcroots" "GC roots under /nix/var/nix/gcroots (links and files, links never followed)." (g.roots.to_string ()))
+    out.push_str (&gauge "vexporter_gcroots_unreadable" "Entries under /nix/var/nix/gcroots vexporter could not read." (g.unreadable.to_string ()))
+  if &r.gens is Ok g
+    out.push_str (&gauge "vexporter_generations" "Generations of the system profile." (g.count.to_string ()))
+    out.push_str (&gauge "vexporter_generation_newest_age_seconds" "Age of the newest system generation's link." (age now g.newest))
+    out.push_str (&gauge "vexporter_generation_oldest_age_seconds" "Age of the oldest system generation's link." (age now g.oldest))
+    out.push_str (&gauge "vexporter_reboot_pending" "1 when the booted system is not the running one." (flag (!g.booted_is_current)))
+    out.push_str (&gauge "vexporter_profile_is_running" "1 when the system profile's default is the running system." (flag g.profile_is_current))
+  if &r.deploy is Ok d
+    out.push_str (&gauge "vexporter_on_main" "1 when the running system was built from main's head (vdeploy's view)." (flag d.on_main))
+    lag = if d.on_main
+      0
+    else
+      d.head_time |> .map (\t -> now.saturating_sub t) |> .unwrap_or 0
+    out.push_str (&gauge "vexporter_deploy_lag_seconds" "Seconds main's head has waited to run here; 0 when on main." (lag.to_string ()))
+  out.push_str "# HELP vexporter_source_up 1 when the source was read this run.\n# TYPE vexporter_source_up gauge\n"
+  out.push_str (&up "store" (r.store.is_ok ()))
+  out.push_str (&up "fs" (r.fs.is_ok ()))
+  out.push_str (&up "gcroots" (r.roots.is_ok ()))
+  out.push_str (&up "generations" (r.gens.is_ok ()))
+  out.push_str (&up "deploy" (r.deploy.is_ok ()))
+  out.push_str (&gauge "vexporter_last_run_timestamp_seconds" "When vexporter last wrote this file." (now.to_string ()))
+  out.push_str (&gauge "vexporter_run_milliseconds" "How long the last run took." (took_ms.to_string ()))
+  out
+
+-- Every metric name vexporter can write (the dashboard's claims check against it).
+export const NAMES : [&str; 16] = ["vexporter_store_paths", "vexporter_store_nar_bytes", "vexporter_nix_fs_size_bytes", "vexporter_nix_fs_free_bytes", "vexporter_gcroots", "vexporter_gcroots_unreadable", "vexporter_generations", "vexporter_generation_newest_age_seconds", "vexporter_generation_oldest_age_seconds", "vexporter_reboot_pending", "vexporter_profile_is_running", "vexporter_on_main", "vexporter_deploy_lag_seconds", "vexporter_source_up", "vexporter_last_run_timestamp_seconds", "vexporter_run_milliseconds"]
+
+#[cfg(test)]
+all_ok : Readings
+all_ok = Readings { store = Ok (Store { paths = 188755, nar_bytes = 709073236640 }), fs = Ok (Fs { size_bytes = 2000, free_bytes = 500 }), roots = Ok (Roots { roots = 40, unreadable = 1 }), gens = Ok (Gens { count = 3, newest = 900, oldest = 100, booted_is_current = false, profile_is_current = true }), deploy = Ok (Deploy { on_main = false, head_time = Some 700 }) }
+
+test "every reading becomes its gauges, and every source says it is up"
+  m = metrics (&all_ok ()) 1000 27
+  for line in ["vexporter_store_paths 188755\n", "vexporter_store_nar_bytes 709073236640\n", "vexporter_nix_fs_free_bytes 500\n", "vexporter_gcroots 40\n", "vexporter_gcroots_unreadable 1\n", "vexporter_generations 3\n", "vexporter_generation_newest_age_seconds 100\n", "vexporter_generation_oldest_age_seconds 900\n", "vexporter_reboot_pending 1\n", "vexporter_profile_is_running 1\n", "vexporter_on_main 0\n", "vexporter_deploy_lag_seconds 300\n", "vexporter_source_up{source=\"store\"} 1\n", "vexporter_run_milliseconds 27\n"]
+    assert! \-> m.contains line
+  -- Every name written is a known name (the dashboard's claims use NAMES).
+  for l in m.lines () |> .filter (\l -> !(l.starts_with '#'))
+    token = l.split_whitespace () |> .next |> .unwrap_or ""
+    name = token.split '{' |> .next |> .unwrap_or ""
+    assert! \-> NAMES.contains (&name)
+
+test "a failed source leaves out only its own gauges, and says it is down"
+  r = Readings { store = Err (.to_string "locked"), deploy = Err (.to_string "no vdeploy"), ...all_ok () }
+  m = metrics (&r) 1000 5
+  assert! \-> !(m.contains "vexporter_store_paths") && !(m.contains "vexporter_on_main")
+  assert! \-> m.contains "vexporter_source_up{source=\"store\"} 0\n" && m.contains "vexporter_source_up{source=\"deploy\"} 0\n"
+  assert! \-> m.contains "vexporter_generations 3\n" && m.contains "vexporter_gcroots 40\n"
+
+test "on main there is no lag; a future link time is age 0, never negative"
+  r = Readings { deploy = Ok (Deploy { on_main = true, head_time = Some 1 }), gens = Ok (Gens { count = 1, newest = 5000, oldest = 5000, booted_is_current = true, profile_is_current = true }), ...all_ok () }
+  m = metrics (&r) 1000 1
+  assert! \-> m.contains "vexporter_deploy_lag_seconds 0\n" && m.contains "vexporter_generation_newest_age_seconds 0\n" && m.contains "vexporter_reboot_pending 0\n"

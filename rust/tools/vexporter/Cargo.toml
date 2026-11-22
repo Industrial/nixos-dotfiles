@@ -1,0 +1,39 @@
+[package]
+name = "vexporter"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "The Nix and fleet metrics no other tool owns, as a node_exporter textfile: the store, the system generations, the deploy lag (GH-248)"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# The store database, read-only, and the generation-link parser.
+nix-store-core = { path = "../nix-store-core" }
+# The connection type nix-store-core's db opens; the same version.
+rusqlite = { version = "0.37", features = ["bundled"] }
+# vdeploy's status.json and plan.json.
+serde_json = "1"
+# statvfs(3) of the store's file system.
+libc = "0.2"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly (never 0.2.0: it miscompiles).
+[build-dependencies]
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
+
+[lib]
+name = "vexporter"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vexporter"
+path = "src/main.rs"
