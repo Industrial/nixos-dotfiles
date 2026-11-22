@@ -1,0 +1,61 @@
+-- Store databases for tests: Nix's schema, empty or with a few rows, in
+-- memory or in a file. For nix-store-core's own tests and for the crates that
+-- read the store database through `db` in theirs. Outside this crate's tests
+-- the module exists only with the `test-support` feature, so a consumer takes
+-- it as a dev-dependency feature and its build keeps the plain API:
+--
+--   [dev-dependencies]
+--   nix-store-core = { path = "../nix-store-core", features = ["test-support"] }
+--
+-- These panic on failure: they are test fixtures, not readers.
+
+import rusqlite::Connection
+
+-- libstore's schema.sql (Nix 2.35): the tables `db` reads, their indexes,
+-- and DerivationOutputs. The indexes matter, because query plans are tested
+-- against them (`db::EDGES`).
+export const SCHEMA : &str = "CREATE TABLE ValidPaths (id integer primary key autoincrement not null, path text unique not null, hash text not null, registrationTime integer not null, deriver text, narSize integer, ultimate integer, sigs text, ca text); CREATE TABLE Refs (referrer integer not null, reference integer not null, primary key (referrer, reference), foreign key (referrer) references ValidPaths(id) on delete cascade, foreign key (reference) references ValidPaths(id) on delete restrict); CREATE INDEX IndexReferrer on Refs(referrer); CREATE INDEX IndexReference on Refs(reference); CREATE TABLE DerivationOutputs (drv integer not null, id text not null, path text not null, primary key (drv, id), foreign key (drv) references ValidPaths(id) on delete cascade); CREATE INDEX IndexDerivationOutputs on DerivationOutputs(path);"
+
+-- An empty store database at `path`: a file, or `:memory:`. Rows go in with
+-- the caller's own SQL.
+export schema_db : &str -> Connection
+schema_db path =
+  conn = Connection::open path |> .expect "a test database"
+  conn.execute_batch SCHEMA |> .expect "the schema"
+  conn
+
+-- A store database in memory with the rows given as (path, base-16 hash,
+-- references). Every path is registered at time 0 with narSize 8.
+export memory_db : Vec<(&str, &str, Vec<&str>)> -> Connection
+memory_db rows =
+  conn = schema_db ":memory:"
+  for row in &rows
+    (path, hash, _) = row
+    added = conn.execute "INSERT INTO ValidPaths (path, hash, registrationTime, narSize) VALUES (?1, ?2, 0, 8)" ([*path, *hash]) |> .expect "a path"
+    assert_eq! \-> added \-> 1
+  for row in &rows
+    (path, _, refs) = row
+    for r in refs
+      linked = conn.execute "INSERT INTO Refs (referrer, reference) SELECT a.id, b.id FROM ValidPaths a, ValidPaths b WHERE a.path = ?1 AND b.path = ?2" ([*path, *r]) |> .expect "a reference"
+      assert_eq! \-> linked \-> 1
+  conn
+
+test "a schema database is empty, and a file one persists"
+  conn = schema_db ":memory:"
+  n = conn.query_row "SELECT count(*) FROM ValidPaths" () (\r -> r.get 0) |> .expect "a count" : i64
+  assert_eq! \-> n \-> 0
+  dir = std::env::temp_dir () |> .join (format! \-> "nix-store-core-testdb-#{std::process::id ()}")
+  std::fs::create_dir_all (&dir) |> .expect "a temp dir"
+  file = dir.join "db.sqlite" |> .to_string_lossy |> .into_owned
+  written = schema_db (&file)
+  written.execute_batch "INSERT INTO ValidPaths (path, hash, registrationTime) VALUES ('/nix/store/x', 'h', 0);" |> .expect "a row"
+  drop written
+  reopened = Connection::open (&file) |> .expect "the file again"
+  m = reopened.query_row "SELECT count(*) FROM ValidPaths" () (\r -> r.get 0) |> .expect "a count" : i64
+  assert_eq! \-> m \-> 1
+  std::fs::remove_dir_all (&dir) |> .expect "cleanup"
+
+test "rows go in with their references"
+  conn = memory_db (.to_vec ([("/nix/store/a", "h", .to_vec (["/nix/store/b"])), ("/nix/store/b", "h", Vec::new ())]))
+  n = conn.query_row "SELECT count(*) FROM Refs" () (\r -> r.get 0) |> .expect "a count" : i64
+  assert_eq! \-> n \-> 1

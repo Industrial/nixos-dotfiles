@@ -13,6 +13,7 @@ import rusqlite::Connection
 import rusqlite::OpenFlags
 import crate::narinfo::NarInfo
 import crate::nixbase32::narinfo_hash
+import crate::worker::PathInfo
 
 export const DEFAULT_DB : &str = "/nix/var/nix/db/db.sqlite"
 
@@ -132,23 +133,147 @@ closure_of_all conn paths =
       out.extend c
   Ok out
 
--- A store database in memory, for tests: Nix's schema for the two tables
--- read here, and the rows given as (path, base-16 hash, references).
+------------------------------------------------------------------------
+-- Every valid path at once (vverify's listing, GH-179)
+
+-- A valid path as the database lists it. `nar_hash` is the database form,
+-- `sha256:<base16>`; a NULL narSize reads as 0.
+export data ValidPath { export path String, export nar_hash String, export nar_size u64 }
+  deriving (Clone, Debug, PartialEq, Eq)
+
+-- Every valid path, in path order.
+const ALL_VALID : &str = "SELECT path, hash, narSize FROM ValidPaths ORDER BY path"
+
+-- Every valid path with its narHash and narSize, in path order, in one query.
+export valid_paths : &Connection -> rusqlite::Result<Vec<ValidPath>>
+valid_paths conn =
+  mut stmt = (conn.prepare ALL_VALID)?
+  rows = (stmt.query_map () (\r -> Ok (ValidPath { path = (r.get 0)?, nar_hash = (r.get 1)?, nar_size = (r.get 2 : rusqlite::Result<Option<u64>>)? |> .unwrap_or 0 })))?
+  rows.collect ()
+
+------------------------------------------------------------------------
+-- A closure as a graph (vwhy's reads, GH-179)
+
+-- A closure member: its ValidPaths id, path and narSize (NULL reads as 0).
+export type Member = (i64, String, u64)
+
+-- A reference: (referrer id, reference id).
+export type Edge = (i64, i64)
+
+-- A closure's members and the references out of them.
+export type ClosureGraph = (Vec<Member>, Vec<Edge>)
+
+-- Every member of a closure, the root included. UNION, not UNION ALL, so
+-- self-references and cycles end the recursion.
+const MEMBERS : &str = "WITH RECURSIVE c(id) AS (SELECT id FROM ValidPaths WHERE path = ?1 UNION SELECT r.reference FROM Refs r JOIN c ON r.referrer = c.id) SELECT v.id, v.path, v.narSize FROM c JOIN ValidPaths v ON v.id = c.id"
+
+-- Every reference out of a closure's members. CROSS JOIN fixes the loop order
+-- (members outside, Refs by its key inside): with a plain JOIN, SQLite's
+-- planner scans all of Refs against a Bloom filter of the members, 150 ms on
+-- drakkar's store even for a closure of one path, against 3 ms this way. The
+-- test "the reference query walks Refs by its key, never scanning it" pins it.
+export const EDGES : &str = "WITH RECURSIVE c(id) AS (SELECT id FROM ValidPaths WHERE path = ?1 UNION SELECT r.reference FROM Refs r JOIN c ON r.referrer = c.id) SELECT r.referrer, r.reference FROM c CROSS JOIN Refs r ON r.referrer = c.id"
+
+-- A closure's members, in no particular order; empty when `root` is not valid.
+export closure_members : &Connection -> &str -> rusqlite::Result<Vec<Member>>
+closure_members conn root =
+  mut stmt = (conn.prepare_cached MEMBERS)?
+  mut rows = (stmt.query ([root]))?
+  mut out = Vec::new () : Vec<Member>
+  while (rows.next ())? is Some row
+    id = (row.get 0 : rusqlite::Result<i64>)?
+    path = (row.get 1 : rusqlite::Result<String>)?
+    size = (row.get 2 : rusqlite::Result<Option<u64>>)?
+    out.push ((id, path, size.unwrap_or 0))
+  Ok out
+
+-- The references out of a closure's members, in no particular order.
+export closure_edges : &Connection -> &str -> rusqlite::Result<Vec<Edge>>
+closure_edges conn root =
+  mut stmt = (conn.prepare_cached EDGES)?
+  mut rows = (stmt.query ([root]))?
+  mut out = Vec::new () : Vec<Edge>
+  while (rows.next ())? is Some row
+    a = (row.get 0 : rusqlite::Result<i64>)?
+    b = (row.get 1 : rusqlite::Result<i64>)?
+    out.push ((a, b))
+  Ok out
+
+-- A closure's members and references in two queries, on one connection. The
+-- two are independent: a caller that wants them concurrently runs
+-- `closure_members` and `closure_edges` on two connections, as vwhy does.
+export closure_graph : &Connection -> &str -> rusqlite::Result<ClosureGraph>
+closure_graph conn root =
+  members = (closure_members conn root)?
+  edges = (closure_edges conn root)?
+  Ok ((members, edges))
+
+------------------------------------------------------------------------
+-- The whole ValidPaths row (vdaemon-proxy's QueryPathInfo read, GH-179)
+
+-- A valid path's row exactly as the database holds it, with its references
+-- (sorted). Nothing is normalised: what a NULL, an empty string or a hash
+-- that is not SHA-256 means is the reader's decision.
+export data Registration
+  { export id i64
+  , export path String
+  , export hash String
+  , export registration_time i64
+  , export deriver Option<String>
+  , export nar_size Option<i64>
+  , export ultimate Option<i64>
+  , export sigs Option<String>
+  , export ca Option<String>
+  , export references Vec<String>
+  }
+  deriving (Clone, Debug, PartialEq, Eq)
+
+const REGISTRATION : &str = "SELECT id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca FROM ValidPaths WHERE path = ?1"
+
+-- A valid path's registration by full path; None when it is not valid.
+export registration : &Connection -> &str -> rusqlite::Result<Option<Registration>>
+registration conn path =
+  mut stmt = (conn.prepare_cached REGISTRATION)?
+  mut rows = (stmt.query ([path]))?
+  first = (rows.next ())?
+  case first of
+    None -> Ok None
+    Some row ->
+      id = (row.get 0 : rusqlite::Result<i64>)?
+      hash = (row.get 1 : rusqlite::Result<String>)?
+      registration_time = (row.get 2 : rusqlite::Result<i64>)?
+      deriver = (row.get 3 : rusqlite::Result<Option<String>>)?
+      nar_size = (row.get 4 : rusqlite::Result<Option<i64>>)?
+      ultimate = (row.get 5 : rusqlite::Result<Option<i64>>)?
+      sigs = (row.get 6 : rusqlite::Result<Option<String>>)?
+      ca = (row.get 7 : rusqlite::Result<Option<String>>)?
+      references = (references_of_id conn id)?
+      Ok (Some (Registration { id, path = path.to_string (), hash, registration_time, deriver, nar_size, ultimate, sigs, ca, references }))
+
+-- A registration as libstore's LocalStore reads it into a ValidPathInfo (what
+-- the daemon's QueryPathInfo sends): signatures split on spaces, empties
+-- dropped, sorted and deduplicated (`tokenizeString<StringSet>`); an empty
+-- content address is none; `ultimate` is the value 1; a negative time or size
+-- is 0. None when the hash is not SHA-256. An empty-string deriver, which
+-- libstore refuses to parse, reads as none here: a reader that must answer
+-- exactly as the daemon does (vdaemon-proxy) checks for it first.
+export to_path_info : Registration -> Option<PathInfo>
+to_path_info r =
+  sig_set = r.sigs.clone () |> .unwrap_or_default |> .split ' ' |> .filter (\s -> !s.is_empty ()) |> .map (\s -> s.to_string ()) |> .collect : BTreeSet<String>
+  case crate::hash::parse (&r.hash) of
+    None -> None
+    Some nar_hash -> Some (PathInfo { path = r.path, deriver = present r.deriver, nar_hash, references = r.references, registration_time = u64::try_from r.registration_time |> .unwrap_or 0, nar_size = r.nar_size |> .and_then (\n -> u64::try_from n |> .ok) |> .unwrap_or 0, ultimate = r.ultimate == Some 1, sigs = sig_set |> .into_iter |> .collect, ca = present r.ca })
+
+-- A valid path's full info (registration time and `ultimate` included, which
+-- `NarInfo` has no room for); None when it is not valid, or its hash is not
+-- SHA-256.
+export full_path_info : &Connection -> &str -> rusqlite::Result<Option<PathInfo>>
+full_path_info conn path =
+  found = (registration conn path)?
+  Ok (found |> .and_then to_path_info)
+
 #[cfg(test)]
-export memory_db : Vec<(&str, &str, Vec<&str>)> -> Connection
-memory_db rows =
-  conn = Connection::open_in_memory () |> .expect "an in-memory database"
-  conn.execute_batch "CREATE TABLE ValidPaths (id integer primary key autoincrement not null, path text unique not null, hash text not null, registrationTime integer not null, deriver text, narSize integer, ultimate integer, sigs text, ca text); CREATE TABLE Refs (referrer integer not null, reference integer not null, primary key (referrer, reference));" |> .expect "the schema"
-  for row in &rows
-    (path, hash, _) = row
-    added = conn.execute "INSERT INTO ValidPaths (path, hash, registrationTime, narSize) VALUES (?1, ?2, 0, 8)" ([*path, *hash]) |> .expect "a path"
-    assert_eq! \-> added \-> 1
-  for row in &rows
-    (path, _, refs) = row
-    for r in refs
-      linked = conn.execute "INSERT INTO Refs (referrer, reference) SELECT a.id, b.id FROM ValidPaths a, ValidPaths b WHERE a.path = ?1 AND b.path = ?2" ([*path, *r]) |> .expect "a reference"
-      assert_eq! \-> linked \-> 1
-  conn
+import crate::testdb::{memory_db, schema_db}
 
 #[cfg(test)]
 const H : &str = "sha256:044b884fce3dd89e5cd04f725b59c2abf51f0c2b496830d3f186107269cda902"
@@ -201,3 +326,87 @@ test "a hash part no valid path has is not found"
     assert! \-> conn.is_ok ()
     found = conn.map (\c -> lookup (&c) "/nix/store" "00000000000000000000000000000000" |> .map (\o -> o.is_none ()) |> .unwrap_or false)
     assert! \-> found.unwrap_or false
+
+#[cfg(test)]
+const H2 : &str = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+
+test "the listing reads every valid path with its registration, in path order"
+  conn = schema_db ":memory:"
+  rows = "INSERT INTO ValidPaths (path, hash, registrationTime, narSize) VALUES ('#{B}', '#{H2}', 0, 8); INSERT INTO ValidPaths (path, hash, registrationTime) VALUES ('#{A}', '#{H}', 0);"
+  conn.execute_batch (&rows) |> .expect "the rows"
+  listed = valid_paths (&conn) |> .expect "a listing"
+  want = .to_vec ([ValidPath { path = A.to_string (), nar_hash = H.to_string (), nar_size = 0 }, ValidPath { path = B.to_string (), nar_hash = H2.to_string (), nar_size = 8 }])
+  assert_eq! \-> listed \-> want
+  assert! \-> valid_paths (&schema_db ":memory:") |> .expect "an empty listing" |> .is_empty
+
+-- 1 -> {1, 2}, 2 -> {3}, 4 -> {1}; 2 has no narSize. vwhy's fixture.
+#[cfg(test)]
+graph_db : Connection
+graph_db =
+  conn = schema_db ":memory:"
+  conn.execute_batch "INSERT INTO ValidPaths (id, path, hash, registrationTime, narSize) VALUES (1, 'a', 'h', 0, 10), (2, 'b', 'h', 0, NULL), (3, 'c', 'h', 0, 30), (4, 'd', 'h', 0, 40); INSERT INTO Refs VALUES (1, 1), (1, 2), (2, 3), (4, 1);" |> .expect "the rows"
+  conn
+
+test "a closure graph: its members with their sizes, the references out of them"
+  conn = graph_db ()
+  g = closure_graph (&conn) "a" |> .expect "a closure graph"
+  mut members = g.0
+  mut edges = g.1
+  members.sort ()
+  edges.sort ()
+  assert_eq! \-> members \-> .to_vec ([(1, .to_string "a", 10), (2, .to_string "b", 0), (3, .to_string "c", 30)])
+  assert_eq! \-> edges \-> .to_vec ([(1, 1), (1, 2), (2, 3)])
+  (none, no_edges) = closure_graph (&conn) "z" |> .expect "no closure"
+  assert! \-> none.is_empty () && no_edges.is_empty ()
+
+test "the reference query walks Refs by its key, never scanning it"
+  conn = graph_db ()
+  sql = "EXPLAIN QUERY PLAN #{EDGES}"
+  mut stmt = conn.prepare (&sql) |> .expect "a plan"
+  plan = stmt.query_map (["a"]) (\row -> row.get 3) |> .expect "plan rows" |> .filter_map (\r -> r.ok ()) |> .collect : Vec<String>
+  assert! \-> !plan.is_empty ()
+  assert! \-> !(plan.iter () |> .any (\step -> step.starts_with "SCAN r"))
+
+-- A -> {A, B}, B -> {C}; B has a deriver, signatures (one twice, a double
+-- space) and a content address; A is ultimate. vdaemon-proxy's fixture.
+#[cfg(test)]
+info_db : Connection
+info_db =
+  conn = schema_db ":memory:"
+  rows = "INSERT INTO ValidPaths (path, hash, registrationTime, narSize, ultimate) VALUES ('#{A}', '#{H}', 7, 120, 1); INSERT INTO ValidPaths (path, hash, registrationTime, deriver, narSize, sigs, ca) VALUES ('#{B}', '#{H}', 9, '#{D}.drv', 8, 'k2:y  k1:x k2:y', 'fixed:r:sha256:1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s'); INSERT INTO ValidPaths (path, hash, registrationTime, deriver, ca) VALUES ('#{C}', 'md5:abc', 1, '', ''); INSERT INTO Refs SELECT a.id, b.id FROM ValidPaths a, ValidPaths b WHERE (a.path = '#{A}' AND b.path IN ('#{A}', '#{B}')) OR (a.path = '#{B}' AND b.path = '#{C}');"
+  conn.execute_batch (&rows) |> .expect "the rows"
+  conn
+
+test "a registration is the row as stored, with its sorted references"
+  conn = info_db ()
+  b = registration (&conn) B |> .expect "a read" |> .expect "valid"
+  assert_eq! \-> (b.path.as_str (), b.hash.as_str (), b.registration_time) \-> (B, H, 9)
+  assert_eq! \-> b.sigs \-> Some (.to_string "k2:y  k1:x k2:y")
+  assert_eq! \-> (b.nar_size, b.ultimate) \-> (Some 8, None)
+  assert_eq! \-> b.references \-> .to_vec ([C.to_string ()])
+  c = registration (&conn) C |> .expect "a read" |> .expect "valid"
+  assert_eq! \-> (c.deriver, c.ca, c.nar_size) \-> (Some (String::new ()), Some (String::new ()), None)
+  assert_eq! \-> registration (&conn) D |> .expect "a read" \-> None
+
+test "the full path info is the daemon's ValidPathInfo"
+  conn = info_db ()
+  b = full_path_info (&conn) B |> .expect "a read" |> .expect "valid"
+  assert_eq! \-> b.deriver \-> Some ("#{D}.drv")
+  assert_eq! \-> b.nar_hash \-> crate::hash::parse H |> .expect "a hash"
+  assert_eq! \-> (b.registration_time, b.nar_size, b.ultimate) \-> (9, 8, false)
+  assert_eq! \-> b.sigs \-> .to_vec ([.to_string "k1:x", .to_string "k2:y"])
+  assert_eq! \-> b.ca \-> Some (.to_string "fixed:r:sha256:1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s")
+  a = full_path_info (&conn) A |> .expect "a read" |> .expect "valid"
+  assert! \-> a.ultimate
+  assert_eq! \-> (a.registration_time, a.nar_size, a.deriver, a.ca) \-> (7, 120, None, None)
+  assert_eq! \-> a.references \-> .to_vec ([A.to_string (), B.to_string ()])
+  assert! \-> a.sigs.is_empty ()
+  assert_eq! \-> full_path_info (&conn) C |> .expect "a read" \-> None
+  assert_eq! \-> full_path_info (&conn) D |> .expect "a read" \-> None
+
+test "empty text and negative numbers normalise as libstore reads them"
+  r = Registration { id = 1, path = A.to_string (), hash = H.to_string (), registration_time = -1, deriver = Some (String::new ()), nar_size = Some (-5), ultimate = Some 2, sigs = Some (.to_string " "), ca = Some (String::new ()), references = Vec::new () }
+  i = to_path_info r |> .expect "a SHA-256 hash"
+  assert_eq! \-> (i.registration_time, i.nar_size, i.ultimate) \-> (0, 0, false)
+  assert_eq! \-> (i.deriver, i.ca) \-> (None, None)
+  assert! \-> i.sigs.is_empty ()

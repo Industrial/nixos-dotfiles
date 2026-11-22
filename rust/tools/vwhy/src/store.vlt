@@ -92,15 +92,9 @@ by_name g package name =
   else
     Ok found
 
--- Every member of a closure: its id, path and narSize. UNION, not UNION ALL,
--- so self-references and cycles end the recursion.
-const MEMBERS : &str = "WITH RECURSIVE c(id) AS (SELECT id FROM ValidPaths WHERE path = ?1 UNION SELECT r.reference FROM Refs r JOIN c ON r.referrer = c.id) SELECT v.id, v.path, v.narSize FROM c JOIN ValidPaths v ON v.id = c.id"
-
--- Every reference out of a closure's members. CROSS JOIN fixes the loop order
--- (members outside, Refs by its primary key inside): with a plain JOIN,
--- SQLite's planner scans all of Refs against a Bloom filter of the members,
--- 150 ms on drakkar's store even for a closure of one path.
-const EDGES : &str = "WITH RECURSIVE c(id) AS (SELECT id FROM ValidPaths WHERE path = ?1 UNION SELECT r.reference FROM Refs r JOIN c ON r.referrer = c.id) SELECT r.referrer, r.reference FROM c CROSS JOIN Refs r ON r.referrer = c.id"
+-- The two reads are nix-store-core's `db::closure_members` and
+-- `db::closure_edges` (the CROSS JOIN form that walks Refs by its key, 3 ms
+-- where a plain JOIN scans all of Refs, 150 ms; pinned by core's tests).
 
 store_error : rusqlite::Error -> WhyError
 store_error e = Store (e.to_string ())
@@ -108,41 +102,18 @@ store_error e = Store (e.to_string ())
 connect : &str -> Result<Connection, WhyError>
 connect db_path = db::open db_path |> .map_err (\e -> Store ("opening #{db_path}: #{e}"))
 
-export member_rows : &Connection -> &str -> rusqlite::Result<Vec<(i64, String, u64)>>
-member_rows conn root =
-  mut stmt = (conn.prepare MEMBERS)?
-  mut rows = (stmt.query ([root]))?
-  mut out = Vec::new () : Vec<(i64, String, u64)>
-  while (rows.next ())? is Some row
-    id = (row.get 0 : rusqlite::Result<i64>)?
-    path = (row.get 1 : rusqlite::Result<String>)?
-    size = (row.get 2 : rusqlite::Result<Option<u64>>)?
-    out.push ((id, path, size.unwrap_or 0))
-  Ok out
-
-export edge_rows : &Connection -> &str -> rusqlite::Result<Vec<(i64, i64)>>
-edge_rows conn root =
-  mut stmt = (conn.prepare EDGES)?
-  mut rows = (stmt.query ([root]))?
-  mut out = Vec::new () : Vec<(i64, i64)>
-  while (rows.next ())? is Some row
-    a = (row.get 0 : rusqlite::Result<i64>)?
-    b = (row.get 1 : rusqlite::Result<i64>)?
-    out.push ((a, b))
-  Ok out
-
-read_members : String -> String -> Result<Vec<(i64, String, u64)>, WhyError>
+read_members : String -> String -> Result<Vec<db::Member>, WhyError>
 read_members db_path root =
   conn = (connect (&db_path))?
-  member_rows (&conn) (&root) |> .map_err store_error
+  db::closure_members (&conn) (&root) |> .map_err store_error
 
-read_edges : String -> String -> Result<Vec<(i64, i64)>, WhyError>
+read_edges : String -> String -> Result<Vec<db::Edge>, WhyError>
 read_edges db_path root =
   conn = (connect (&db_path))?
-  edge_rows (&conn) (&root) |> .map_err store_error
+  db::closure_edges (&conn) (&root) |> .map_err store_error
 
 -- A closure's rows: members (id, path, narSize) and references (referrer, reference).
-export type Rows = (Vec<(i64, String, u64)>, Vec<(i64, i64)>)
+export type Rows = db::ClosureGraph
 
 assembled : String -> Rows -> Result<Graph, WhyError>
 assembled root rows =
@@ -191,34 +162,20 @@ test "a dependency outside the closure says so, as nix does"
   assert_eq! \-> e \-> Some ("'#{SYSTEM}' does not depend on '/nix/store/00000000000000000000000000000000-x'")
   assert! \-> matches (&g) (&ByName (.to_string "openssl")) |> .is_err
 
--- Nix's schema for the two tables read here, with its index on references.
-#[cfg(test)]
-const SCHEMA : &str = "CREATE TABLE ValidPaths (id integer primary key autoincrement not null, path text unique not null, hash text not null, registrationTime integer not null, deriver text, narSize integer, ultimate integer, sigs text, ca text); CREATE TABLE Refs (referrer integer not null, reference integer not null, primary key (referrer, reference)); CREATE INDEX IndexReference on Refs(reference);"
-
-#[cfg(test)]
-memory : Connection
-memory =
-  conn = Connection::open_in_memory () |> .expect "an in-memory database"
-  conn.execute_batch SCHEMA |> .expect "the schema"
-  conn.execute_batch "INSERT INTO ValidPaths (id, path, hash, registrationTime, narSize) VALUES (1, 'a', 'h', 0, 10), (2, 'b', 'h', 0, NULL), (3, 'c', 'h', 0, 30), (4, 'd', 'h', 0, 40); INSERT INTO Refs VALUES (1, 1), (1, 2), (2, 3), (4, 1);" |> .expect "the rows"
-  conn
-
-test "a closure's rows: its members with their sizes, the references out of them"
-  conn = memory ()
-  mut members = member_rows (&conn) "a" |> .expect "members"
-  members.sort ()
-  assert_eq! \-> members \-> .to_vec ([(1, .to_string "a", 10), (2, .to_string "b", 0), (3, .to_string "c", 30)])
-  mut edges = edge_rows (&conn) "a" |> .expect "edges"
-  edges.sort ()
-  assert_eq! \-> edges \-> .to_vec ([(1, 1), (1, 2), (2, 3)])
-  assert! \-> member_rows (&conn) "z" |> .expect "no members" |> .is_empty
-
-test "the reference query walks Refs by its key, never scanning it"
-  conn = memory ()
-  sql = "EXPLAIN QUERY PLAN #{EDGES}"
-  mut stmt = conn.prepare (&sql) |> .expect "a plan"
-  plan = stmt.query_map (["a"]) (\row -> row.get 3) |> .expect "plan rows" |> .filter_map (\r -> r.ok ()) |> .collect : Vec<String>
-  assert! \-> !(plan.iter () |> .any (\step -> step.starts_with "SCAN r"))
+test "the closure graph is core's two reads, assembled"
+  dir = std::env::temp_dir () |> .join (format! \-> "vwhy-store-#{std::process::id ()}")
+  std::fs::create_dir_all (&dir) |> .expect "a temp dir"
+  file = dir.join "db.sqlite" |> .to_string_lossy |> .into_owned
+  conn = nix_store_core::testdb::schema_db (&file)
+  rows = "INSERT INTO ValidPaths (id, path, hash, registrationTime, narSize) VALUES (7, '#{SYSTEM}', 'h', 0, 1), (8, '#{GLIBC_BIN}', 'h', 0, 2), (9, '#{GLIBC}', 'h', 0, 4), (10, '/nix/store/00000000000000000000000000000000-other', 'h', 0, 8); INSERT INTO Refs VALUES (7, 8), (8, 9), (10, 7);"
+  conn.execute_batch (&rows) |> .expect "the rows"
+  drop conn
+  exit = id_effect::testing::run_test (closure_graph (file.clone ()) (SYSTEM.to_string ()))
+  g = id_effect::testing::expect_exit_success exit
+  assert_eq! \-> g \-> small ()
+  missing = id_effect::testing::run_test (closure_graph (file.clone ()) (.to_string "/nix/store/11111111111111111111111111111111-none"))
+  assert! \-> missing |> .into_result |> .is_err
+  std::fs::remove_dir_all (&dir) |> .expect "cleanup"
 
 test "the closure graph reads from the database, both reads agreeing"
   if Path::new db::DEFAULT_DB |> .exists

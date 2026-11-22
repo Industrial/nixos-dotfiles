@@ -164,8 +164,34 @@ them.
 | `references : &Connection -> &str -> rusqlite::Result<Option<Vec<String>>>` | direct references, sorted (`nix-store -q --references`) |
 | `closure : &Connection -> &str -> rusqlite::Result<Option<Vec<String>>>` | the closure including the path, sorted (`nix-store -qR`). Uses one recursive SQL query |
 | `closure_of_all : &Connection -> &[String] -> rusqlite::Result<BTreeSet<String>>` | the union of several closures. Paths that are not valid are skipped |
+| `ValidPath { path, nar_hash, nar_size: u64 }`, `valid_paths : &Connection -> rusqlite::Result<Vec<ValidPath>>` | every valid path with its narHash (database form, `sha256:<base16>`) and narSize, in path order, in one query (vverify's listing). A NULL narSize is 0 |
+| `Member = (i64, String, u64)`, `Edge = (i64, i64)`, `ClosureGraph = (Vec<Member>, Vec<Edge>)` | a closure member (ValidPaths id, path, narSize) and a reference (referrer id, reference id) |
+| `closure_members`, `closure_edges : &Connection -> &str -> rusqlite::Result<Vec<_>>` | a closure's members, and the `Refs` rows out of them, one recursive query each, in no particular order; empty when the root is not valid. Independent, so they can run on two connections at once (vwhy) |
+| `closure_graph : &Connection -> &str -> rusqlite::Result<ClosureGraph>` | both, on one connection. `EDGES` is the query: its CROSS JOIN keeps SQLite walking `Refs` by its key (3 ms on drakkar where a plain JOIN scans all of `Refs`, 150 ms); a test pins the plan |
+| `Registration { id, path, hash, registration_time: i64, deriver, nar_size: Option<i64>, ultimate: Option<i64>, sigs, ca, references }`, `registration : &Connection -> &str -> rusqlite::Result<Option<Registration>>` | a valid path's whole ValidPaths row as stored (nothing normalised), with its sorted references |
+| `to_path_info : Registration -> Option<worker::PathInfo>` | the row as libstore reads it: sigs split on spaces, sorted, deduplicated; empty `ca`/deriver as none; `ultimate` is 1; negative numbers 0. None when the hash is not SHA-256. vdaemon-proxy declines an empty-string deriver before calling it |
+| `full_path_info : &Connection -> &str -> rusqlite::Result<Option<worker::PathInfo>>` | the two together: what the daemon's QueryPathInfo answers, registration time and `ultimate` included |
 
 None means "not a valid path". GC roots and the `DerivationOutputs` walk stay in vgc.
+
+### `testdb`: store databases for tests (`test-support` feature)
+
+Built for this crate's own tests, and for a consumer's with the
+`test-support` feature, taken as a dev-dependency feature so the consumer's
+build keeps the plain API (`Cargo.lock` does not change):
+
+```toml
+[dev-dependencies]
+nix-store-core = { path = "../nix-store-core", features = ["test-support"] }
+```
+
+| Item | Meaning |
+|---|---|
+| `SCHEMA : &str` | libstore's `schema.sql`: ValidPaths, Refs with IndexReferrer and IndexReference, DerivationOutputs |
+| `schema_db : &str -> Connection` | an empty store database at a file path or `:memory:`; the caller inserts rows with SQL |
+| `memory_db : Vec<(&str, &str, Vec<&str>)> -> Connection` | in memory, with (path, base-16 hash, references) rows, each at time 0 with narSize 8 |
+
+They panic on failure: they are fixtures.
 
 ### `generations`: profile generations and `--delete-older-than`
 

@@ -12,16 +12,14 @@
 
 import std::io::{Error, ErrorKind}
 import std::path::Path
-import rusqlite::Connection
 import nix_store_core::db
+import nix_store_core::db::ValidPath
 import nix_store_core::hash
 import nix_store_core::nar
 import nix_store_core::nar::NarDigest
 
--- A valid path as the database lists it. `nar_hash` is the database form,
--- `sha256:<base16>`.
-export data Candidate { export path String, export nar_hash String, export nar_size u64 }
-  deriving (Clone, Debug, PartialEq)
+-- The paths to check are nix-store-core's `db::valid_paths`: every
+-- `ValidPath` with its registered narHash (`sha256:<base16>`) and narSize.
 
 -- What checking one path found.
 export data Verdict
@@ -40,15 +38,6 @@ export data Verdict
 export data Checked { export path String, export verdict Verdict }
   deriving (Clone, Debug, PartialEq)
 
--- Every valid path, in path order.
-const ALL_VALID : &str = "SELECT path, hash, narSize FROM ValidPaths ORDER BY path"
-
-export valid_paths : &Connection -> rusqlite::Result<Vec<Candidate>>
-valid_paths conn =
-  mut stmt = (conn.prepare ALL_VALID)?
-  rows = (stmt.query_map () (\r -> Ok (Candidate { path = (r.get 0)?, nar_hash = (r.get 1)?, nar_size = (r.get 2 : rusqlite::Result<Option<u64>>)? |> .unwrap_or 0 })))?
-  rows.collect ()
-
 -- The registered hash, in the form a report prints (`sha256:<nix32>`).
 shown : &str -> String
 shown registered =
@@ -59,7 +48,7 @@ shown registered =
 -- The verdict on a path from its NAR digest, or from why it could not be
 -- archived. A registered hash that does not parse cannot match anything, so
 -- it is reported as corrupt, with the database's text.
-export judge : &Candidate -> std::io::Result<NarDigest> -> Verdict
+export judge : &ValidPath -> std::io::Result<NarDigest> -> Verdict
 judge c got =
   case got of
     Ok d ->
@@ -80,7 +69,7 @@ unreadable path e =
 
 -- Archive and hash one path (blocking: the whole NAR is read, one chunk at a
 -- time), then judge it.
-export check : Candidate -> Checked
+export check : ValidPath -> Checked
 check c =
   verdict = judge (&c) (nar::nar_hash (Path::new (&c.path)))
   Checked { path = c.path, verdict }
@@ -136,8 +125,8 @@ faults t =
   t.corrupt.len () + t.missing.len () + t.unreadable.len ()
 
 #[cfg(test)]
-candidate : &str -> &str -> u64 -> Candidate
-candidate path h size = Candidate { path = path.to_string (), nar_hash = h.to_string (), nar_size = size }
+candidate : &str -> &str -> u64 -> ValidPath
+candidate path h size = ValidPath { path = path.to_string (), nar_hash = h.to_string (), nar_size = size }
 
 #[cfg(test)]
 digest_of : &str -> u64 -> NarDigest
@@ -189,10 +178,10 @@ test "a real file checks against its own digest"
   std::fs::write (&file) "hello\n" |> .expect "a temp file"
   path = file.to_string_lossy () |> .into_owned
   d = nar::nar_hash (&file) |> .expect "a NAR"
-  good = check (Candidate { path = path.clone (), nar_hash = hash::typed_base16 (&d.hash), nar_size = d.size })
+  good = check (ValidPath { path = path.clone (), nar_hash = hash::typed_base16 (&d.hash), nar_size = d.size })
   assert_eq! \-> good.verdict \-> Intact
   std::fs::write (&file) "hellO\n" |> .expect "a corrupted file"
-  bad = check (Candidate { path = path.clone (), nar_hash = hash::typed_base16 (&d.hash), nar_size = d.size })
+  bad = check (ValidPath { path = path.clone (), nar_hash = hash::typed_base16 (&d.hash), nar_size = d.size })
   assert! \-> bad.verdict |> .ne (&Intact)
   std::fs::remove_dir_all (&dir) |> .expect "cleanup"
 
@@ -203,14 +192,12 @@ test "a tally counts every verdict and keeps the faults"
   assert_eq! \-> (t.corrupt.len (), t.missing.len (), t.unreadable.len ()) \-> (1, 1, 1)
   assert_eq! \-> faults (&t) \-> 3
 
--- Nix's schema for the two tables read here (nix-store-core's own test
--- database is private to its tests), at `file`, with two rows; one has no
--- narSize.
+-- A store database (nix-store-core's `testdb`, Nix's schema) at `file`, with
+-- two rows; one has no narSize.
 #[cfg(test)]
-listing_db : &Path -> Connection
+listing_db : &str -> rusqlite::Connection
 listing_db file =
-  conn = Connection::open file |> .expect "a test database"
-  conn.execute_batch "CREATE TABLE ValidPaths (id integer primary key autoincrement not null, path text unique not null, hash text not null, registrationTime integer not null, deriver text, narSize integer, ultimate integer, sigs text, ca text); CREATE TABLE Refs (referrer integer not null, reference integer not null, primary key (referrer, reference));" |> .expect "the schema"
+  conn = nix_store_core::testdb::schema_db file
   added = conn.execute "INSERT INTO ValidPaths (path, hash, registrationTime, narSize) VALUES (?1, ?2, 0, 8)" (["/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b", H2]) |> .expect "a path"
   assert_eq! \-> added \-> 1
   bare = conn.execute "INSERT INTO ValidPaths (path, hash, registrationTime) VALUES (?1, ?2, 0)" (["/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a", H1]) |> .expect "a path"
@@ -218,17 +205,17 @@ listing_db file =
   conn
 
 test "listing reads every valid path with its registration, in path order"
-  conn = listing_db (Path::new ":memory:")
-  listed = valid_paths (&conn) |> .expect "a listing"
+  conn = listing_db ":memory:"
+  listed = db::valid_paths (&conn) |> .expect "a listing"
   assert_eq! \-> listed \-> .to_vec ([candidate "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a" H1 0, candidate "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b" H2 8])
 
 test "a missing path vanished only when the database no longer has it"
   dir = std::env::temp_dir () |> .join (format! \-> "vverify-recheck-#{std::process::id ()}")
   std::fs::create_dir_all (&dir) |> .expect "a temp dir"
   file = dir.join "db.sqlite"
-  conn = listing_db (&file)
-  drop conn
   db_path = file.to_string_lossy () |> .into_owned
+  conn = listing_db (&db_path)
+  drop conn
   gone_path = Checked { path = .to_string "/nix/store/00000000000000000000000000000000-gone", verdict = Missing }
   assert_eq! \-> (recheck (&db_path) gone_path).verdict \-> Vanished
   valid_path = Checked { path = .to_string "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a", verdict = Missing }
