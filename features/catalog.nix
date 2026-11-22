@@ -98,6 +98,7 @@
   ./cli/vfetch
   ./cli/vwhy
   ./cli/vswitch
+  ./cli/vlocate
   ./cli/yazi
   ./cli/zellij
   ./cli/zoxide
