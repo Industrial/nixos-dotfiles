@@ -20,6 +20,9 @@ import crate::common::SwitchError
 import crate::common::SwitchError::{Activate, Declined, Usage}
 import crate::plan::{Activation, Tools, Verb, absolute, activation_command, activation_of, build_command, dry_command, euid_of, idle_line, toplevel_of, verb_name}
 import crate::world::{WorldTool, live}
+import vdeploy::evalcache::{Cache, Lookup, cache_said, off}
+import vdeploy::caps::installable
+import nix_store_core::veval::Record
 import vdeploy::apply::{LiveSystem, System}
 
 -- Everything one run needs, resolved at the edge.
@@ -35,6 +38,9 @@ export data Run
   , export health_as Option<String>
   , export ask bool
   , export root bool
+  , export flake String
+  , export host String
+  , export cache Cache
   }
   deriving (Debug, Clone, PartialEq, Eq)
 
@@ -92,12 +98,55 @@ located w r x =
   w2 = w.clone ()
   w.0.state () |> .flat_map (move \st -> diffed w2 r x st.0 st.1)
 
--- Step 1.
+-- Step 1, as before the eval cache: the flake's toplevel, evaluated and built.
+evaluated : WorldTool -> Run -> Effect<String, SwitchError, HNil>
+evaluated w r = w.0.build (build_command (&r.tools) (&r.installable) (&r.out_link)) (r.out_link.clone ())
+
+-- A hit, built: kept only when the build's path is the record's out;
+-- anything else is said, and the flake is evaluated after all.
+kept : WorldTool -> Run -> Record -> String -> Effect<String, SwitchError, HNil>
+kept w r rec x =
+  if x == rec.out
+    succeed x
+  else
+    w2 = w.clone ()
+    w.0.say ("vswitch: eval cache record refused, evaluating: #{rec.drv} built #{x}, the record says #{rec.out}") |> .widen |> .flat_map (move \_ -> evaluated w2 r)
+
+-- The record's derivation, built: no evaluation.
+taken : WorldTool -> Run -> Record -> Effect<String, SwitchError, HNil>
+taken w r rec =
+  w2 = w.clone ()
+  target = installable (&rec.drv)
+  w.0.build (build_command (&r.tools) (&target) (&r.out_link)) (r.out_link.clone ()) |> .flat_map (move \x -> kept w2 r rec x)
+
+-- What the eval cache (GH-243) answered, said (unless it is off), then built.
+built_from : WorldTool -> Run -> Lookup -> Effect<String, SwitchError, HNil>
+built_from w r found =
+  w2 = w.clone ()
+  line = "vswitch: #{cache_said (&found)}"
+  case found of
+    Lookup::Hit rec -> w.0.say line |> .widen |> .flat_map (move \_ -> taken w2 r rec)
+    Lookup::Off -> evaluated w r
+    _ -> w.0.say line |> .widen |> .flat_map (move \_ -> evaluated w2 r)
+
+-- Step 1: `--toplevel`, else vci's record of this commit when the eval cache
+-- has one, else the flake's toplevel evaluated and built.
 toplevel_for : WorldTool -> Run -> Effect<String, SwitchError, HNil>
 toplevel_for w r =
   case r.toplevel.clone () of
     Some x -> w.0.resolve x
-    None -> w.0.build (build_command (&r.tools) (&r.installable) (&r.out_link)) (r.out_link.clone ())
+    None ->
+      w2 = w.clone ()
+      r2 = r.clone ()
+      w.0.shared (r.flake.clone ()) (r.host.clone ()) |> .widen |> .flat_map (move \found -> built_from w2 r2 found)
+
+-- The eval cache's settings (GH-243): none with `--no-eval-cache`.
+export cache_of : &Options -> Cache
+cache_of o =
+  if o.no_eval_cache
+    off ()
+  else
+    Cache { urls = o.eval_cache.clone (), keys = o.eval_cache_keys.clone (), curl = o.curl.clone (), git = o.git.clone (), nix = o.tools.nix.clone () }
 
 -- One run against a world.
 export switched : WorldTool -> Run -> Effect<(), SwitchError, HNil>
@@ -138,7 +187,7 @@ run_of o =
   host = o.host.clone () |> .unwrap_or_else (\-> hostname ())
   path = std::env::var "PATH" |> .unwrap_or_default
   runtime = std::env::var "XDG_RUNTIME_DIR" |> .ok
-  Run { verb = o.verb, installable = toplevel_of (&o.flake) (&host), toplevel = o.toplevel.clone (), out_link = link_of o.verb (o.out_link.clone ()) runtime, tools = absolute (&o.tools) (&path), program = self_exe (), state_dir = o.state_dir.clone (), health_window = o.health_window.clone (), health_as = o.health_as.clone (), ask = o.ask, root = is_root () }
+  Run { verb = o.verb, installable = toplevel_of (&o.flake) (&host), toplevel = o.toplevel.clone (), out_link = link_of o.verb (o.out_link.clone ()) runtime, tools = absolute (&o.tools) (&path), program = self_exe (), state_dir = o.state_dir.clone (), health_window = o.health_window.clone (), health_as = o.health_as.clone (), ask = o.ask, root = is_root (), flake = o.flake.clone (), host, cache = cache_of (&o) }
 
 -- `vswitch apply …`: vdeploy's apply transaction, its own parser and all.
 applied : Vec<String> -> Effect<(), SwitchError, HNil>
@@ -205,7 +254,7 @@ program parsed =
     Ok (Command::Run o) ->
       db = o.db.clone ()
       r = suspend (move \-> succeed (run_of (*o)))
-      r |> .flat_map (move \run -> switched (WorldTool (Arc::new (live db (run.tools.systemctl.clone ())))) run)
+      r |> .flat_map (move \run -> switched (WorldTool (Arc::new (live db (run.tools.systemctl.clone ()) (run.cache.clone ())))) run)
 
 -- On a fiber of the runtime's executor (as rust/tools/vdeploy's app.vlt):
 -- `run_main` polls its root outside the executor's context.
@@ -237,7 +286,7 @@ tools = Tools { nix = .to_string "/n/nix", vmon = Some (.to_string "/m/vmon"), s
 
 #[cfg(test)]
 run_for : Verb -> Run
-run_for verb = Run { verb, installable = .to_string "/f#nixosConfigurations.\"h\".config.system.build.toplevel", toplevel = None, out_link = .to_string "/r/result", tools = tools (), program = .to_string "/v/vswitch", state_dir = .to_string "/var/lib/vdeploy", health_window = .to_string "2m", health_as = Some (.to_string "vhealth"), ask = false, root = false }
+run_for verb = Run { verb, installable = .to_string "/f#nixosConfigurations.\"h\".config.system.build.toplevel", toplevel = None, out_link = .to_string "/r/result", tools = tools (), program = .to_string "/v/vswitch", state_dir = .to_string "/var/lib/vdeploy", health_window = .to_string "2m", health_as = Some (.to_string "vhealth"), ask = false, root = false, flake = .to_string "/f", host = .to_string "h", cache = off () }
 
 #[cfg(test)]
 world : &str -> &str -> Option<&str> -> Scripted
@@ -341,3 +390,34 @@ test "a usage error carries the usage line"
   exit = id_effect::testing::run_test (program (Err (.to_string "unknown argument: -x")))
   err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
   assert! \-> err |> .map (\e -> e.contains USAGE && e.contains "-x") |> .unwrap_or false
+
+#[cfg(test)]
+hit_for : &str -> Lookup
+hit_for out = Lookup::Hit (vdeploy::caps::scripted_record "c1" "/nix/store/c1-h.drv" out)
+
+test "eval cache hit: the record's drv is built, no flake evaluation, and the switch goes on"
+  w = Scripted { lookup = Some (hit_for "/nix/store/new"), ...world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new") }
+  assert! \-> ran_in (w.clone ()) (run_for Verb::Switch) |> .is_ok
+  builds = log_of (&w) |> .into_iter |> .filter (\l -> l.starts_with "build ") |> .collect : Vec<String>
+  assert_eq! \-> builds.len () \-> 1
+  assert! \-> builds[0].contains "/nix/store/c1-h.drv^out" && !(builds[0].contains "#nixosConfigurations")
+  assert! \-> log_of (&w) |> .iter |> .any (\l -> l.starts_with "say vswitch: eval cache hit")
+  assert_eq! \-> runs (&w) |> .len \-> 1
+
+test "a record whose drv builds another out: said, then the flake is evaluated after all"
+  w = Scripted { lookup = Some (hit_for "/nix/store/other"), ...world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new") }
+  assert! \-> ran_in (w.clone ()) (run_for Verb::Switch) |> .is_ok
+  builds = log_of (&w) |> .into_iter |> .filter (\l -> l.starts_with "build ") |> .collect : Vec<String>
+  assert_eq! \-> builds.len () \-> 2
+  assert! \-> builds[1].contains "#nixosConfigurations"
+  assert! \-> log_of (&w) |> .iter |> .any (\l -> l.contains "eval cache record refused")
+
+test "eval cache miss or refusal: said, and the flake is evaluated as before; off says nothing"
+  for found in [Lookup::Miss (.to_string "no record"), Lookup::Bad (.to_string "another drv")]
+    w = Scripted { lookup = Some found, ...world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new") }
+    assert! \-> ran_in (w.clone ()) (run_for Verb::Switch) |> .is_ok
+    builds = log_of (&w) |> .into_iter |> .filter (\l -> l.starts_with "build ") |> .collect : Vec<String>
+    assert! \-> builds.len () == 1 && builds[0].contains "#nixosConfigurations"
+  off = world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new")
+  assert! \-> ran_in (off.clone ()) (run_for Verb::Switch) |> .is_ok
+  assert! \-> !(log_of (&off) |> .iter |> .any (\l -> l.starts_with "say vswitch: eval cache"))

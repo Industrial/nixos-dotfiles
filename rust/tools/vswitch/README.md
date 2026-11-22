@@ -67,6 +67,23 @@ an activation that was rolled back, refused or failed; 130 on Ctrl-C.
 On a host where vdeploy deploys, the next commit on main is still switched to by vdeploy:
 vswitch is for experiments and console recovery, not a second deployer.
 
+## The eval cache (GH-243)
+
+```
+vswitch … [--eval-cache URL --eval-cache-key KEY …] [--curl PROG] [--git PROG] | --no-eval-cache
+```
+
+When the flake is a git checkout, given at its top, whose tracked files and submodules are
+exactly HEAD (`git status --porcelain --untracked-files=no` is empty), Nix would evaluate
+exactly that commit. vswitch then asks the caches for vci's record of (HEAD, host), as
+vdeploy does (`vdeploy::evalcache`), and on a hit builds `<record's drv>^out` instead of the
+flake's toplevel: no evaluation. The built path must be the record's out; otherwise, and on
+any miss (a dirty tree, a subdirectory, a flake URL, no record, unsigned …), the flake is
+evaluated and built as before. Each outcome but "off" is one `vswitch: eval cache …` line.
+The wrapper (features/cli/vswitch) follows `features.nix.vdeploy.evalCache`, so that
+option's `lib.mkForce false` is the rollback here too. vswitch is a command, not a daemon:
+it writes no metrics.
+
 ## Tools
 
 The activation runs under sudo (which resets PATH) and inside a transient unit (with

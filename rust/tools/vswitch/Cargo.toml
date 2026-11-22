@@ -21,6 +21,8 @@ id_effect_cli = "=0.13.0"
 # its option parser for that transaction, and its LiveSystem. vdeploy itself is
 # unchanged. default.nix roots its source at rust/tools.
 vdeploy = { path = "../vdeploy" }
+# The eval cache's record (GH-243): nix-store-core's veval, which vdeploy also links.
+nix-store-core = { path = "../nix-store-core" }
 # The closure diff, printed before a switch (vdiff's own text report).
 vdiff = { path = "../vdiff" }
 

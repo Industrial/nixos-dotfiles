@@ -8,6 +8,7 @@
 {
   lib,
   rustPlatform,
+  git,
 }:
 rustPlatform.buildRustPackage {
   pname = "vswitch";
@@ -41,6 +42,13 @@ rustPlatform.buildRustPackage {
   # is not among the build inputs (`ld: cannot find -lsqlite3`); build the
   # bundled sources instead, as vdeploy and vcache do.
   dontCargoUseSystemLibs = true;
+
+  # The eval cache's clean-checkout test (GH-243) runs real git on a scratch repository
+  # under $TMPDIR; git wants a HOME it can read.
+  nativeCheckInputs = [git];
+  preCheck = ''
+    export HOME="$TMPDIR"
+  '';
 
   meta = {
     description = "Local NixOS rebuild: build through vmon, closure diff with vdiff, then vdeploy's health-checked apply with rollback (replaces nixos-rebuild and nh)";
