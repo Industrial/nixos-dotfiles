@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Fail if a tracked file hands Nix a whole directory to copy into the store (#266).
+#
+#   bin/ci/flake-refs            scan the tracked tree
+#   bin/ci/flake-refs FILE...    scan these files only (bin/dev.d/test.sh uses this)
+#
+# Two shapes copy EVERYTHING in a directory, .git, .tmp, target/, .devenv and every
+# ignored file included, into the world-readable /nix/store (25-34 GB for the main
+# checkout, 1.1-1.8 GB for a worktree):
+#
+#   1. a `path:` flake reference to a directory (`nix eval path:.#…`, `path:$ROOT`);
+#   2. `builtins.getFlake` on anything but a URL: getFlake "<dir>" is a path, even in a
+#      real git checkout, unlike the command line.
+#
+# Nix's command line resolves `.#…` and bare directories through git, so those copy only
+# the tracked files (in a worktree too, Nix 2.35); this check leaves them alone. A
+# relative `url = "path:./sub"` flake input resolves inside the already-copied source,
+# so it is allowed too.
+#
+# A getFlake whose argument is a variable cannot be read from here: build the reference
+# with git_flake_ref (bin/lib/flake-ref.sh) and mark the line `flake-ref: git-tracked`.
+# Comment lines are skipped. Fast: one git grep, no evaluation.
+set -uo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT" || exit 2
+
+PAT='getFlake|path:[./$~]'
+if [ $# -gt 0 ]; then
+  hits="$(grep -nHIE -- "$PAT" "$@")"
+else
+  # features/games is vendored addon Lua, *.md and .maestro are prose about these
+  # shapes, flake.lock records the relative inputs; this script names the patterns.
+  hits="$(git grep -nIE -- "$PAT" -- . ':!features/games' ':!*.md' ':!.maestro' \
+    ':!*.lock' ':!bin/ci/flake-refs')"
+fi
+
+findings="$(printf '%s\n' "$hits" | awk '
+  NF == 0 { next }
+  {
+    t = $0
+    sub(/^[^:]*:[0-9]+:/, "", t)
+    loc = substr($0, 1, length($0) - length(t) - 1)
+  }
+  t ~ /^[[:space:]]*(#|\/\/|--|\*)/ { next }  # a comment
+  t ~ /flake-ref: git-tracked/ { next }       # reviewed: built by git_flake_ref
+  t ~ /getFlake/ && t !~ /getFlake[[:space:](]*\\?"(git\+file|git\+https|git\+ssh|github|gitlab|sourcehut|https|tarball\+https|flake):/ {
+    print loc ": builtins.getFlake on a path copies the whole directory; pass git+file://<dir> (bin/lib/flake-ref.sh)"
+    next
+  }
+  t ~ /(^|[^A-Za-z0-9_-])path:[.\/$~]/ && t !~ /url[[:space:]]*=[[:space:]]*"path:\.\// {
+    print loc ": a path: flake ref copies the whole directory; use .#... or git+file://<dir>"
+  }
+')"
+
+if [ -n "$findings" ]; then
+  printf '%s\n' "$findings" >&2
+  echo "flake-refs: $(printf '%s\n' "$findings" | wc -l) whole-directory flake reference(s), see #266" >&2
+  exit 1
+fi
+echo "flake-refs: no whole-directory flake references"

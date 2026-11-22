@@ -179,6 +179,37 @@ has "deploy-rs only as --legacy" '^    if \[\[ "\$\{1:-\}" == "--legacy" \]\]; t
 has "from the flake's pinned input" '^  nix run --accept-flake-config --inputs-from "\$ROOT" deploy-rs -- "\$@"$'
 lacks "never an unpinned deploy-rs" 'github:serokell/deploy-rs'
 
+# --- whole-directory flake copies (#266) -------------------------------------
+# getFlake on a directory and path: refs copy .git, .tmp and target/ into the store. The
+# fixtures spell the shapes in pieces so this file does not trip the check itself.
+FR="$DOT/bin/ci/flake-refs"
+gf="builtins.get""Flake" pth="pa""th:"
+expect "the tracked tree hands Nix no whole directory" 0 '^flake-refs: no whole-directory' "$FR"
+printf 'nix build --impure --expr "(%s \\"$ROOT\\").x"\n' "$gf" >"$T/fr-dir"
+expect "a directory given to builtins.get-Flake fails the check" 1 'fr-dir:1: builtins[.]get[F]lake on a path' "$FR" "$T/fr-dir"
+printf 'nix eval %s.#x\nnix eval "%s$ROOT#x"\n' "$pth" "$pth" >"$T/fr-path"
+expect "a path: flake ref fails the check" 1 'fr-path:2: a path: flake ref' "$FR" "$T/fr-path"
+has "both path: lines are reported" 'fr-path:1: a path: flake ref'
+{
+    printf '(%s \\"git+file://$ROOT?rev=$sha\\").x\n' "$gf"
+    printf '(%s "github:o/r").x\n' "$gf"
+    printf 'let f = %s ref; # flake-ref: git-tracked\n' "$gf"
+    printf '# never %s "<dir>" (a comment)\n' "$gf"
+    printf '  inputs.sub.url = "%s./rust/tools/x";\n' "$pth"
+    printf 'nix eval .#x; nix build "$ROOT#x"; - uses: actions/checkout\n  with: { path: .update-base }\n'
+} >"$T/fr-ok"
+expect "git+file, remote URLs, marked lines, comments, relative inputs and .# pass" 0 \
+    '^flake-refs: no whole-directory' "$FR" "$T/fr-ok"
+# The helper the fixed callers share: tracked files only, a subdirectory as &dir=.
+git init -q "$T/fr-repo" && mkdir -p "$T/fr-repo/sub"
+expect "git_flake_ref gives git+file for a repository root" 0 "^git\\+file://.*/fr-repo\\?shallow=1\$" \
+    bash -c 'source "$1" && git_flake_ref "$2"' _ "$DOT/bin/lib/flake-ref.sh" "$T/fr-repo"
+expect "and &dir= below it" 0 '\?shallow=1&dir=sub$' \
+    bash -c 'source "$1" && git_flake_ref "$2"' _ "$DOT/bin/lib/flake-ref.sh" "$T/fr-repo/sub"
+mkdir -p "$T/fr-plain"
+expect "and refuses a directory outside git rather than fall back to a path" 1 'not in a git work tree' \
+    env GIT_CEILING_DIRECTORIES="$T" bash -c 'source "$1" && git_flake_ref "$2"' _ "$DOT/bin/lib/flake-ref.sh" "$T/fr-plain"
+
 # bin/with-devenv in a checkout with no .devenv link and no devenv installed.
 mkdir -p "$T/repo/bin"
 cp "$DOT/bin/with-devenv" "$T/repo/bin/with-devenv"
