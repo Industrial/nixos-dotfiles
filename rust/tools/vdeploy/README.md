@@ -140,7 +140,10 @@ generation. vdeploy is built differently:
   between are skipped and counted (`vdeploy_commits_skipped_total`).
 - **Debounce** (`--debounce`, default 0): main must stay on one commit for that long before
   a plan starts. The window is counted in whole polls, so it is deterministic under the test
-  clock. Slow hosts can be given a longer window.
+  clock. Slow hosts can be given a longer window. Only interval polls count: a wake's poll
+  (`vdeploy wake`) that sees main where it was is left out (watch.vlt `quiet_seen`), so no
+  number of wakes shortens the debounce; `wake --wait` reports the polls left and exits 0.
+  A wake that sees main move starts the count afresh, as any poll does.
 - A commit whose plan fails is not retried until main moves again.
 
 The decision rules are pure (`src/watch.vlt`). `src/agent.vlt` tests them end to end on the

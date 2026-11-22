@@ -22,7 +22,7 @@ import crate::common::{DeployError, now_secs}
 import crate::dotfiles::{Checkout, state_name}
 import crate::report::{Plan, SAME, json_of, line_of, publish_metrics, publish_plan}
 import crate::wake::{Wakes, publish_status, reader, waited, wakes}
-import crate::watch::{Decision, Head, Status, decide, failed_with, finished_with, observed, taken, unobserved}
+import crate::watch::{Decision, Head, Status, decide, failed_with, finished_with, observed, taken, unobserved, woke_still}
 
 -- How the agent runs.
 export data Settings
@@ -112,16 +112,30 @@ metered s st =
     eprintln! \-> "vdeploy: #{e}"
   succeed (())
 
+-- A poll's result, with a wake's still main left out of the debounce's count.
+export counted : bool -> ((Option<String>, Option<Checkout>), Status) -> ((Option<String>, Option<Checkout>), Status)
+counted woke r =
+  (news, st) = r
+  if woke && news.0.is_none ()
+    (news, Status { watch = woke_still (st.watch.clone ()), ...st })
+  else
+    (news, st)
+
 -- One poll.
 export poll : Caps -> Settings -> Ref<Status> -> Effect<(), Never, HNil>
-poll caps s state =
+poll caps s state = poll_as caps s state false
+
+-- One poll; `woke` when a wake asked for it (GH-246): then a poll that sees main
+-- where it was is not counted toward the debounce (watch.vlt `quiet_seen`).
+poll_as : Caps -> Settings -> Ref<Status> -> bool -> Effect<(), Never, HNil>
+poll_as caps s state woke =
   effect!
     let head = ~fetched(caps.source.clone());
     let rev = ~running_rev(caps.clone());
     let now = now_secs();
     let age = ~age_of(caps.source.clone(), rev.clone(), now);
     let dots = ~dotfiles_for(caps.clone(), head.clone());
-    let news = ~state.modify::<(Option<String>, Option<Checkout>), Never, HNil>(move |st| polled(st, head, rev, age, dots, now));
+    let news = ~state.modify::<(Option<String>, Option<Checkout>), Never, HNil>(move |st| counted(woke, polled(st, head, rev, age, dots, now)));
     ~said(s.clone(), news);
     let st = ~state.get::<Never, HNil>();
     ~metered(s, st)
@@ -229,9 +243,9 @@ agent caps s state work polls =
 -- With wakes (GH-246): the same worker, and a poller that polls, then waits
 -- for `interval` or a wake, whichever comes first. A wake during a plan is
 -- held (the queue keeps one) and polls after; it never cancels the plan.
-poll_and_wait : Caps -> Settings -> Ref<Status> -> Wakes -> Duration -> Effect<(), Never, HNil>
-poll_and_wait caps s state w every =
-  poll caps s state |> .flat_map (move \_ -> waited w every)
+wait_and_poll : Caps -> Settings -> Ref<Status> -> Wakes -> Duration -> Effect<(), Never, HNil>
+wait_and_poll caps s state w every =
+  waited w every |> .flat_map (move \woke -> poll_as caps s state woke)
 
 export woken_agent : Caps -> Settings -> Ref<Status> -> Schedule<u64, ()> -> Wakes -> Effect<(), Never, HNil>
 woken_agent caps s state work w =
@@ -240,7 +254,10 @@ woken_agent caps s state work w =
   r1 = state.clone ()
   every = Duration::from_secs s.interval
   worker = Effect::repeat (move \-> step (c1.clone ()) (s1.clone ()) (r1.clone ())) work |> .map (\_ -> ())
-  poller = Effect::repeat (move \-> poll_and_wait (caps.clone ()) (s.clone ()) (state.clone ()) (w.clone ()) every) (Schedule::forever ()) |> .map (\_ -> ())
+  c0 = caps.clone ()
+  s0 = s.clone ()
+  r0 = state.clone ()
+  poller = poll c0 s0 r0 |> .flat_map (move \_ -> Effect::repeat (move \-> wait_and_poll (caps.clone ()) (s.clone ()) (state.clone ()) (w.clone ()) every) (Schedule::forever ()) |> .map (\_ -> ()))
   worker.race_first poller
 
 -- The daemon with the wake FIFO at `fifo`: its reader forked beside the agent.
@@ -455,3 +472,20 @@ test "a wake never cancels a plan in flight: it is held, and polls after"
   assert! \-> exit |> .into_result |> .is_ok
   assert_eq! \-> logged (&world.finished) \-> logged (&world.started)
   assert! \-> !(logged (&world.started) |> .is_empty)
+
+test "a wake every second never starts a debounced plan; the interval's polls still do"
+  world = crate::caps::Scripted { heads = heads 1, ...crate::caps::Scripted::default () }
+  w = wakes ()
+  w2 = w.clone ()
+  waker = Effect::repeat (move \-> w2.0.offer (()) |> .map (\_ -> ())) (seconds 9) |> .flat_map (\_ -> id_effect::sleep (Duration::from_secs 3600))
+  state = Ref::new (Status::default ())
+  debounced = Settings { interval = 3600, ...settings 2 }
+  exit = id_effect::testing::run_test (woken_agent (crate::caps::scripted (world.clone ())) debounced (state.clone ()) (seconds 10) w |> .race_first waker)
+  assert! \-> exit |> .into_result |> .is_ok
+  assert! \-> world.polls.load (std::sync::atomic::Ordering::SeqCst) > 2
+  assert! \-> logged (&world.started) |> .is_empty
+  -- The same debounce on a 1 s interval, no wakes: planned.
+  plain = crate::caps::Scripted { heads = heads 1, ...crate::caps::Scripted::default () }
+  ran = id_effect::testing::run_test (woken_agent (crate::caps::scripted (plain.clone ())) (Settings { interval = 1, ...settings 2 }) (Ref::new (Status::default ())) (seconds 10) (wakes ()))
+  assert! \-> ran |> .into_result |> .is_ok
+  assert! \-> !(logged (&plain.started) |> .is_empty)
