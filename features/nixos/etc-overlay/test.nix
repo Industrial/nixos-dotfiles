@@ -34,6 +34,11 @@
     ;
   features = import ../../../lib/features.nix {inherit lib;};
 
+  # drakkar's own package set (its nixpkgs.config and overlays already applied), shared by
+  # the node and every specialisation. Left to the nodes, each of the two or three module
+  # evaluations instantiates nixpkgs again, which put one check past CI's 8 GiB eval budget.
+  drakkarPkgs = (import ../../../lib/mk-host.nix {inherit inputs;} "drakkar").pkgs;
+
   # Time the `etc` activation snippet itself, whichever implementation it is.
   timing = {
     system.activationScripts.etc.text = lib.mkMerge [
@@ -89,6 +94,14 @@ in
           timing
         ];
       disabledModules = [../../../hosts/drakkar/disko.nix];
+
+      # Already carries drakkar's config and overlays, so the modules' own are dropped here
+      # (the nixpkgs module refuses `config` next to `pkgs`, and would re-apply `overlays`).
+      nixpkgs = {
+        pkgs = lib.mkForce drakkarPkgs;
+        config = lib.mkForce {};
+        overlays = lib.mkForce [];
+      };
 
       # VM-only adjustments, the minimum for drakkar's config to coexist with qemu-vm.
       services.timesyncd.enable = lib.mkForce false;
