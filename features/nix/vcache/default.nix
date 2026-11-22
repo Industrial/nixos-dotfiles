@@ -100,19 +100,20 @@ in {
     # costs clients only their fallback to cache.nixos.org.
     startLimitIntervalSec = 0;
 
-    environment = {
-      HOST = toString bindIp;
-      PORT = toString port;
-      HOME = stateDir;
-      VCACHE_STORE_DIR = "/nix/store";
-      VCACHE_DB = "/nix/var/nix/db/db.sqlite";
-      VCACHE_SIGN_KEY_FILE = "${stateDir}/secret-key";
-      # GH-248: the request counters, flushed every 30 s (off the request path).
-      VCACHE_TEXTFILE_DIR = textfileDir;
-    }
-    // lib.optionalAttrs (vevalDir != null) {
-      VCACHE_VEVAL_DIR = vevalDir;
-    };
+    environment =
+      {
+        HOST = toString bindIp;
+        PORT = toString port;
+        HOME = stateDir;
+        VCACHE_STORE_DIR = "/nix/store";
+        VCACHE_DB = "/nix/var/nix/db/db.sqlite";
+        VCACHE_SIGN_KEY_FILE = "${stateDir}/secret-key";
+        # GH-248: the request counters, flushed every 30 s (off the request path).
+        VCACHE_TEXTFILE_DIR = textfileDir;
+      }
+      // lib.optionalAttrs (vevalDir != null) {
+        VCACHE_VEVAL_DIR = vevalDir;
+      };
 
     serviceConfig = {
       Type = "simple";

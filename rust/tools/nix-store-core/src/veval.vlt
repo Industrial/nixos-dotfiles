@@ -76,7 +76,7 @@ key_of commit tree lock host nix_output =
 
 -- Lowercase hex digits only.
 is_hex : &str -> bool
-is_hex s = s.chars () |> .all (\c -> c.is_ascii_digit () || ('a' <= c && c <= 'f'))
+is_hex s = s.chars () |> .all (\c -> c.is_ascii_hexdigit () && !(c.is_ascii_uppercase ()))
 
 -- A git object id: 40 (SHA-1) or 64 (SHA-256) lowercase hex digits.
 export is_object_id : &str -> bool
@@ -332,13 +332,8 @@ test "golden: the key id is fixed for a fixed key"
 test "golden: a change in any key field is another key"
   base = key_id (&sample_key ())
   k = sample_key ()
-  mut changed = Vec::new () : Vec<Key>
-  changed.push (Key { commit = .to_string "20456cfc2d62540970eb9c40bc34a840da517ca8", ...k.clone () })
-  changed.push (Key { tree = .to_string "4b825dc642cb6eb9a060e54bf8d69288fbee4905", ...k.clone () })
-  changed.push (Key { lock = .to_string "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d5", ...k.clone () })
-  changed.push (Key { host = .to_string "drakkar", ...k.clone () })
-  changed.push (Key { nix = .to_string "nix (Nix) 2.31.3", ...k.clone () })
-  ids = changed |> .iter |> .map (\c -> key_id c) |> .collect : Vec<String>
+  changed = .to_vec ([Key { commit = .to_string "20456cfc2d62540970eb9c40bc34a840da517ca8", ...k.clone () }, Key { tree = .to_string "4b825dc642cb6eb9a060e54bf8d69288fbee4905", ...k.clone () }, Key { lock = .to_string "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d5", ...k.clone () }, Key { host = .to_string "drakkar", ...k.clone () }, Key { nix = .to_string "nix (Nix) 2.31.3", ...k.clone () }]) : Vec<Key>
+  ids = changed |> .iter |> .map key_id |> .collect : Vec<String>
   assert! \-> ids |> .iter |> .all (\i -> i != &base)
   mut unique = ids.clone ()
   unique.sort ()
