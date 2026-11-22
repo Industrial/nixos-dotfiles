@@ -5,7 +5,10 @@
 -- fibers are interrupted with their finalizers).
 
 import id_effect::{Effect, HNil, effect, fail}
-import crate::agent::{Settings, daemon, once}
+import crate::agent::{Settings, daemon, once, woken_daemon}
+import crate::cli::wake_args
+import crate::common::now_secs
+import crate::wake::{delivered, followed}
 import crate::caps::{Caps, Wiring, live}
 import crate::cli::{Options, USAGE, parse_args}
 import crate::common::DeployError
@@ -85,7 +88,40 @@ program parsed =
     else if o.once
       once (caps_of (&o)) (settings_of (&o))
     else
-      daemon (caps_of (&o)) (settings_of (&o)) |> .widen
+      case o.wake_fifo.clone () of
+        Some fifo -> woken_daemon (caps_of (&o)) (settings_of (&o)) fifo |> .widen
+        None -> daemon (caps_of (&o)) (settings_of (&o)) |> .widen
+
+-- `vdeploy wake`: one byte into the FIFO; with --wait, the outcome followed
+-- in status.json, plan.json and last.json. Exit 0 when the host is (or would
+-- be) on main; 1 when not kept or not settled in time; the writer's refusals
+-- have their own codes (69 no wake here, 75 not listening, 77 not allowed).
+export wake_code : &[String] -> std::process::ExitCode
+wake_code rest =
+  case wake_args rest of
+    Err why ->
+      eprintln! \-> "#{why}\n#{USAGE}"
+      std::process::ExitCode::from 64
+    Ok w ->
+      since = now_secs ()
+      case (delivered (w.fifo.clone ())).block_on () |> .into_result |> .map_err (\c -> c.fail_option ()) of
+        Err (Some r) ->
+          eprintln! \-> "vdeploy wake: #{r.why}"
+          std::process::ExitCode::from r.code
+        Err None -> std::process::ExitCode::from 101
+        Ok () -> if !w.wait
+          println! \-> "vdeploy wake: woken; it polls main now"
+          std::process::ExitCode::SUCCESS
+        else
+          -- The edge: one wait on the process-wide runtime, its value back for the exit code.
+          case (followed (w.state_dir.clone ()) since w.timeout).block_on () |> .into_result of
+            Ok (what, ok) ->
+              println! \-> "vdeploy wake: #{what}"
+              if ok
+                std::process::ExitCode::SUCCESS
+              else
+                std::process::ExitCode::from 1
+            Err _ -> std::process::ExitCode::from 101
 
 -- On a fiber of the runtime's executor (as rust/tools/vverify's app.vlt):
 -- `run_main` polls its root outside the executor's context, so the program
@@ -100,6 +136,9 @@ supervised eff =
 export main_code : std::process::ExitCode
 main_code =
   args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  if args.first () |> .map (\a -> a == "wake") |> .unwrap_or false
+    rest = args.iter () |> .skip 1 |> .cloned |> .collect : Vec<String>
+    return wake_code (&rest)
   parsed = parse_args (&args)
   if parsed |> .as_ref |> .map (\o -> o.help) |> .unwrap_or false
     println! \-> "#{USAGE}"

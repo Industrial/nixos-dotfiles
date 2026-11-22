@@ -1,0 +1,376 @@
+-- The wake (GH-246): a way to make the poller poll main NOW instead of at
+-- the end of its interval. It carries nothing: no commit, no toplevel, no
+-- flag. Everything after the wake is the ordinary path (fetch main from the
+-- pinned URL, verify, debounce, bad marks, the health gate, rollback), so the
+-- worst a wake can do is make a host poll main sooner. The poll on
+-- `--interval` stays the default and the fallback.
+--
+--   the FIFO   /run/vdeploy/wake (systemd-tmpfiles, root:vdeploy-wake 0620).
+--              The daemon holds it open read-write (so it never sees end of
+--              file) and turns every read into one offer to a sliding queue of
+--              one: a burst of writes is one wake. No socket, no port, no
+--              signal: a wake that arrives while vdeploy restarts finds no
+--              reader and fails at the writer (ENXIO); nothing can kill the
+--              daemon.
+--   `vdeploy wake`
+--              opens the FIFO write-only and non-blocking and writes one byte,
+--              as the operator (group vdeploy-wake). With `--wait` it then
+--              follows the outcome in files any user may read: status.json
+--              (written after every poll), plan.json and last.json.
+--
+-- The decision of `--wait` is pure (`progress_of`), so it is tested here.
+
+import std::fs
+import std::io::Write
+import std::os::unix::fs::OpenOptionsExt
+import std::path::Path
+import std::time::Duration
+import serde_json::{Map, Value}
+import id_effect::{Effect, HNil, Never, Queue, Ref, Schedule, fail, succeed, suspend}
+import crate::common::now_secs
+import crate::watch::Status
+
+export const WAKE_FIFO : &str = "/run/vdeploy/wake"
+export const STATUS_FILE : &str = "status.json"
+
+-- The wakes: a sliding queue of one, so any number of writes before the
+-- poller looks is one poll.
+export newtype Wakes = Wakes (export Queue<()>)
+
+instance Clone Wakes
+  clone : &self -> Self
+  clone self = Wakes (self.0.clone ())
+
+export wakes : Wakes
+wakes = Wakes (Queue::sliding 1)
+
+-- The poller's wait: `every`, or a wake, whichever comes first.
+export waited : Wakes -> Duration -> Effect<(), Never, HNil>
+waited w every =
+  interval = id_effect::sleep every : Effect<(), Never, HNil>
+  late = id_effect::sleep every : Effect<(), Never, HNil>
+  woke = w.0.take () |> .catch (move \_ -> late)
+  interval.race_first woke
+
+rust """
+  /// The wake FIFO, opened read-write on the runtime's reactor: with a writer
+  /// end of its own it never reads end of file, so the reader waits for real
+  /// writes. Fails when the path is missing or is not a FIFO.
+  pub fn open_wake(path: String) -> Effect<std::sync::Arc<tokio::net::unix::pipe::Receiver>, String, HNil> {
+      id_effect::from_async(move || async move {
+          tokio::net::unix::pipe::OpenOptions::new()
+              .read_write(true)
+              .open_receiver(&path)
+              .map(std::sync::Arc::new)
+              .map_err(|e| format!("opening {path}: {e}"))
+      })
+  }
+
+  /// One read of the wake FIFO: waits until a writer has written, then drains
+  /// what is there (a burst is one wake). 0: a spurious readiness.
+  pub fn read_wake(rx: std::sync::Arc<tokio::net::unix::pipe::Receiver>) -> Effect<usize, String, HNil> {
+      id_effect::from_async(move || async move {
+          rx.readable().await.map_err(|e| format!("waiting on the wake FIFO: {e}"))?;
+          let mut buf = [0u8; 64];
+          match rx.try_read(&mut buf) {
+              Ok(n) => Ok(n),
+              Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(0),
+              Err(e) => Err(format!("reading the wake FIFO: {e}")),
+          }
+      })
+  }
+"""
+
+offered : Wakes -> usize -> Effect<(), String, HNil>
+offered w n =
+  if n > 0
+    w.0.offer (()) |> .map (\_ -> ())
+  else
+    succeed (())
+
+
+-- How long one reader cycle holds the FIFO open: a FIFO deleted or replaced
+-- (tmpfiles on a switch) is picked up again within this.
+export const CYCLE_SECS : u64 = 60
+
+-- A minute's wait for a write, as a read of nothing.
+quiet : Effect<usize, String, HNil>
+quiet = (id_effect::sleep (Duration::from_secs CYCLE_SECS) : Effect<(), Never, HNil>) |> .map (\_ -> 0) |> .widen
+
+-- One cycle: open the FIFO afresh, wait up to CYCLE_SECS for a write, drain
+-- it (any number of bytes is one offer), close it.
+cycled : Wakes -> String -> Effect<usize, String, HNil>
+cycled w path =
+  open_wake path |> .flat_map (move \rx -> read_wake rx |> .race_first (quiet ())) |> .flat_map (move \n -> offered w n |> .map (move \_ -> n))
+
+-- A cycle that failed (no FIFO, not a FIFO, a read error): said once per
+-- change, then a pause, and the next cycle tries again. The poller polls on
+-- its interval meanwhile; nothing here can end the daemon.
+recovered : Ref<bool> -> String -> Effect<(), Never, HNil>
+recovered broken e =
+  b2 = broken.clone ()
+  (broken.get () : Effect<bool, Never, HNil>) |> .flat_map (move \was -> noted_once b2 was e) |> .flat_map (\_ -> id_effect::sleep (Duration::from_secs CYCLE_SECS))
+
+noted_once : Ref<bool> -> bool -> String -> Effect<(), Never, HNil>
+noted_once broken was e =
+  if !was
+    eprintln! \-> "vdeploy: wake: #{e}; polling on the interval only until it is back"
+  broken.set true
+
+healed : Ref<bool> -> Effect<(), Never, HNil>
+healed broken =
+  b2 = broken.clone ()
+  (broken.get () : Effect<bool, Never, HNil>) |> .flat_map (move \was -> back b2 was)
+
+back : Ref<bool> -> bool -> Effect<(), Never, HNil>
+back broken was =
+  if was
+    eprintln! \-> "vdeploy: wake: the FIFO is back"
+  broken.set false
+
+one_cycle : Wakes -> String -> Ref<bool> -> Effect<(), Never, HNil>
+one_cycle w path broken =
+  b2 = broken.clone ()
+  b3 = broken.clone ()
+  cycled w path |> .flat_map (move \_ -> healed b2 |> .widen) |> .catch (move \e -> recovered b3 e)
+
+-- The reader fiber, for ever: one cycle after another. A missing or replaced
+-- FIFO is logged and retried each cycle; the daemon never exits for it.
+export reader : Wakes -> String -> Effect<(), Never, HNil>
+reader w path =
+  broken = Ref::new false
+  Effect::repeat (move \-> one_cycle (w.clone ()) (path.clone ()) (broken.clone ())) (Schedule::forever ()) |> .map (\_ -> ())
+
+-- ---------------------------------------------------------------- status.json
+
+-- What `wake --wait` needs from the poller, after every poll: the head it
+-- saw, the commit the worker last took, whether a plan runs, and the debounce
+-- still to go. No secrets: commits and times.
+export status_json : &Status -> u64 -> bool -> u64 -> String
+status_json st quiet_polls deploy now =
+  mut m = Map::new ()
+  m.insert (.to_string "schema") (Value::from 1)
+  m.insert (.to_string "head") (st.watch.head |> .as_ref |> .map (\h -> Value::from (h.sha.clone ())) |> .unwrap_or Value::Null)
+  m.insert (.to_string "done") (st.done |> .as_ref |> .map (\d -> Value::from (d.clone ())) |> .unwrap_or Value::Null)
+  m.insert (.to_string "polledAt") (Value::from (st.last_poll |> .unwrap_or now))
+  m.insert (.to_string "planning") (Value::from (st.started > st.finished))
+  seen = st.watch.polls.saturating_sub st.watch.changed_at
+  m.insert (.to_string "debounceLeft") (Value::from (quiet_polls.saturating_sub seen))
+  m.insert (.to_string "mode") (Value::from (if deploy
+    "deploy"
+  else
+    "observe"))
+  Value::Object m |> .to_string
+
+-- Written atomically into the state directory, readable by anyone (0644).
+export publish_status : Option<String> -> &Status -> u64 -> bool -> Result<(), String>
+publish_status dir st quiet_polls deploy =
+  case dir of
+    None -> Ok ()
+    Some d ->
+      path = Path::new (&d) |> .join STATUS_FILE
+      text = "#{status_json st quiet_polls deploy (now_secs ())}\n"
+      crate::report::write_atomic (&path) (&text) |> .map_err (\e -> "writing #{path.display ()}: #{e}")
+
+-- ---------------------------------------------------------------- vdeploy wake
+
+-- Why a wake was not delivered, and the exit code that says so.
+export data Refused { export why String, export code u8 }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Linux's O_NONBLOCK (asm-generic, x86_64 and aarch64 alike): a FIFO nobody
+-- reads then fails at once (ENXIO) instead of blocking the operator.
+const O_NONBLOCK : i32 = 2048
+
+export refusal_of : std::io::Error -> &str -> Refused
+refusal_of e path =
+  case e.raw_os_error () of
+    Some 2 -> Refused { why = "#{path} does not exist: this host's vdeploy takes no wakes (observe mode, or no wake support)", code = 69 }
+    Some 6 -> Refused { why = "vdeploy is not reading #{path} right now (starting or restarting); it polls main on its own interval", code = 75 }
+    Some 13 -> Refused { why = .to_string "not allowed to wake vdeploy: only the operators (group vdeploy-wake) may", code = 77 }
+    Some 1 -> Refused { why = .to_string "not allowed to wake vdeploy: only the operators (group vdeploy-wake) may", code = 77 }
+    _ -> Refused { why = "#{path}: #{e}", code = 74 }
+
+-- One wake, delivered: the reader reopens the FIFO every cycle, so a write in
+-- the instant between two cycles finds no reader (ENXIO). Ten tries 200 ms
+-- apart (2 s) cover that; a refusal that is not about timing (no FIFO, not
+-- allowed) is the same on every try and is said after them.
+export delivered : String -> Effect<(), Refused, HNil>
+delivered path =
+  tries = Schedule::spaced (Duration::from_millis 200) |> .intersect (Schedule::recurs 10)
+  Effect::retry (move \-> once_now (path.clone ())) tries
+
+once_now : String -> Effect<(), Refused, HNil>
+once_now path =
+  suspend (move \-> settled_write (woken (&path)))
+
+settled_write : Result<(), Refused> -> Effect<(), Refused, HNil>
+settled_write r =
+  case r of
+    Ok () -> succeed (())
+    Err e -> fail e
+
+-- One wake: one byte, written and closed (a real write, which is what the
+-- reader waits for).
+export woken : &str -> Result<(), Refused>
+woken path =
+  mut file = (fs::OpenOptions::new () |> .write true |> .custom_flags O_NONBLOCK |> .open path |> .map_err (\e -> refusal_of e path))?
+  file.write_all (b"w") |> .map_err (\e -> refusal_of e path)
+
+-- ---------------------------------------------------------------- --wait
+
+-- Where a wake has got to.
+export data Progress = Waiting String | Settled String bool
+  deriving (Debug, Clone, PartialEq, Eq)
+
+text_of : &Option<Value> -> &str -> Option<String>
+text_of v key = v |> .as_ref |> .and_then (\d -> d.get key) |> .and_then (\x -> x.as_str ()) |> .map (\s -> s.to_string ())
+
+number_of : &Option<Value> -> &str -> Option<u64>
+number_of v key = v |> .as_ref |> .and_then (\d -> d.get key) |> .and_then (\x -> x.as_u64 ())
+
+flag_of : &Option<Value> -> &str -> bool
+flag_of v key = v |> .as_ref |> .and_then (\d -> d.get key) |> .and_then (\x -> x.as_bool ()) |> .unwrap_or false
+
+short : &str -> String
+short sha = sha.chars () |> .take 9 |> .collect
+
+-- The apply's verdict on the planned toplevel, once the ledger has it.
+applied_progress : &str -> &Option<Value> -> &Option<Value> -> Progress
+applied_progress head plan last =
+  out = text_of plan "out"
+  planned_at = number_of plan "plannedAt" |> .unwrap_or 0
+  toplevel = text_of last "toplevel"
+  at = number_of last "at" |> .unwrap_or 0
+  if out.is_some () && toplevel == out && at >= planned_at
+    case text_of last "result" |> .unwrap_or_default |> .as_str of
+      "switched" -> Settled "switched to main #{short head}, health-checked" true
+      "already" -> Settled "already on main #{short head}" true
+      other ->
+        reason = text_of last "reason" |> .unwrap_or_default
+        Settled "not kept (#{other}): #{reason}" false
+  else
+    Waiting "applying main #{short head} (switch, health check)"
+
+-- The progress of a wake made at `since`, from status.json, plan.json and
+-- last.json as they are now.
+export progress_of : u64 -> &Option<Value> -> &Option<Value> -> &Option<Value> -> Progress
+progress_of since status plan last =
+  polled = number_of status "polledAt" |> .unwrap_or 0
+  if status.is_none () || polled < since
+    Waiting (.to_string "waiting for vdeploy to poll main")
+  else
+    case text_of status "head" of
+      None -> Settled (.to_string "vdeploy could not fetch main (see journalctl -u vdeploy)") false
+      Some head ->
+        done = text_of status "done"
+        left = number_of status "debounceLeft" |> .unwrap_or 0
+        planned = text_of plan "commit"
+        if planned.as_deref () == Some (head.as_str ())
+          action = text_of plan "action" |> .unwrap_or_default
+          mode = text_of plan "mode" |> .unwrap_or_default
+          if action == "none"
+            Settled "already runs main #{short (&head)}: nothing to switch" true
+          else if mode == "observe"
+            Settled "would switch to main #{short (&head)} (observe mode: vdeploy does not switch here)" true
+          else
+            applied_progress (&head) plan last
+        else if done.as_deref () != Some (head.as_str ()) && left > 0
+          Settled "main moved to #{short (&head)}; it must stay there #{left} more poll(s) (debounce) before vdeploy plans it, on its own interval" true
+        else if done.as_deref () == Some (head.as_str ()) && !(flag_of status "planning")
+          Settled "the plan for main #{short (&head)} failed (see journalctl -u vdeploy)" false
+        else
+          Waiting "planning main #{short (&head)}"
+
+read_json : &Path -> Option<Value>
+read_json path = fs::read_to_string path |> .ok |> .and_then (\t -> serde_json::from_str (&t) |> .ok)
+
+-- The files now.
+export observed_in : String -> u64 -> Progress
+observed_in state since =
+  d = Path::new (&state)
+  status = read_json (&d.join STATUS_FILE)
+  plan = read_json (&d.join "plan.json")
+  last = read_json (&d.join "last.json")
+  progress_of since (&status) (&plan) (&last)
+
+-- One look; still waiting is a failure, so a Schedule retries it.
+looked : String -> u64 -> Effect<(String, bool), String, HNil>
+looked state since =
+  suspend (move \-> settled_or (observed_in state since))
+
+settled_or : Progress -> Effect<(String, bool), String, HNil>
+settled_or p =
+  case p of
+    Settled what ok -> succeed ((what, ok))
+    Waiting what -> fail what
+
+-- Follow a wake to its outcome: a look every 2 s until it settles or
+-- `timeout` seconds are up (then the last word on it, as not settled).
+export followed : String -> u64 -> u64 -> Effect<(String, bool), Never, HNil>
+followed state since timeout =
+  looks = Schedule::spaced (Duration::from_secs 2) |> .intersect (Schedule::recurs (timeout / 2 + 1))
+  Effect::retry (move \-> looked (state.clone ()) since) looks |> .catch (move \last -> succeed (("still #{last} after #{timeout}s", false)))
+
+#[cfg(test)]
+json : &str -> Option<Value>
+json s = serde_json::from_str s |> .ok
+
+#[cfg(test)]
+sha40 : String
+sha40 = std::iter::repeat_n (char::from 97) 40 |> .collect
+
+test "before the poll it waits; after it, an unchanged main is nothing to switch"
+  st = json "{\"polledAt\":90,\"head\":\"x\",\"done\":\"x\"}"
+  assert_eq! \-> progress_of 100 (&st) (&None) (&None) \-> Waiting (.to_string "waiting for vdeploy to poll main")
+  assert_eq! \-> progress_of 100 (&None) (&None) (&None) \-> Waiting (.to_string "waiting for vdeploy to poll main")
+  head = sha40 ()
+  status = json (&"{\"polledAt\":100,\"head\":\"#{head}\",\"done\":\"#{head}\",\"planning\":false}")
+  plan = json (&"{\"commit\":\"#{head}\",\"action\":\"none\",\"mode\":\"deploy\"}")
+  assert_eq! \-> progress_of 100 (&status) (&plan) (&None) \-> Settled (.to_string "already runs main aaaaaaaaa: nothing to switch") true
+
+test "a new main: planning, then applying, then the apply's verdict"
+  head = sha40 ()
+  status = json (&"{\"polledAt\":100,\"head\":\"#{head}\",\"done\":\"old\",\"planning\":false,\"debounceLeft\":0}")
+  assert_eq! \-> progress_of 100 (&status) (&None) (&None) \-> Waiting (.to_string "planning main aaaaaaaaa")
+  plan = json (&"{\"commit\":\"#{head}\",\"action\":\"switch\",\"mode\":\"deploy\",\"out\":\"/nix/store/x\",\"plannedAt\":110}")
+  assert_eq! \-> progress_of 100 (&status) (&plan) (&None) \-> Waiting (.to_string "applying main aaaaaaaaa (switch, health check)")
+  stale = json "{\"toplevel\":\"/nix/store/x\",\"at\":50,\"result\":\"switched\"}"
+  assert! \-> progress_of 100 (&status) (&plan) (&stale) |> .eq (&Waiting (.to_string "applying main aaaaaaaaa (switch, health check)"))
+  kept = json "{\"toplevel\":\"/nix/store/x\",\"at\":120,\"result\":\"switched\"}"
+  assert_eq! \-> progress_of 100 (&status) (&plan) (&kept) \-> Settled (.to_string "switched to main aaaaaaaaa, health-checked") true
+  back = json "{\"toplevel\":\"/nix/store/x\",\"at\":120,\"result\":\"rolled-back\",\"reason\":\"unhealthy: web down\"}"
+  assert_eq! \-> progress_of 100 (&status) (&plan) (&back) \-> Settled (.to_string "not kept (rolled-back): unhealthy: web down") false
+
+test "debounce, observe mode, a failed plan, a failed fetch"
+  head = sha40 ()
+  debounced = json (&"{\"polledAt\":100,\"head\":\"#{head}\",\"done\":\"old\",\"debounceLeft\":2}")
+  assert! \-> case progress_of 100 (&debounced) (&None) (&None) of
+    Settled w ok -> ok && w.contains "2 more poll(s) (debounce)"
+    _ -> false
+  observing = json (&"{\"commit\":\"#{head}\",\"action\":\"switch\",\"mode\":\"observe\"}")
+  status = json (&"{\"polledAt\":100,\"head\":\"#{head}\",\"done\":\"#{head}\"}")
+  assert! \-> case progress_of 100 (&status) (&observing) (&None) of
+    Settled w ok -> ok && w.contains "observe mode"
+    _ -> false
+  failed = json (&"{\"polledAt\":100,\"head\":\"#{head}\",\"done\":\"#{head}\",\"planning\":false}")
+  older = json "{\"commit\":\"old\",\"action\":\"none\"}"
+  assert! \-> case progress_of 100 (&failed) (&older) (&None) of
+    Settled w ok -> !ok && w.contains "failed"
+    _ -> false
+  nofetch = json "{\"polledAt\":100,\"head\":null}"
+  assert! \-> case progress_of 100 (&nofetch) (&None) (&None) of
+    Settled w ok -> !ok && w.contains "could not fetch"
+    _ -> false
+
+test "the writer's refusals say who may wake, and when to retry"
+  assert_eq! \-> (refusal_of (std::io::Error::from_raw_os_error 6) "/run/vdeploy/wake").code \-> 75
+  assert_eq! \-> (refusal_of (std::io::Error::from_raw_os_error 13) "/run/vdeploy/wake").code \-> 77
+  assert_eq! \-> (refusal_of (std::io::Error::from_raw_os_error 2) "/run/vdeploy/wake").code \-> 69
+  assert_eq! \-> woken "/nonexistent/vdeploy/wake" |> .err |> .map (\r -> r.code) \-> Some 69
+
+test "status.json names the head, what was done, and the debounce left"
+  st = Status { watch = crate::watch::Watch { head = Some (crate::watch::Head { sha = .to_string "c3", time = 1, signed = false }), polls = 5, changed_at = 4, changes = 2 }, done = Some (.to_string "c2"), started = 2, finished = 1, last_poll = Some 77, ...Status::default () }
+  v = json (&status_json (&st) 3 true 99) |> .expect "json"
+  assert_eq! \-> (v.get "head" |> .and_then (\x -> x.as_str ()), v.get "done" |> .and_then (\x -> x.as_str ()), v.get "polledAt" |> .and_then (\x -> x.as_u64 ())) \-> (Some "c3", Some "c2", Some 77)
+  assert_eq! \-> (v.get "planning" |> .and_then (\x -> x.as_bool ()), v.get "debounceLeft" |> .and_then (\x -> x.as_u64 ()), v.get "mode" |> .and_then (\x -> x.as_str ())) \-> (Some true, Some 2, Some "deploy")

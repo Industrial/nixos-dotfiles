@@ -38,6 +38,7 @@ macro_rules! voltaic {
 
 voltaic!(common);
 voltaic!(watch);
+voltaic!(wake);
 voltaic!(dotfiles);
 voltaic!(caps);
 voltaic!(report);

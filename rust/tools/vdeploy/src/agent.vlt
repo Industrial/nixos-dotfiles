@@ -21,6 +21,7 @@ import crate::caps::{BuilderTool, Caps, DifferTool, SourceTool}
 import crate::common::{DeployError, now_secs}
 import crate::dotfiles::{Checkout, state_name}
 import crate::report::{Plan, SAME, json_of, line_of, publish_metrics, publish_plan}
+import crate::wake::{Wakes, publish_status, reader, waited, wakes}
 import crate::watch::{Decision, Head, Status, decide, failed_with, finished_with, observed, taken, unobserved}
 
 -- How the agent runs.
@@ -104,6 +105,9 @@ said s news =
 
 metered : Settings -> Status -> Effect<(), Never, HNil>
 metered s st =
+  -- What `vdeploy wake --wait` reads (GH-246): the poll it waits for.
+  if publish_status (s.state_dir.clone ()) (&st) s.quiet_polls s.deploy is Err e
+    eprintln! \-> "vdeploy: #{e}"
   if publish_metrics (s.textfile_dir.clone ()) (&st) is Err e
     eprintln! \-> "vdeploy: #{e}"
   succeed (())
@@ -222,6 +226,40 @@ agent caps s state work polls =
   poller = Effect::repeat (move \-> poll (caps.clone ()) (s.clone ()) (state.clone ())) polls |> .map (\_ -> ())
   worker.race_first poller
 
+-- With wakes (GH-246): the same worker, and a poller that polls, then waits
+-- for `interval` or a wake, whichever comes first. A wake during a plan is
+-- held (the queue keeps one) and polls after; it never cancels the plan.
+poll_and_wait : Caps -> Settings -> Ref<Status> -> Wakes -> Duration -> Effect<(), Never, HNil>
+poll_and_wait caps s state w every =
+  poll caps s state |> .flat_map (move \_ -> waited w every)
+
+export woken_agent : Caps -> Settings -> Ref<Status> -> Schedule<u64, ()> -> Wakes -> Effect<(), Never, HNil>
+woken_agent caps s state work w =
+  c1 = caps.clone ()
+  s1 = s.clone ()
+  r1 = state.clone ()
+  every = Duration::from_secs s.interval
+  worker = Effect::repeat (move \-> step (c1.clone ()) (s1.clone ()) (r1.clone ())) work |> .map (\_ -> ())
+  poller = Effect::repeat (move \-> poll_and_wait (caps.clone ()) (s.clone ()) (state.clone ()) (w.clone ()) every) (Schedule::forever ()) |> .map (\_ -> ())
+  worker.race_first poller
+
+-- The daemon with the wake FIFO at `fifo`: its reader forked beside the agent.
+export woken_daemon : Caps -> Settings -> String -> Effect<(), Never, HNil>
+woken_daemon caps s fifo =
+  -- The daemon's own first line, word for word (operators and tests read it), then the wake.
+  mode_said (&s)
+  eprintln! \-> "vdeploy: polling main every #{s.interval}s, and on a wake (#{fifo})"
+  w = wakes ()
+  work = Schedule::spaced (Duration::from_secs s.tick)
+  state = Ref::new (Status { deploy = s.deploy, ...Status::default () })
+  c2 = caps.clone ()
+  s2 = s.clone ()
+  w2 = w.clone ()
+  effect!
+    let _reading = ~reader(w.clone(), fifo).fork();
+    ~prepared(caps, s);
+    ~woken_agent(c2, s2, state, work, w2)
+
 -- Deploy mode, before the first poll: retire comin (wait for its last
 -- switch, then stop it), and finish an apply a restart interrupted.
 export prepared : Caps -> Settings -> Effect<(), Never, HNil>
@@ -232,13 +270,19 @@ prepared caps s =
   else
     succeed (())
 
--- The daemon's Schedules: the worker every `tick`, the poller every `interval`.
-export daemon : Caps -> Settings -> Effect<(), Never, HNil>
-daemon caps s =
+-- The daemon's first line: its mode, interval and debounce.
+mode_said : &Settings -> ()
+mode_said s =
   if s.deploy
     eprintln! \-> "vdeploy: deploy mode for #{s.host}: polling main every #{s.interval}s, debounce #{s.quiet_polls} poll(s); every switch is health-checked and rolled back when unhealthy"
   else
     eprintln! \-> "vdeploy: observe mode for #{s.host}: polling main every #{s.interval}s, debounce #{s.quiet_polls} poll(s); never switching"
+  ()
+
+-- The daemon's Schedules: the worker every `tick`, the poller every `interval`.
+export daemon : Caps -> Settings -> Effect<(), Never, HNil>
+daemon caps s =
+  mode_said (&s)
   work = Schedule::spaced (Duration::from_secs s.tick)
   polls = Schedule::spaced (Duration::from_secs s.interval)
   state = Ref::new (Status { deploy = s.deploy, ...Status::default () })
@@ -375,3 +419,39 @@ test "a poll records the head, the generation age and a changed checkout"
   assert_eq! \-> (moved2, dots2, st2.generation_age) \-> (None, None, Some 60)
   ((_, _), st3) = polled st2 None None None None 220
   assert_eq! \-> (st3.poll_failures, st3.last_poll, st3.watch.polls) \-> (1, Some 160, 3)
+
+-- GH-246: the wake. The poller polls, then waits for `interval` or a wake.
+#[cfg(test)]
+polls_with : u64 -> u64 -> u64
+polls_with wakes_before interval =
+  world = crate::caps::Scripted { heads = heads 1, ...crate::caps::Scripted::default () }
+  w = wakes ()
+  if wakes_before > 0
+    for _ in 0 .. wakes_before
+      id_effect::testing::run_test (w.0.offer (()) : Effect<bool, Never, HNil>) |> .into_result |> .ok
+  s = Settings { interval, ...settings 0 }
+  state = Ref::new (Status::default ())
+  exit = id_effect::testing::run_test (woken_agent (crate::caps::scripted (world.clone ())) s (state.clone ()) (seconds 10) w)
+  assert! \-> exit |> .into_result |> .is_ok
+  world.polls.load (std::sync::atomic::Ordering::SeqCst)
+
+test "with no wake the poller keeps its interval, as today"
+  -- One poll at the start, the next an hour away: 10 s of worker ticks see one.
+  assert_eq! \-> polls_with 0 3600 \-> 1
+
+test "a wake polls before the interval is up"
+  assert_eq! \-> polls_with 1 3600 \-> 2
+
+test "a burst of wakes is one poll"
+  assert_eq! \-> polls_with 10 3600 \-> 2
+
+test "a wake never cancels a plan in flight: it is held, and polls after"
+  -- Builds take 5 s; a wake is waiting from the start; every build started also finishes.
+  world = crate::caps::Scripted { heads = heads 3, build_secs = 5, ...crate::caps::Scripted::default () }
+  w = wakes ()
+  id_effect::testing::run_test (w.0.offer (()) : Effect<bool, Never, HNil>) |> .into_result |> .ok
+  state = Ref::new (Status::default ())
+  exit = id_effect::testing::run_test (woken_agent (crate::caps::scripted (world.clone ())) (Settings { interval = 3600, ...settings 0 }) (state.clone ()) (seconds 20) w)
+  assert! \-> exit |> .into_result |> .is_ok
+  assert_eq! \-> logged (&world.finished) \-> logged (&world.started)
+  assert! \-> !(logged (&world.started) |> .is_empty)
