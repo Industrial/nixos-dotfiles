@@ -1,0 +1,240 @@
+-- App locals
+local _, app = ...;
+local L = app.L;
+
+-- This window is not currently supported by Classic!
+if not app.IsRetail then return; end
+
+-- Global locals
+local ipairs, setmetatable, tonumber, tremove, wipe
+	= ipairs, setmetatable, tonumber, tremove, wipe
+
+-- Local functions
+local IMPORT_TYPES = {}
+
+local function ParseCommand(self, cmd)
+	if not cmd or cmd == "" then
+		return
+	end
+
+	local typeName, input = cmd:match("^(%S+)%s+(.+)$")
+	if not typeName or not input then
+		return
+	end
+
+	local typeKey = IMPORT_TYPES[typeName:lower()]
+	if not typeKey then
+		app.print("Unknown import type: "..typeName)
+		return
+	end
+
+	self:Import(typeKey, input)
+	self:ShowResetButton()
+	self:Rebuild()
+
+	return true
+end
+
+-- Implementation
+app:CreateWindow("Import", {
+	Commands = { "attimport" },
+	RootCommands = { "import" },
+	OnCommand = function(self, args)
+		local cmd = table.concat(args, " ")
+
+		if ParseCommand(self, cmd) then
+			if not self:IsShown() then
+				self:Show()
+			end
+			return true
+		end
+	end,
+	OnInit = function(self, handlers)
+		local SearchForObject = app.SearchForObject
+
+		function self:ClearResults()
+			local fixed = {}
+			for _, row in ipairs(self.data.g) do
+				if row.isButton then
+					fixed[#fixed + 1] = row
+				end
+			end
+			wipe(self.data.g)
+			app.ArrayAppend(self.data.g, fixed)
+		end
+
+		local function ParseIDs(str)
+			local ids = {}
+			for id in str:gmatch("%d+%.?%d*") do
+				id = tonumber(id)
+				if id then
+					ids[#ids + 1] = id
+				end
+			end
+			if #ids > 0 then return ids end
+
+			-- if there were no raw ids parsed from the input, try to use the string as a global table reference :O
+			local keychain = {("."):split(str)}
+			local t
+			for i = 1, #keychain do
+				t = (t and t[keychain[i]]) or _G[keychain[i]]
+			end
+			if t then
+				for id in pairs(t) do
+					id = tonumber(id)
+					if id then
+						ids[#ids + 1] = id
+					end
+				end
+			end
+			return ids
+		end
+
+		local function SearchTypeObject(typeKey, id)
+			local o = setmetatable({ OnUpdate = app.ForceShowUpdate, g = app.EmptyTable }, {
+					__index = id and (SearchForObject(typeKey, id, "key")
+									or SearchForObject(typeKey, id, "field")
+									or app.__CreateObject({[typeKey]=id}))
+								or setmetatable({name=EMPTY}, app.BaseClass)
+				})
+			-- app.PrintDebug("Created", typeKey, id, "->", o.name or "???")
+			-- app.PrintTable(o)
+			return o
+		end
+
+		function self:Import(typeKey, input)
+			local ids = ParseIDs(input)
+			self:ClearResults()
+			if not ids then return false end
+
+			-- app.PrintDebug("Importing", #ids, typeKey)
+
+			local objs = {}
+			for _, id in ipairs(ids) do
+				objs[#objs + 1] = SearchTypeObject(typeKey, id)
+			end
+
+			-- Merge all the search results into the list, ensure to clone
+			app.NestObjects(self.data, objs, true)
+		end
+
+		local initialButtons = {
+			{ id = "achievementID", name = ACHIEVEMENTS, icon = app.asset("Category_Achievements") },
+			{ id = "sourceID", name = WARDROBE, icon = 135276 },
+			{ minBuild = 70000, id = "artifactID", name = ITEM_QUALITY6_DESC, icon = app.asset("Weapon_Type_Artifact") },
+			{ minBuild = 80200, id = "azeriteessenceID", name = SPLASH_BATTLEFORAZEROTH_8_2_0_FEATURE2_TITLE, icon = app.asset("Category_AzeriteEssences") },
+			{ id = "speciesID", name = AUCTION_CATEGORY_BATTLE_PETS, icon = app.asset("Category_PetJournal") },
+			{ minBuild = 110100, id = "campsiteID", name = WARBAND_SCENES, icon = app.asset("Category_Campsites") },
+			{ id = "currencyID", name = CURRENCY, icon = app.asset("Interface_Vendor") },
+			{ minBuild = 110207, id = "decorID", name = CATALOG_SHOP_TYPE_DECOR, icon = app.asset("Category_Housing") },
+			{ id = "explorationID", name = L.EXPLORATION, icon = app.asset("Category_Exploration") },
+			{ id = "factionID", name = L.FACTIONS, icon = app.asset("Category_Factions") },
+			{ id = "flightpathID", name = L.FLIGHT_PATHS, icon = app.asset("Category_FlightPaths") },
+			{ minBuild = 60000, id = "followerID", name = GARRISON_FOLLOWERS, icon = app.asset("Category_Followers") },
+			{ minBuild = 70000, id = "illusionID", name = L.FILTER_ID_TYPES[103], icon = app.asset("Category_Illusions") },
+			{ id = "modItemID", name = ITEMS, icon = 135276 },
+			{ id = "questID", name = TRACKER_HEADER_QUESTS, icon = app.asset("Interface_Quest_header") },
+			{ id = "spellID", name = SPELLS, icon = 135736 },
+			{ id = "titleID", name = PAPERDOLL_SIDEBAR_TITLES, icon = app.asset("Category_Titles") },
+		}
+
+		for i = #initialButtons, 1, -1 do
+			local minBuild = initialButtons[i].minBuild;
+			if minBuild and app.GameBuildVersion < minBuild then
+				tremove(initialButtons, i);
+			end
+		end
+
+		for _, info in ipairs(initialButtons) do
+			IMPORT_TYPES[info.id:lower()] = info.id
+		end
+
+		local function ImportButton(typeKey, label, icon)
+			return app.CreateRawText(label, {
+				icon = icon,
+				visible = true,
+				isButton = true,
+				OnUpdate = app.AlwaysShowUpdate,
+				OnClick = function()
+					app:ShowPopupDialogWithEditBox(
+						L.IMPORT_PASTE_HINT:format(label),
+						"",
+						function(input)
+							if not input or input:match("^%s*$") then
+								return
+							end
+
+							self:Import(typeKey, input)
+							self:ShowResetButton()
+							self:Rebuild()
+						end
+					)
+					return true
+				end,
+			})
+		end
+
+		function self:ResetToInitialButtons()
+			local g = self.data.g
+			wipe(g)
+			for _, b in ipairs(initialButtons) do
+				g[#g+1] = ImportButton(b.id, b.name, b.icon)
+			end
+			self.data.SortType = "text"
+			self:Rebuild()
+		end
+
+		function self:ShowResetButton()
+			local importedRows = {}
+			for _, row in ipairs(self.data.g) do
+				if not row.isButton then
+					importedRows[#importedRows+1] = row
+				end
+			end
+			wipe(self.data.g)
+
+			local resetButton = app.CreateRawText(L.IMPORT_RESET, {
+				icon = app.asset("unknown"),
+				visible = true,
+				isButton = true,
+				OnUpdate = app.AlwaysShowUpdate,
+				SortPriority = -1,
+				OnClick = function()
+					self:ResetToInitialButtons()
+					return true
+				end,
+			})
+			self.data.g[#self.data.g+1] = resetButton
+			app.ArrayAppend(self.data.g, importedRows)
+			self:Rebuild()
+		end
+
+		self:SetData(app.CreateRawText(L.IMPORT, {
+			icon = app.asset("logo_32x32"),
+			description = L.IMPORT_TOOLTIP,
+			visible = true,
+			back = 1,
+			g = {}
+		}))
+
+		self:ResetToInitialButtons()
+	end,
+});
+
+-- register the 'ID' style exporter
+app:RegisterDataStyleExporter("Raw ID", {
+	main = function(data, depth)
+		if data and data.key then
+			return data[data.key] .. ",\t-- " .. (data.name or UNKNOWN)
+		end
+	end
+})
+
+-- register the 'Raw questID' style exporter
+app:RegisterDataStyleExporter("Raw questID", {
+	main = function(data, depth)
+		if data then
+			return (data.questID or "???") .. ",\t-- " .. (data.name or UNKNOWN)
+		end
+	end
+})

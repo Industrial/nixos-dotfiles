@@ -456,7 +456,7 @@ end
 -- (0.8.2 build 4: the "usually" line under Value and its 30% rule are gone; the tooltip shows the
 -- usual price as a percent on the Value line)
 
--- "today", "1 day ago", "9 days ago"
+-- "today", "1 day ago", "9 days ago" (kept for /aux price)
 function M.age_text(age)
 	if not age then
 		return
@@ -466,6 +466,16 @@ function M.age_text(age)
 		return '1 day ago'
 	end
 	return age .. ' days ago'
+end
+
+-- 0.9 (Tyler): compact tooltip age: "today", "1d", "3d", "9d"
+function M.short_age_text(age)
+	if not age then
+		return
+	elseif age <= 0 then
+		return 'today'
+	end
+	return age .. 'd'
 end
 
 function M.market_value(item_key)

@@ -35,48 +35,13 @@ idAutomationDB = {
 ["unlock"] = false,
 },
 ["Sidebar"] = {
-["bag_attach_modifier"] = "ctrl",
+["width_right"] = 320,
 ["width_left"] = 480,
-["mail_autosend_full"] = true,
+["remember_layout"] = true,
 ["one_part"] = false,
 ["enable"] = true,
 ["layout"] = {
 ["panels"] = {
-["talents"] = {
-["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
-["parts"] = {
-"tree",
-},
-},
-["gossip"] = {
-["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
-["parts"] = {
-"options",
-"quests",
-},
-},
-["collections"] = {
-["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
-["parts"] = {
-"mounts",
-"pets",
-"toys",
-"heirlooms",
-"appearances",
-},
-},
 ["merchant"] = {
 ["minimized"] = false,
 ["detached"] = {
@@ -89,26 +54,38 @@ idAutomationDB = {
 "repair",
 },
 },
-["spellbook"] = {
+["guild"] = {
 ["minimized"] = false,
 ["detached"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
 ["parts"] = {
-"spells",
-"passives",
-"pets",
+"guild",
 },
 },
-["inspect"] = {
+["calendar"] = {
 ["minimized"] = false,
 ["detached"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
 ["parts"] = {
-"equipment",
+"month",
+"invites",
+"holidays",
+},
+},
+["achievements"] = {
+["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["parts"] = {
+"categories",
+"recent",
+"statistics",
 },
 },
 ["character"] = {
@@ -133,6 +110,87 @@ idAutomationDB = {
 ["open"] = false,
 ["parts"] = {
 "items",
+},
+},
+["inspect"] = {
+["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["parts"] = {
+"equipment",
+},
+},
+["taxi"] = {
+["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["parts"] = {
+"map",
+"routes",
+},
+},
+["journal"] = {
+["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["parts"] = {
+"suggested",
+"dungeons",
+"raids",
+"loot",
+},
+},
+["spellbook"] = {
+["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["parts"] = {
+"spells",
+"passives",
+"pets",
+},
+},
+["collections"] = {
+["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["parts"] = {
+"mounts",
+"pets",
+"toys",
+"heirlooms",
+"appearances",
+},
+},
+["gossip"] = {
+["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["parts"] = {
+"options",
+"quests",
+},
+},
+["talents"] = {
+["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["parts"] = {
+"tree",
 },
 },
 ["trade"] = {
@@ -179,14 +237,14 @@ idAutomationDB = {
 "completed",
 },
 },
-["guild"] = {
+["pvp"] = {
 ["minimized"] = false,
 ["detached"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
 ["parts"] = {
-"guild",
+"honor",
 },
 },
 },
@@ -198,9 +256,9 @@ idAutomationDB = {
 ["bag_attach_modifier_retired"] = true,
 ["accordion"] = "side",
 ["rail_badges"] = true,
-["width_right"] = 320,
+["bag_attach_modifier"] = "ctrl",
 ["space"] = "overlay",
-["remember_layout"] = true,
+["mail_autosend_full"] = true,
 ["panel_professions"] = false,
 ["auto_fold_interaction"] = true,
 },
@@ -927,7 +985,7 @@ idAutomationDB = {
 ["Sidebar"] = {
 ["auto_fold_interaction"] = true,
 ["width_left"] = 320,
-["bag_attach_modifier"] = "ctrl",
+["width_right"] = 320,
 ["one_part"] = false,
 ["enable"] = true,
 ["layout"] = {
@@ -1086,11 +1144,11 @@ idAutomationDB = {
 ["bag_attach_modifier_retired"] = true,
 ["accordion"] = "side",
 ["rail_badges"] = true,
-["mail_autosend_full"] = true,
-["space"] = "overlay",
 ["remember_layout"] = true,
+["space"] = "overlay",
+["mail_autosend_full"] = true,
 ["panel_professions"] = false,
-["width_right"] = 320,
+["bag_attach_modifier"] = "ctrl",
 },
 ["Sound"] = {
 ["enable"] = true,
@@ -1130,12 +1188,12 @@ idAutomationDB = {
 ["max_zoom"] = true,
 },
 ["Rotation"] = {
-["scale"] = 1,
-["locked"] = false,
 ["enable"] = false,
+["combat_only"] = true,
+["scale"] = 1,
 ["mode"] = "hybrid",
 ["depth"] = 2,
-["combat_only"] = true,
+["locked"] = false,
 },
 ["ObjectiveTracker"] = {
 ["zone_only"] = false,
@@ -1235,7 +1293,7 @@ idAutomationDB = {
 ["enable"] = true,
 ["hide_loot_window"] = true,
 ["auto_loot"] = true,
-["trash_quality"] = "2",
+["trash_quality"] = "1",
 ["saved_auto_loot_cvar"] = "1",
 ["feed_unlock"] = false,
 ["force_auto_loot"] = true,
@@ -1542,9 +1600,9 @@ idAutomationDB = {
 ["include_pet"] = true,
 },
 ["Sidebar"] = {
-["mail_autosend_full"] = true,
+["bag_attach_modifier"] = "ctrl",
 ["mail_bulk_attach_modifier"] = "alt",
-["remember_layout"] = true,
+["width_right"] = 480,
 ["one_part"] = false,
 ["enable"] = true,
 ["layout"] = {
@@ -1907,9 +1965,9 @@ idAutomationDB = {
 ["bag_attach_modifier_retired"] = true,
 ["accordion"] = "side",
 ["rail_badges"] = true,
-["bag_attach_modifier"] = "ctrl",
+["mail_autosend_full"] = true,
 ["width_left"] = 480,
-["width_right"] = 480,
+["remember_layout"] = true,
 ["panel_professions"] = false,
 ["auto_fold_interaction"] = true,
 },
@@ -1956,12 +2014,12 @@ idAutomationDB = {
 ["hide_blizzard"] = true,
 },
 ["Rotation"] = {
-["enable"] = true,
-["combat_only"] = false,
 ["scale"] = 1,
+["locked"] = false,
+["enable"] = true,
 ["mode"] = "hybrid",
 ["depth"] = 2,
-["locked"] = false,
+["combat_only"] = false,
 },
 ["Camera"] = {
 ["enable"] = true,
@@ -2034,7 +2092,7 @@ idAutomationDB = {
 },
 ["debug"] = false,
 ["_meta"] = {
-["last_updated"] = 1795318916,
+["last_updated"] = 1795349690,
 ["schema_version"] = 1,
 },
 ["debug_default_retired"] = true,
@@ -8217,8 +8275,8 @@ idAutomationDB = {
 ["gossipPins"] = {
 },
 ["brokerMoney"] = {
-["Banknspank - "] = 188869,
-["Derpnschmerp - "] = 572172,
+["Banknspank - "] = 290489,
+["Derpnschmerp - "] = 710368,
 ["Banknspank - CAMWOW EU4 Realm 1 PvE"] = 32808,
 ["Derpnschmerp - CAMWOW EU4 Realm 1 PvE"] = 425587,
 },

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64">
+  <!-- An EasyFind extension icon. Draw in white on the "icon" layer, lines
+       5 units wide with round ends, inside the solid square (5 px margin);
+       the dashed square is where most of EasyFind's icons sit. Hide the
+       background and guides, export a square PNG, then:
+         python make_icon.py convert export.png icon.tga
+       MIT licensed: copy freely. -->
+  <rect id="background" width="64" height="64" fill="#1c1c22"/>
+  <g id="guides" fill="none" stroke="#4a8fe0" stroke-width="0.25">
+    <rect x="5" y="5" width="54" height="54"/>
+    <rect x="10" y="10" width="44" height="44" stroke-dasharray="1 1"/>
+    <line x1="32" y1="0" x2="32" y2="64"/>
+    <line x1="0" y1="32" x2="64" y2="32"/>
+  </g>
+  <g id="icon" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 9 H47 V56 L32 44 L17 56 Z"/>
+  </g>
+</svg>

@@ -1,0 +1,1033 @@
+--------------------------------------------------------------------------------
+--                        A L L   T H E   T H I N G S                         --
+--------------------------------------------------------------------------------
+--            Copyright 2017-2025 Dylan Fortune (Crieve-Sargeras)             --
+--------------------------------------------------------------------------------
+---@type function,function,function,function,function,function,function,function,function,function,function,function
+local rawget, next, pairs, rawset, type, tinsert, tremove, setmetatable, print,math_sqrt,math_floor,getmetatable
+	= rawget, next, pairs, rawset, type, tinsert, tremove, setmetatable, print,math.sqrt,math.floor,getmetatable
+-- This is a hidden frame that intercepts all of the event notifications that we have registered for.
+local appName, app = ...;
+if not app.ReagentsDB then
+	app.ReagentsDB = {};
+end
+if not app.ForceFillDB then
+	app.ForceFillDB = {};
+end
+
+-- Hey Blizzard, stop that. Thanks.
+SetCVar("taintLog","0");
+
+-- Generate the version identifier.
+local v = app.WOWAPI.GetAddOnMetadata(appName, "Version");
+if v:match("version") then
+	app.Version = "[Git]";
+	app.IsGit = true;
+else
+	app.Version = "" .. v;
+end
+app.DESCRIPTION_SEPARATOR = "`"
+
+-- ReloadUI slash command (for ease of use)
+SLASH_RELOADUI1 = "/reloadui";
+SLASH_RELOADUI2 = "/rl";
+SlashCmdList.RELOADUI = ReloadUI;
+
+local assetRootPath = "interface/Addons\\" .. appName .. "\\assets\\";
+app.asset = function(path)
+	return assetRootPath .. path;
+end
+app.AlwaysShowUpdate = function(data) data.visible = true; return true; end
+app.AlwaysShowUpdateWithoutReturn = function(data) data.visible = true; end
+-- Does not omit the UpdateGroup handling but will persist showing the data
+app.ForceShowUpdate = function(data) data.forceShow = true end
+app.ReturnTrue = function() return true; end
+app.ReturnFalse = function() return false; end
+
+-- Faction Specific Data
+local HORDE_FACTION_ID = Enum.FlightPathFaction.Horde;
+app.ResolveQuestData = function(t)
+	local aqd, hqd = t.aqd, t.hqd;
+	if aqd and hqd then
+		t.aqd = nil; t.hqd = nil;
+		local questData, otherQuestData;
+		if app.FactionID == HORDE_FACTION_ID then
+			questData = hqd;
+			questData.races = HORDE_ONLY;
+			otherQuestData = aqd;
+		else
+			questData = aqd;
+			questData.races = ALLIANCE_ONLY;
+			otherQuestData = hqd;
+		end
+
+		-- Move over the quest data's groups. (This is never used...)
+		if questData.g then
+			-- app.PrintDebug("move quest groups",t.hash,questData.hash)
+			local g = t.g;
+			if g then
+				local qdg = questData.g
+				local qdgCount = #qdg
+				for i=1,qdgCount do
+					tinsert(g, 1, qdg[i]);
+				end
+				questData.g = g;
+				t.g = nil;
+			end
+		end
+
+		-- Apply the common data to the faction group
+		for key,value in pairs(t) do
+			if not questData[key] then
+				questData[key] = value;
+			end
+		end
+
+		-- we know nmr based on matching faction
+		questData.nmr = false
+
+		-- Link some other data if the other data is a real Type that someone might search/tooltip directly in-game
+		if otherQuestData.__type then
+			otherQuestData.nmr = true
+			otherQuestData.g = questData.g
+			-- force faction associations
+			aqd.r = 2
+			hqd.r = 1
+			-- this is a bit weird, but we otherwise have no 'nice' way to hook our Typed-group into the
+			-- actual Main list via parent hierarchy since it is being created and just orphaned within the context
+			-- of the current faction data Type
+			otherQuestData.parent = questData
+		end
+		questData.otherQuestData = otherQuestData
+
+		return questData;
+	else
+		error("Missing AQD / HQD: " .. (aqd and 1 or 0) .. " " .. (hqd and 1 or 0));
+	end
+	return t;
+end
+
+-- External API
+-- TODO: We will use a common API eventually.
+if not _G.ATTC then
+	_G.ATTC = app;
+end
+if not _G.AllTheThings then
+	_G.AllTheThings = app;
+end
+
+-- API Functions
+local function AssignChildren(parent)
+	local g = parent.g;
+	if g then
+		-- Iterate through the groups
+		local group;
+		local gCount = #g
+		for i=1,gCount,1 do
+			-- Set the group's parent
+			group = g[i];
+			group.parent = parent;
+			AssignChildren(group);
+		end
+	end
+end
+local function AssignFieldValue(group, field, value)
+	if group then
+		group[field] = value;
+		local g = group.g
+		if g then
+			local gCount = #g
+			for i=1,gCount do
+				AssignFieldValue(g[i], field, value)
+			end
+		end
+	end
+end
+local function CloneArray(arr, clone)
+	local clone = clone or {}
+	local arrCount = #arr
+	for i=1,arrCount do
+		clone[#clone + 1] = arr[i]
+	end
+	return clone
+end
+local function CloneDictionary(data, clone)
+	if clone and getmetatable(clone) then
+		for key,value in next,data do
+			if rawget(clone, key) == nil then
+				clone[key] = value
+			end
+		end
+		return clone
+	else
+		clone = clone or {}
+		for key,value in next,data do
+			if clone[key] == nil then
+				clone[key] = value
+			end
+		end
+		return clone
+	end
+end
+app.distance = function( x1, y1, x2, y2 )
+	return math_sqrt( (x2-x1)^2 + (y2-y1)^2 )
+end
+-- from http://lua-users.org/wiki/SimpleRound
+app.round = function(num, numDecimalPlaces)
+	local mult = 10^(numDecimalPlaces or 0)
+	return math_floor(num * mult + 0.5) / mult
+end
+-- Returns the best mapID for a group based on that group's coordinate and map data. If the current mapID is included in any of those fields, it will return that. This is used exclusively within tooltips and does not need to reference the source parent.
+local function GetBestMapForGroup(group, currentMapID)
+	if group then
+		local mapID = group.mapID;
+		if mapID and mapID == currentMapID then
+			return mapID;
+		end
+
+		if group.coords and group.coords[currentMapID] then return currentMapID; end
+		local maps = group.maps;
+		if maps then
+			local mapCount = #maps
+			for i=1,mapCount do
+				mapID = maps[i];
+				if mapID == currentMapID then
+					return mapID;
+				end
+			end
+		end
+
+		return mapID or GetBestMapForGroup(group.parent, currentMapID);
+	end
+end
+-- Returns the first matching relative value from the "oldest" parent in the hierarchy where you need to go recursively deeper in the hierarchy to find the value from the top down. (meaning if you're 4 headerIDs deep and looking for "headerID", it'll return the root category's headerID rather than the immediate parent or grandparent's headerID)
+local function GetDeepestRelativeValue(group, field)
+	if group then
+		return GetDeepestRelativeValue(rawget(group, "sourceParent") or group.parent, field) or group[field];
+	end
+end
+local function GetDeepestRelativeFunc(group, func)
+	if group then
+		return GetDeepestRelativeFunc(rawget(group, "sourceParent") or group.parent, func) or func(group);
+	end
+end
+-- Returns the first matching relative group from the "oldest" parent in the hierarchy where you need to go recursively deeper in the hierarchy to find the value from the top down. (meaning if you're 4 headerIDs deep and looking for "headerID", it'll return the root category's headerID rather than the immediate parent or grandparent's headerID)
+local function GetDeepestRelativeGroup(group, field)
+	if group then
+		return GetDeepestRelativeGroup(rawget(group, "sourceParent") or group.parent, field) or (group[field] and group);
+	end
+end
+app.GetDeepestRelativeGroup = GetDeepestRelativeGroup;
+local function GetRelativeField(group, field, value)
+	if group then
+		return group[field] == value or GetRelativeField(rawget(group, "sourceParent") or group.parent, field, value);
+	end
+end
+local function GetRawRelativeField(group, field, value)
+	if group then
+		return group[field] == value or GetRawRelativeField(rawget(group, "parent"), field, value)
+	end
+end
+-- Returns the first encountered group's value tracing upwards in parent hierarchy which has a value for the provided field
+-- Prioritizes sourceParent before parent
+local function GetRelativeValue(group, field)
+	if group then
+		return group[field] or GetRelativeValue(rawget(group, "sourceParent") or group.parent, field);
+	end
+end
+-- Returns the first encountered group tracing upwards in parent hierarchy which has a value for the provided field.
+-- Specify 'followSource' to prioritize the Source Parent of a group over the direct Parent
+local function GetRelativeGroup(group, field, followSource)
+	if group then
+		return (group[field] and group) or GetRelativeGroup(followSource and rawget(group, "sourceParent") or group.parent, field);
+	end
+end
+app.GetRelativeGroup = GetRelativeGroup;
+-- Returns the first encountered group tracing upwards in direct parent hierarchy which has a value for the provided field
+local function GetRelativeRawWithField(group, field)
+	if group then
+		return group[field] or GetRelativeRawWithField(rawget(group, "parent"), field);
+	end
+end
+app.GetRelativeRawWithField = GetRelativeRawWithField;
+-- Returns the first encountered group tracing upwards in direct parent hierarchy which returns a value from when passed into the provided function
+local function GetRelativeByFunc(group, func)
+	if group then
+		return func(group) or GetRelativeByFunc(rawget(group, "sourceParent") or group.parent, func)
+	end
+end
+-- Iterates down a whole tree, filtering matching groups into the results table
+local function GetAllNestedGroupsByFunc(results, groups, func)
+	local g,o
+	for i=1,#groups do
+		o = groups[i]
+		if func(o) then results[#results + 1] = o end
+		g = o.g
+		if g then
+			for i=1,#g do
+				GetAllNestedGroupsByFunc(results, g[i], func)
+			end
+		end
+	end
+end
+app.GetRelativeByFunc = GetRelativeByFunc;
+app.AssignChildren = AssignChildren;
+app.AssignFieldValue = AssignFieldValue;
+app.CloneArray = CloneArray;
+app.CloneDictionary = CloneDictionary;
+app.GetBestMapForGroup = GetBestMapForGroup;
+app.GetDeepestRelativeFunc = GetDeepestRelativeFunc;
+app.GetDeepestRelativeValue = GetDeepestRelativeValue;
+app.GetRelativeField = GetRelativeField;
+app.GetRawRelativeField = GetRawRelativeField
+app.GetAllNestedGroupsByFunc = GetAllNestedGroupsByFunc
+app.GetRelativeValue = GetRelativeValue;
+app.IsComplete = function(o)
+	local total = o.total
+	if total and total > 0 then return total == o.progress; end
+	if o.collectible then return o.collected; end
+	if o.trackable then return o.saved; end
+	return true;
+end
+
+local GetItemIcon = app.WOWAPI.GetItemIcon;
+local GetSpellIcon = app.WOWAPI.GetSpellIcon
+app.GetIconFromProviders = function(group)
+	local qss = group.qss;
+	if qss then
+		local icon = GetItemIcon(qss[1]);
+		if icon then return icon; end
+	end
+	local providers = group.providers
+	if not providers or #providers == 0 then return end
+
+	local icon, v, t, id
+	local providerCount = #providers
+	for i=1,providerCount do
+		v = providers[i]
+		t = v[1]
+		id = v[2]
+		if id > 0 then
+			if t == "o" then
+				icon = app.ObjectIcons[id];
+			elseif t == "i" then
+				icon = GetItemIcon(id);
+			elseif t == "s" then
+				icon = GetSpellIcon(id);
+			end
+			if icon then return icon; end
+		end
+	end
+end;
+local GetItemInfo = app.WOWAPI.GetItemInfo;
+app.GetNameFromProviders = function(group)
+	local providers = group.providers
+	if not providers or #providers == 0 then return end
+
+	local pt, id, name, v
+	local providerCount = #providers
+	for i=1,providerCount do
+		v = providers[i]
+		id = v[2]
+		if id > 0 then
+			pt = v[1]
+			if pt == "o" then
+				name = app.ObjectNames[id];
+				break
+			elseif pt == "i" then
+				name = GetItemInfo(id);
+				break
+			elseif pt == "n" then
+				name = app.NPCNameFromID[id];
+				break
+			elseif pt == "s" then
+				name = app.WOWAPI.GetSpellName(id)
+				break
+			end
+		end
+	end
+	return name
+end
+-- Returns the 'name' of a provider based on a given 'providerType' and 'providerID'
+app.GetNameFromProvider = function(pt, id)
+	if not pt or not id or id < 1 then return end
+
+	if pt == "o" then
+		return app.ObjectNames[id];
+	elseif pt == "i" then
+		return GetItemInfo(id);
+	elseif pt == "n" then
+		return app.NPCNameFromID[id];
+	elseif pt == "s" then
+		return app.WOWAPI.GetSpellName(id)
+	end
+end
+
+-- Common Metatable Functions
+do
+local function AutoTableMetaFunc(t, key)
+	local value = {}
+	t[key] = value
+	return value
+end
+if app.__perf then
+	-- if tracking performance, we actually want each MetaTable reference to create a unique metatable so that performance stats are not shared
+	-- between multiple tables
+	local function AutoTableOfTablesMetaIndexFunc(t, key)
+		local value = setmetatable({}, { __index = AutoTableMetaFunc });
+		t[key] = value;
+		return value;
+	end
+	local function AutoTableOfTablesMetaNewIndexFunc(t, key, value)
+		if type(value) == "table" then
+			setmetatable(value, { __index = AutoTableMetaFunc });
+		end
+		rawset(t, key, value);
+		return value;
+	end
+	local function AutoTableOfTablesOfTablesMetaIndexFunc(t, key)
+		local value = setmetatable({}, {
+			__index = AutoTableOfTablesMetaIndexFunc,
+			__newindex = AutoTableOfTablesMetaNewIndexFunc
+		});
+		t[key] = value;
+		return value;
+	end
+	local function AutoTableOfTablesOfTablesMetaNewIndexFunc(t, key, value)
+		if type(value) == "table" then
+			setmetatable(value, {
+				__index = AutoTableOfTablesMetaIndexFunc,
+				__newindex = AutoTableOfTablesMetaNewIndexFunc
+			});
+		end
+		rawset(t, key, value);
+		return value;
+	end
+	local __MetaTable = {
+		AutoTable = function()
+			return { __index = AutoTableMetaFunc }
+		end,
+		AutoTableOfTables = function()
+			return {
+				__index = AutoTableOfTablesMetaIndexFunc,
+				__newindex = AutoTableOfTablesMetaNewIndexFunc
+			};
+		end,
+		AutoTableOfTablesOfTables = function()
+			return {
+				__index = AutoTableOfTablesOfTablesMetaIndexFunc,
+				__newindex = AutoTableOfTablesOfTablesMetaNewIndexFunc
+			};
+		end
+	}
+	app.MetaTable = setmetatable({__noperf=true}, {
+		__index = function(t,key)
+			return __MetaTable[key] and __MetaTable[key]() or nil
+		end
+	})
+else
+	local AutoTableMeta = { __index = AutoTableMetaFunc };
+	local AutoTableOfTablesMeta = {
+		__index = function(t, key)
+			local value = setmetatable({}, AutoTableMeta);
+			t[key] = value;
+			return value;
+		end,
+		__newindex = function(t, key, value)
+			if type(value) == "table" then
+				setmetatable(value, AutoTableMeta);
+			end
+			rawset(t, key, value);
+			return value;
+		end,
+	};
+	local AutoTableOfTablesOfTablesMeta = {
+		__index = function(t, key)
+			local value = setmetatable({}, AutoTableOfTablesMeta);
+			t[key] = value;
+			return value;
+		end,
+		__newindex = function(t, key, value)
+			if type(value) == "table" then
+				setmetatable(value, AutoTableOfTablesMeta);
+			end
+			rawset(t, key, value);
+			return value;
+		end,
+	};
+	app.MetaTable = {
+		AutoTable = AutoTableMeta,
+		AutoTableOfTables = AutoTableOfTablesMeta,
+		AutoTableOfTablesOfTables = AutoTableOfTablesOfTablesMeta,
+	};
+end
+end
+
+-- Cache information about the player.
+app.Gender = UnitSex("player");
+app.GUID = UnitGUID("player");
+app.Level = UnitLevel("player");
+
+-- Determine the player's faction.
+local factionGroup = UnitFactionGroup("player");
+app.Faction = factionGroup;
+if factionGroup == "Horde" then
+	app.FactionID = Enum.FlightPathFaction.Horde;
+elseif factionGroup == "Alliance" then
+	app.FactionID = Enum.FlightPathFaction.Alliance;
+else
+	-- Neutral Pandaren or... something else. Scourge? Neat.
+	app.FactionID = 0;
+end
+
+-- Determine the player's name and class information.
+local name = GetUnitName("player");
+local realm = GetRealmName();
+local className, classFile, classID = UnitClass("player");
+local classColorPrefix = "|c".. (RAID_CLASS_COLORS[classFile].colorStr or "ff1eff00");
+app.Me = classColorPrefix .. name .. "-" .. realm .. "|r";
+app.ClassName = classColorPrefix..className.."|r";
+app.ClassIndex = classID;
+app.Class = classFile;
+
+-- Determine the player's race information.
+local _, race, raceID = UnitRace("player");
+local raceIndex = app.RaceDB[race] or raceID;
+app.RaceIndex = type(raceIndex) == "table" and raceIndex[factionGroup] or raceIndex;
+app.RaceID = raceID;
+app.Race = race;
+
+-- Whether ATT should ignore saving data experienced during the play session
+app.IgnoreDataCaching = function()
+	-- This function currently returns false on Tournament realms. Very good. >_<
+	if IsOnTournamentRealm() then
+		app.print("Data will not be saved for Tournament Realms");
+		app.IgnoreDataCaching = app.ReturnTrue;
+		return true;
+	end
+	local realmName = GetRealmName();
+	if  realmName:find("Mythic Dungeons") or
+		realmName:find("Arena Champions") or
+		realmName:find("Tournament")
+		-- realmName:find("US") or
+		-- realmName:find("AU") or
+		-- realmName:find("EU") or
+		-- confirm realm tournament names elsewhere
+		-- or realmName:find("CN")
+		-- or realmName:find("TW")
+	then
+		app.print("Data will not be saved for this Realm");
+		app.IgnoreDataCaching = app.ReturnTrue;
+		return true;
+	end
+end
+-- Returns the Global reference by name, or if not existing,
+-- setting it to {} if 'init' is true, or the 'init' value itself
+app.LocalizeGlobal = function(globalName, init)
+	local val = _G[globalName]
+	if not val then
+		if init == true then
+			val = {}
+			_G[globalName] = val
+		elseif init then
+			val = init
+			_G[globalName] = val
+		end
+	end
+	-- app.PrintDebug("LocalizeGlobal",globalName,val)
+	return val;
+end
+-- Returns the Global reference by name, setting it to the 'init' value if not already existing
+-- ONLY if no value returned from app.IgnoreDataCaching(). Otherwise the captured Global reference will be
+-- forced to an alternate value to prevent being captured into the Saved Variables when unloading
+app.LocalizeGlobalIfAllowed = function(globalName, init)
+	if app.IgnoreDataCaching() then
+		globalName = globalName.."__NOSTORE";
+	end
+	return app.LocalizeGlobal(globalName, init);
+end
+
+-- Make sure required variables exist
+if not app.Presets then app.Presets = {}; end
+if not app.ObjectNames then app.ObjectNames = {}; end
+if not app.FilterConstants then app.FilterConstants = {}; end
+if not app.AccountWideQuestsDB then app.AccountWideQuestsDB = {}; end
+if not app.Presets.ALL then app.Presets.ALL = setmetatable({}, {__index = app.ReturnTrue}) end
+
+do
+-- Extend the Frame Class and give them ATT-Style Coroutines and Tooltips!
+local coroutineStack = {};
+local frame, errorID = app.frame, 0;
+local function OnCoroutineUpdate()
+	for i=#coroutineStack,1,-1 do
+		if not coroutineStack[i][3]() then
+			tremove(coroutineStack, i);
+			if #coroutineStack < 1 then
+				frame:SetScript("OnUpdate", nil);
+				--print("Coroutines Finished.");
+			end
+		--else
+			--print(coroutineStack[i][1], coroutineStack[i][2]);
+		end
+	end
+end
+local function Push(self, name, method)
+	if #coroutineStack < 1 then
+		frame:SetScript("OnUpdate", OnCoroutineUpdate);
+	end
+	local owner = self.Suffix or (self.GetName and self:GetName()) or self.text;
+	--print(owner, "Push ->", name);
+	coroutineStack[#coroutineStack + 1] = { owner, name, method }
+end
+local function StartATTCoroutine(self, name, method)
+	if method then
+		local refreshing = self.__attActiveCoroutines;
+		if not refreshing then
+			refreshing = {};
+			self.__attActiveCoroutines = refreshing;
+		end
+		if not refreshing[name] then
+			refreshing[name] = true;
+			local co = coroutine.create(method);
+			Push(self, name, function()
+				-- Check the status of the coroutine
+				if co and coroutine.status(co) ~= "dead" then
+					local ok, err = coroutine.resume(co, self);
+					if ok then return true;	-- This means more work is required.
+					else
+						-- Show the error. Returning nothing is the same as canceling the work.
+						errorID = errorID + 1;
+						local title, popupID = "Stack Trace #" .. errorID, "error-" .. errorID;
+						app:SetupReportDialog(popupID, title, {err, "", debugstack(co)});
+						print("Error:", app:Linkify(title, app.Colors.ChatLinkError, "dialog:" .. popupID));
+						error(err,2);
+					end
+				end
+				refreshing[name] = nil;
+			end);
+		end
+	end
+end
+local SetATTTooltip = function(self, text)
+	self:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+		if text then
+			GameTooltip:SetText(text, nil, nil, nil, nil, true);
+		else
+			GameTooltip:ClearLines();
+		end
+		if self.OnTooltip then
+			local tooltipInfo = {};
+			self:OnTooltip(tooltipInfo);
+			app.Modules.Tooltip.AttachTooltipInformation(GameTooltip, tooltipInfo);
+		end
+		GameTooltip:Show();
+	end);
+	self:SetScript("OnLeave", function(self)
+		if GameTooltip:GetOwner() == self then
+			GameTooltip:Hide();
+		end
+	end);
+end
+
+--- Frame prototype extended with ATT tooltip and coroutine helpers.
+---@class ATTFrameClass: Frame
+local frameClass = getmetatable(frame).__index;
+frameClass.SetATTTooltip = SetATTTooltip;
+frameClass.StartATTCoroutine = StartATTCoroutine;
+-- app-based coroutine calls are unique on app, but we only ever call them in global context
+app.StartATTCoroutine = function(self, ...)
+	app.StartCoroutine(...);
+end
+
+local button = CreateFrame("Button", nil, frame);
+--- Button prototype extended with ATT tooltip and coroutine helpers.
+---@class ATTButtonClass: Button
+local buttonClass = getmetatable(button).__index;
+buttonClass.StartATTCoroutine = StartATTCoroutine;	-- don't think this is used...
+buttonClass.SetATTTooltip = SetATTTooltip;
+button:Hide();
+
+local checkbutton = CreateFrame("CheckButton", nil, frame);
+--- CheckButton prototype extended with ATT tooltip helpers.
+---@class ATTCheckButtonClass: CheckButton
+local checkButtonClass = getmetatable(checkbutton).__index;
+checkButtonClass.SetATTTooltip = SetATTTooltip;
+checkbutton:Hide();
+
+local editbox = CreateFrame("EditBox", nil, frame);
+--- EditBox prototype extended with ATT tooltip helpers.
+---@class ATTEditBoxClass: EditBox
+local editBoxClass = getmetatable(editbox).__index;
+editBoxClass.SetATTTooltip = SetATTTooltip;
+editbox:Hide();
+
+local slider = CreateFrame("Slider", nil, frame);
+--- Slider prototype extended with ATT tooltip helpers.
+---@class ATTEditBoxClass: Slider
+local sliderClass = getmetatable(slider).__index;
+sliderClass.SetATTTooltip = SetATTTooltip;
+slider:Hide();
+end
+
+function app:ShowPopupDialog(msg, callback)
+	local popup = StaticPopupDialogs.ALL_THE_THINGS;
+	if not popup then
+		popup = {
+			button1 = YES,
+			button2 = NO,
+			timeout = 0,
+			showAlert = true,
+			whileDead = true,
+			hideOnEscape = true,
+			enterClicksFirstButton = true,
+			preferredIndex = 3,  -- avoid some UI taint, see http://www.wowace.com/announcements/how-to-avoid-some-ui-taint/
+		};
+		StaticPopupDialogs.ALL_THE_THINGS = popup;
+	end
+	popup.text = msg or "Are you sure?";
+	popup.OnAccept = callback or print;
+	StaticPopup_Hide ("ALL_THE_THINGS");
+	StaticPopup_Show ("ALL_THE_THINGS");
+end
+function app:ShowPopupDialogWithEditBox(msg, text, callback, timeout)
+	local popup = StaticPopupDialogs.ALL_THE_THINGS_EDITBOX;
+	if not popup then
+		popup = {
+			button1 = OKAY,
+			button2 = CANCEL,
+			showAlert = true,
+			whileDead = true,
+			hideOnEscape = true,
+			enterClicksFirstButton = true,
+			hasEditBox = true,
+			maxLetters = 0,
+			OnAccept = function(self)
+				if popup.callback and type(popup.callback) == "function" then
+					local editBox = self.editBox or self.EditBox or (self.GetEditBox and self:GetEditBox())
+					popup.callback(editBox:GetText());
+				end
+			end,
+			-- OnCancel = function(self)
+			-- end,
+			preferredIndex = 3,  -- avoid some UI taint, see http://www.wowace.com/announcements/how-to-avoid-some-ui-taint/
+		};
+		StaticPopupDialogs.ALL_THE_THINGS_EDITBOX = popup;
+	end
+	popup.OnShow = function(self, data)
+		local editBox = self.editBox or self.EditBox or (self.GetEditBox and self:GetEditBox())
+		editBox:SetText(text)
+		editBox:SetJustifyH("CENTER")
+		editBox:SetWidth(240)
+		if editBox.HighlightText then
+			editBox:HighlightText()
+		end
+		editBox:SetFocus()
+
+		editBox:SetScript("OnEnterPressed", function(self)
+			local parent = self:GetOwningDialog()
+			local acceptButton = parent and parent.GetButton1 and parent:GetButton1()
+			if acceptButton then
+				acceptButton:Click()
+			end
+		end)
+
+		editBox:SetScript("OnEscapePressed", function(self)
+			local parent = self:GetOwningDialog()
+			local cancelButton = parent and parent.GetButton2 and parent:GetButton2()
+			if cancelButton then
+				cancelButton:Click()
+			else
+				StaticPopup_Hide("ALL_THE_THINGS_EDITBOX")
+			end
+		end)
+	end;
+	popup.text = msg or "";
+	popup.callback = callback;
+	popup.timeout = timeout;
+	StaticPopup_Hide ("ALL_THE_THINGS_EDITBOX");
+	StaticPopup_Show ("ALL_THE_THINGS_EDITBOX");
+end
+function app:ShowPopupDialogWithMultiLineEditBox(text, onclick, label)
+	local f = ATTEditBox;
+	if not f then
+		--- Movable, resizable popup dialog for displaying or editing multiline text.
+		---@class ATTEditBox: BackdropTemplate, Frame
+		f = CreateFrame("Frame", "ATTEditBox", UIParent, "DialogBoxFrame")
+		f:SetPoint("CENTER")
+		f:SetSize(600, 500)
+		f:SetBackdrop({
+			bgFile = 137056,
+			edgeFile = 137057,
+			tile = true, tileSize = 16, edgeSize = 16,
+			insets = { left = 4, right = 4, top = 4, bottom = 4 }
+		})
+		f:SetBackdropColor(0, 0, 0, 1);
+		f:SetMovable(true)
+		f:SetClampedToScreen(true)
+		f:SetScript("OnMouseDown", function(self, button)
+			if button == "LeftButton" then
+				self:StartMoving()
+			end
+		end)
+		f:SetScript("OnMouseUp", f.StopMovingOrSizing)
+
+		-- ScrollFrame
+		--- Scrollable viewport for the popup dialog's multiline text input.
+		---@class ATTEditBoxScrollFrame: ScrollFrame
+		local sf = CreateFrame("ScrollFrame", "ATTEditBoxScrollFrame", f, "UIPanelScrollFrameTemplate")
+		---@diagnostic disable-next-line: undefined-field
+		sf:SetPoint("BOTTOM", ATTEditBoxButton, "TOP", 0, 4)
+		sf:SetPoint("LEFT", 16, 0)
+		sf:SetPoint("RIGHT", -32, 0)
+		f.ScrollFrame = sf;
+
+		-- Label (conditionally create)
+		if label then
+			local l = f:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
+			l:SetPoint("TOP", f, "TOP", 0, -3);
+			l:SetJustifyH("CENTER");
+			l:SetText(label or "");
+			l:SetWordWrap(true)
+			l:SetPoint("LEFT", f, "LEFT", 10, -10)
+			l:SetPoint("RIGHT", f, "RIGHT", -10, -10)
+			f.Label = l;
+			sf:SetPoint("TOP", l, "BOTTOM", 0, -5)
+		else
+			sf:SetPoint("TOP", 0, -16);
+		end
+
+		-- EditBox
+		--- Multiline text input whose contents are passed to the popup's submit callback.
+		---@class ATTEditBoxEditBox: EditBox
+		local eb = CreateFrame("EditBox", "ATTEditBoxEditBox", sf)
+		eb:SetSize(sf:GetSize())
+		eb:SetMultiLine(true)
+		eb:SetAutoFocus(false) -- dont automatically focus
+		eb:SetFontObject("ChatFontNormal")
+		eb:SetScript("OnEscapePressed", function() f:Hide() end)
+		---@diagnostic disable-next-line: undefined-field
+		ATTEditBoxButton:SetScript("OnClick", function (self, button, down)
+			if self:GetParent().OnClick then
+				self:GetParent().OnClick(eb:GetText());
+			end
+			self:GetParent():Hide();
+		end);
+		sf:SetScrollChild(eb)
+		f.EditBox = eb;
+
+		-- Resizable
+		f:SetResizable(true)
+		if f.SetResizeBounds then
+			f:SetResizeBounds(150, 100, 600, 600);
+		else
+			---@diagnostic disable-next-line: undefined-field
+			f:SetMinResize(150, 100);
+		end
+
+		local rb = CreateFrame("Button", "ATTEditBoxResizeButton", ATTEditBox)
+		rb:SetPoint("BOTTOMRIGHT", -6, 7)
+		rb:SetSize(16, 16)
+
+		rb:SetNormalTexture(386864)
+		rb:SetHighlightTexture(386863)
+		rb:SetPushedTexture(386862)
+
+		rb:SetScript("OnMouseDown", function(self, button)
+			if button == "LeftButton" then
+				f:StartSizing("BOTTOMRIGHT")
+				self:GetHighlightTexture():Hide() -- more noticeable
+			end
+		end)
+		rb:SetScript("OnMouseUp", function(self, button)
+			f:StopMovingOrSizing()
+			self:GetHighlightTexture():Show()
+			eb:SetWidth(sf:GetWidth())
+		end)
+		f:Show()
+	end
+	f.OnClick = onclick;
+	f:Show()
+	if text then
+		if label then
+			local l = f.Label;
+			if l then l:SetText(label); end
+		end
+		f.EditBox:SetText(text)
+		f.EditBox:HighlightText();
+		f.EditBox:SetFocus();
+	end
+end
+function app:ShowPopupDialogToReport(reportReason, text)
+	app:ShowPopupDialogWithMultiLineEditBox(text, nil, (reportReason or "Missing Data").."\n"..app.L.PLEASE_REPORT_MESSAGE..app.L.REPORT_TIP);
+end
+
+-- Define Modules
+app.Modules = {};
+
+-- Global Variables
+AllTheThingsSavedVariables = {};
+
+-- Data style exporters and utility for copying window data via various styles.
+local DataStyleExporters = {};
+app.DataStyleExporters = DataStyleExporters
+
+-- Register a new exporter by name.  If the style already exists or the
+-- provided function is invalid the call is ignored.
+--
+-- 'funcs' is a table of callbacks used by ExportStylizedData:
+--
+-- funcs.main(data, depth)
+--   Required. Returns a string representation for the current data node.
+--
+-- funcs.beforeData(data, depth)
+--   Optional. If returns a string, it is inserted before current data.
+--
+-- funcs.afterData(data, depth)
+--   Optional. If returns a string, it is inserted after current data.
+--
+-- funcs.getSub(data)
+--   Optional. If returns a table, this table is considered the 'Sub' data for the current data (this defaults to data.g)
+--
+-- funcs.beforeSub(data, depth)
+--   Optional. If returns a string, it is inserted before descendants are processed.
+--
+-- funcs.afterSub(data, depth)
+--   Optional. If returns a string, it is inserted after descendants are processed.
+--
+-- funcs.depthShift(data)
+--   Optional. Controls depth increment for child recursion. Defaults to 1.
+function app:RegisterDataStyleExporter(style, funcs)
+	if type(style) ~= "string" or type(funcs) ~= "table" or type(funcs.main) ~= "function" then
+		app.print("Invalid definition for RegisterDataStyleExporter:", style)
+		return
+	end
+	if DataStyleExporters[style] then
+		app.print("Export Style already defined!",style)
+	end
+	-- Validate optional function keys
+	for key, func in pairs(funcs) do
+		if key ~= "main" and type(func) ~= "function" then
+			app.print("Invalid definition for RegisterDataStyleExporter:", style, "- invalid key:", key)
+			return
+		end
+	end
+	DataStyleExporters[style] = funcs
+end
+
+-- Recursive helper which walks data and its .g subgroups applying the
+-- provided style function and collecting results into the strings array.
+local function ExportDataRecursively(data, styleFuncs, strings, depth)
+	if not data then return end
+	depth = depth or 0
+	local g = styleFuncs.getSub and styleFuncs.getSub(data) or data.g
+	if not g or type(g) ~= "table" then
+		g = nil
+	end
+	local str
+	-- run the style exporter and add its result if present
+	if styleFuncs.beforeData then
+		str = styleFuncs.beforeData(data, depth)
+		if str then
+			strings[#strings + 1] = str
+		end
+	end
+	str = styleFuncs.main(data, depth)
+	if str then
+		strings[#strings + 1] = str;
+	end
+	if g then
+		if styleFuncs.beforeSub then
+			str = styleFuncs.beforeSub(data, depth)
+			if str then
+				strings[#strings + 1] = str
+			end
+		end
+		local depthShift = styleFuncs.depthShift and styleFuncs.depthShift(data) or 1
+		local gCount = #g
+		for i=1,gCount do
+			ExportDataRecursively(g[i], styleFuncs, strings, depth + depthShift)
+		end
+		if styleFuncs.afterSub then
+			str = styleFuncs.afterSub(data, depth)
+			if str then
+				strings[#strings + 1] = str;
+			end
+		end
+	end
+	if styleFuncs.afterData then
+		str = styleFuncs.afterData(data, depth)
+		if str then
+			strings[#strings + 1] = str
+		end
+	end
+end
+
+-- Accepts a window (string identifier or table) and an export style key.
+-- The style key is looked up in DataStyleExporters; if missing an error message is
+-- shown.  Data from the window and all nested groups is passed through the
+-- exporter and the resulting strings concatenated and displayed in a multi-
+-- line popup for easy copying.
+function app:ExportStylizedData(window, style)
+	-- style must exist and window must have data
+	local styleFuncs = DataStyleExporters[style]
+	if not styleFuncs then
+		app.print("Export Style not defined!",style)
+		return
+	end
+	-- resolve window string to actual window table if needed
+	if type(window) == "string" then
+		window = app:GetWindow(window)
+	end
+	if not window or not window.data then
+		app.print("Export Window not defined or has no data!")
+		return
+	end
+	local DataStyleStrings = {}
+	if styleFuncs.beforeExport then
+		local str = styleFuncs.beforeExport(window.data)
+		if str then
+			DataStyleStrings[#DataStyleStrings + 1] = str
+		end
+	end
+	ExportDataRecursively(window.data, styleFuncs, DataStyleStrings)
+	if styleFuncs.afterExport then
+		local str = styleFuncs.afterExport(window.data)
+		if str then
+			DataStyleStrings[#DataStyleStrings + 1] = str
+		end
+	end
+	-- join each style string with a newline for readability
+	local out = app.TableConcat(DataStyleStrings, nil, nil, "\n")
+	app:ShowPopupDialogWithMultiLineEditBox(out)
+end
+
+function app:RenderStylizedRawData(data, style)
+	-- style must exist and window must have data
+	local styleFuncs = DataStyleExporters[style]
+	if not styleFuncs then
+		app.print("Export Style not defined!",style)
+		return
+	end
+	if not data then
+		app.print("data not defined!")
+		return
+	end
+	local DataStyleStrings = {}
+	if styleFuncs.beforeExport then
+		local str = styleFuncs.beforeExport(data)
+		if str then
+			DataStyleStrings[#DataStyleStrings + 1] = str
+		end
+	end
+	ExportDataRecursively(data, styleFuncs, DataStyleStrings)
+	if styleFuncs.afterExport then
+		local str = styleFuncs.afterExport(data)
+		if str then
+			DataStyleStrings[#DataStyleStrings + 1] = str
+		end
+	end
+	-- join each style string with a newline for readability
+	local out = app.TableConcat(DataStyleStrings, nil, nil, "\n")
+	return out
+end

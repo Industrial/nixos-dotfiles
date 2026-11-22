@@ -1,0 +1,249 @@
+-- App locals
+local _, app = ...;
+local L = app.L;
+local contains = app.contains
+
+-- Global locals
+local ipairs, next, pairs, select, tonumber, tinsert
+	= ipairs, next, pairs, select, tonumber, tinsert;
+local GetAchievementCriteriaInfo, GetAchievementNumCriteria, GetAchievementInfo, GetCategoryInfo, GetCategoryList, GetGuildCategoryList, GetCategoryNumAchievements
+	= GetAchievementCriteriaInfo, GetAchievementNumCriteria, GetAchievementInfo, GetCategoryInfo, GetCategoryList, GetGuildCategoryList, GetCategoryNumAchievements;
+
+-- App locals
+local GetRelativeValue = app.GetRelativeValue;
+
+-- Module locals
+local AchievementPriority = setmetatable({
+	[92] = -100,		-- General / Character [Retail]
+	[96] = -99,			-- Quests
+	[97] = -98,			-- Exploration
+	[15522] = -97,		-- Delves
+	[95] = -96,			-- Player vs. Player
+	[168] = -95,		-- Dungeons & Raids
+	[169] = -94,		-- Professions
+	[201] = -93,		-- Reputations
+	[15165] = -92,		-- Scenarios
+	[155] = -91,		-- World Events
+	[15117] = -90,		-- Pet Battles
+	[15246] = -89,		-- Collections
+	[15301] = -88,		-- Expansion Features
+	[81] = 100000,		-- Feats of Strength
+	[15234] = 100001,	-- Legacy
+	[15076] = 100002,	-- Guild
+}, { __index = function(t, id) return id; end });
+local function cacheAchievementData(self, categories, g)
+	if g then
+		for i,o in ipairs(g) do
+			if o.achievementCategoryID then
+				categories[o.achievementCategoryID] = o;
+				if not o.g then
+					o.g = {};
+				else
+					cacheAchievementData(self, categories, o.g);
+				end
+			elseif o.achievementID then
+				self.achievements[o.achievementID] = o;
+			end
+		end
+	end
+end
+local function getAchievementCategory(categories, achievementCategoryID)
+	local c = categories[achievementCategoryID];
+	if not c then
+		c = app.CreateAchievementCategory(achievementCategoryID);
+		categories[achievementCategoryID] = c;
+		c.g = {};
+
+		local p = getAchievementCategory(categories, c.parentCategoryID);
+		if not p.g then p.g = {}; end
+		p.g[#p.g+1] = c
+		c.parent = p;
+	end
+	return c;
+end
+local function achievementSort(a, b)
+	if a.achievementCategoryID then
+		if b.achievementCategoryID then
+			return AchievementPriority[a.achievementCategoryID] < AchievementPriority[b.achievementCategoryID];
+		end
+		return true;
+	elseif b.achievementCategoryID then
+		return false;
+	end
+	if a.rank then
+		if b.rank then
+			if a.type then
+				if b.type then
+					if a.type == b.type then
+						return a.rank < b.rank;
+					else
+						return a.type < b.type;
+					end
+				end
+				return true;
+			elseif b.type then
+				return false;
+			end
+			return a.rank < b.rank;
+		end
+		return true;
+	elseif b.rank then
+		return false;
+	end
+	return app.SortDefaults.name(a, b);
+end;
+local function UpdateMissingAchievements(self)
+	if GetCategoryList and GetCategoryNumAchievements then
+		for _,categoryID in ipairs(GetCategoryList()) do
+			local numAchievements = GetCategoryNumAchievements(categoryID);
+			if numAchievements and numAchievements > 0 then
+				for i=1,numAchievements,1 do
+					local achievementID, _, _, _, _, _, _, _, _, _, _, isGuildAch, _, _, isStatistic = GetAchievementInfo(categoryID, i);
+					if achievementID and not isStatistic and not self.data.achievements[achievementID] then
+						local achievement = (isGuildAch and app.CreateGuildAchievement or app.CreateAchievement)(achievementID);
+						self.data.achievements[i] = achievement;
+						achievement.parent = getAchievementCategory(self.data.categories, -1);-- achievement.parentCategoryID);
+						achievement.description = L.ACHIEVEMENTS_NO_SOURCE;
+						if not achievement.u or achievement.u ~= 1 then
+							achievement.parent.g[#achievement.parent.g+1] = achievement
+						end
+						local numCriteria = GetAchievementNumCriteria(achievementID);
+						if numCriteria > 0 then
+							local g = {};
+							for j=1,numCriteria,1 do
+								local criteriaUID = select(10, GetAchievementCriteriaInfo(achievementID, j));
+								local criteriaObject = app.CreateAchievementCriteria(criteriaUID);
+								criteriaObject.parent = achievement;
+								g[#g+1] = criteriaObject
+							end
+							achievement.g = g;
+						end
+						app.CacheFields(achievement, true);
+
+						-- Put a copy in Unsorted.
+						app:GetWindow("Unsorted"):AddUnsortedAchievement(achievement);
+					end
+				end
+			end
+		end
+	end
+	app.Sort(self.data.g, achievementSort, true);
+	self:Update(true);
+end
+
+-- Implementation
+app:CreateWindow("Achievements", {
+	AllowCompleteSound = true,
+	IsDynamicCategory = true,
+	Commands = { "attachievements", "attach" },
+	OnInit = function(self, handlers)
+		self:SetData(app.CreateCustomHeader(app.HeaderConstants.ACHIEVEMENTS, {
+			description = L.ACHIEVEMENTS_TOOLTIP,
+			IgnoreBuildRequests = true,
+			visible = true,
+			expanded = true,
+			back = 1,
+			g = {},
+			achievements = {},
+			categories = {},
+			CheckForMissingButton = app.CreateRawText(L.ACHIEVEMENTS_CHECK_MISSING, {
+				description = L.ACHIEVEMENTS_MISSING_DESC,
+				icon = 132089,
+				OnClick = function(row, button)
+					-- Only run this once per session.
+					local uma = UpdateMissingAchievements;
+					if uma then
+						UpdateMissingAchievements = nil;
+						uma(self);
+					end
+					local window = app.GetRelativeValue(row.ref, "window");
+					if window ~= self then window:Update(true); end
+					return true;
+				end,
+				OnUpdate = function(data)
+					data.visible = not not UpdateMissingAchievements;
+					return true;
+				end,
+			}),
+			OnUpdate = function(data)
+				local categories = data.categories;
+				categories[-1] = data;
+				if GetCategoryList then
+					for _,categoryID in ipairs(GetCategoryList()) do
+						getAchievementCategory(categories, categoryID);
+					end
+				end
+				if GetGuildCategoryList then
+					for _,categoryID in ipairs(GetGuildCategoryList()) do
+						getAchievementCategory(categories, categoryID);
+					end
+				end
+				cacheAchievementData(data, categories, data.g);
+				for i,matches in next,app.GetFieldContainer("achievementID") do
+					if not data.achievements[i] then
+						local mostAccessibleSource;
+						for j,o in ipairs(matches) do
+							if o.key == "achievementID" or o.key == "guildAchievementID" then
+								if GetRelativeValue(o, "_hqt") or GetRelativeValue(o, "u") == 1 or o.isStatistic then
+									data.achievements[i] = true;
+								else
+									mostAccessibleSource = o;
+								end
+								break;
+							end
+						end
+						if mostAccessibleSource then
+							local achievement = (mostAccessibleSource.isGuild and app.CreateGuildAchievement or app.CreateAchievement)(tonumber(i));
+							for key,value in pairs(mostAccessibleSource) do
+								achievement[key] = value;
+							end
+							if mostAccessibleSource.parent then
+								achievement.sourceParent = mostAccessibleSource.parent;
+								if not mostAccessibleSource.sourceQuests then
+									local questID = GetRelativeValue(mostAccessibleSource, "questID");
+									if questID then
+										if not achievement.sourceQuests then
+											achievement.sourceQuests = {};
+										end
+										if not contains(achievement.sourceQuests, questID) then
+											achievement.sourceQuests[#achievement.sourceQuests+1] = questID
+										end
+									else
+										local sourceQuests = GetRelativeValue(mostAccessibleSource, "sourceQuests");
+										if sourceQuests then
+											if not achievement.sourceQuests then
+												achievement.sourceQuests = {};
+												for k,questID in ipairs(sourceQuests) do
+													achievement.sourceQuests[#achievement.sourceQuests+1] = questID
+												end
+											else
+												for k,questID in ipairs(sourceQuests) do
+													if not contains(achievement.sourceQuests, questID) then
+														achievement.sourceQuests[#achievement.sourceQuests+1] = questID
+													end
+												end
+											end
+										end
+									end
+								end
+							end
+							achievement.progress = nil;
+							achievement.total = nil;
+							achievement.g = nil;
+							achievement.parent = getAchievementCategory(categories, achievement.parentCategoryID);
+							achievement.parent.g[#achievement.parent.g+1] = achievement
+							data.achievements[i] = achievement;
+						end
+					end
+				end
+				app.Sort(data.g, achievementSort, true);
+				tinsert(data.g, 1, data.CheckForMissingButton);
+				data.CheckForMissingButton.parent = data;
+				data.OnUpdate = nil;
+			end
+		}));
+		if not (GetCategoryInfo and GetCategoryInfo(92) ~= "") then
+			self.data.description = L.ACHIEVEMENTS_WRATH_SECTION_DESC;
+		end
+	end,
+});

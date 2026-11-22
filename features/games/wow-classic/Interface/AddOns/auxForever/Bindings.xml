@@ -1,0 +1,14 @@
+<Bindings>
+	<Binding name="AUXFOREVER_BUY" category="BINDING_HEADER_AUXFOREVER">
+		AuxForever_RunBinding("buy")
+	</Binding>
+	<Binding name="AUXFOREVER_CONFIRM" category="BINDING_HEADER_AUXFOREVER">
+		AuxForever_RunBinding("confirm")
+	</Binding>
+	<Binding name="AUXFOREVER_CANCEL" category="BINDING_HEADER_AUXFOREVER">
+		AuxForever_RunBinding("cancel")
+	</Binding>
+	<Binding name="AUXFOREVER_BUY_OR_CONFIRM" category="BINDING_HEADER_AUXFOREVER">
+		AuxForever_RunBinding("buy_or_confirm")
+	</Binding>
+</Bindings>

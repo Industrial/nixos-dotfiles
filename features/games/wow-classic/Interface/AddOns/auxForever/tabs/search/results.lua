@@ -345,6 +345,7 @@ function start_live_scan(query, search)
     local alerted
     scan.start {
         type = 'list',
+        priority = scan.PRIORITY_WATCH,
         sort_type = search.sort_type,
         queries = { query },
         fast = search.fast,
@@ -1024,6 +1025,7 @@ do
             local fresh = {}
             scan.start{
                 type = 'list',
+                priority = scan.PRIORITY_BACKGROUND,
                 quiet = true,
                 no_view = true, -- one version of an item is not a look at the whole item
                 queries = {{item_keys = {key}, validator = validator}},
@@ -1121,14 +1123,17 @@ do
         search.table:SetDatabase()
         local key, old_id = record.item_search_key, record.auction_id
         aux.coro_thread(function()
-            local updated
+            local updated, closed
             local listener_id = aux.event_listener('ITEM_SEARCH_RESULTS_UPDATED', function(item_key)
                 if item_key and item_key.itemID == key.itemID then
                     updated = true
                 end
             end)
+            local close_id = aux.event_listener('AUCTION_HOUSE_CLOSED', function()
+                closed = true
+            end)
             local t0 = GetTime()
-            while not updated and GetTime() - t0 < 1.5 do
+            while not updated and not closed and GetTime() - t0 < 1.5 do
                 -- the update may already have arrived before this started listening
                 local bucket = find_bucket(record)
                 if bucket and bucket.auctionID ~= old_id then
@@ -1137,27 +1142,41 @@ do
                 end
                 aux.coro_wait()
             end
-            if not updated then
+            local timed_out
+            if not updated and not closed then
                 -- the client no longer holds this item's results; ask for them again, once any
                 -- search running now has ended (it used to be stopped, so a search started right
                 -- after buying was cut off; found with the slow test auction house). The row stays
                 -- busy meanwhile, so it cannot be bought at the old auction ID.
                 t0 = GetTime()
-                while scan.is_scanning() and GetTime() - t0 < 30 do
+                while not closed and scan.is_scanning() and GetTime() - t0 < 30 do
                     aux.coro_wait()
                 end
-                while not C_AuctionHouse.IsThrottledMessageSystemReady() do
-                    aux.coro_wait()
-                end
-                C_AuctionHouse.SendSearchQuery(key, {{sortOrder = Enum.AuctionHouseSortOrder.Price, reverseSort = false}}, true)
                 t0 = GetTime()
-                while not updated and GetTime() - t0 < 5 do
+                while not closed and not C_AuctionHouse.IsThrottledMessageSystemReady() do
+                    if GetTime() - t0 >= scan.THROTTLE_TIMEOUT then
+                        timed_out = true
+                        aux.print(scan.THROTTLE_TEXT)
+                        break
+                    end
                     aux.coro_wait()
+                end
+                if not closed and not timed_out then
+                    C_AuctionHouse.SendSearchQuery(key, {{sortOrder = Enum.AuctionHouseSortOrder.Price, reverseSort = false}}, true)
+                    t0 = GetTime()
+                    while not updated and not closed and GetTime() - t0 < 5 do
+                        aux.coro_wait()
+                    end
                 end
             end
             aux.kill_listener(listener_id)
-            local bucket = find_bucket(record)
+            aux.kill_listener(close_id)
             record.syncing = nil
+            if closed or timed_out then
+                search.table:SetDatabase()
+                return
+            end
+            local bucket = find_bucket(record)
             if bucket and (bucket.auctionID ~= old_id or updated) then
                 record.auction_id = bucket.auctionID
                 record.auction_count = max(1, bucket.quantity or 1)
@@ -1206,7 +1225,11 @@ do
             on_auction = function(record)
                 tinsert(fresh, record)
             end,
-            on_complete = function()
+            on_complete = function(result)
+                -- 0.9: do not wipe existing commodity rows if the refresh timed out or was throttled
+                if not scan.saw_everything(result) then
+                    return
+                end
                 for i = #search.records, 1, -1 do
                     if search.records[i].commodity and search.records[i].item_id == item_id then
                         tremove(search.records, i)
@@ -1342,7 +1365,15 @@ do
             on_auction = function(auction_record)
                 tinsert(loaded, auction_record)
             end,
-            on_complete = function()
+            on_complete = function(result)
+                -- 0.9: a timed-out or throttled read must not delete the fast row and say it sold
+                if not scan.saw_everything(result) and #loaded == 0 then
+                    search.open[record.item_key] = nil
+                    if current_search() == search then
+                        buy_bar.show_note(record.name, 'The auction house did not answer in time. Click the row to try again.', aux.color.red)
+                    end
+                    return
+                end
                 replace_item(search, record, loaded)
             end,
         }

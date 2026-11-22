@@ -1,0 +1,16 @@
+## Interface: 11509, 16001, 20506
+## Title: EasyFind [Spoken]
+## Notes: Hear Spoken's lines from EasyFind's search results: right-click a quest, place, dungeon, boss or letter. Requires Spoken.
+## Author: justawower
+## Version: 1.0.0
+## X-Curse-Project-ID: 1778429
+## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
+## Group: EasyFind
+## Category: UI
+## Dependencies: EasyFind
+## OptionalDeps: Spoken, Spoken_Quests, Spoken_Places, Spoken_Readables, Spoken_Bosses, Spoken_NPCs
+## DefaultState: enabled
+
+Locales\enUS.lua
+Spoken.lua
+MapButton.lua

@@ -17,6 +17,15 @@ M.REPLICATE_COOLDOWN = 15 * 60
 -- since Forever launched a player saw the list take more than 5 minutes to arrive, so the scan gave
 -- up before the server answered ("i cant scan today", deep_structure).
 M.REPLICATE_WAIT = 10 * 60
+-- 0.9: Forever's AH throttle can freeze (IsThrottledMessageSystemReady stuck false, Seen 2026-11-20).
+-- Give up after THROTTLE_TIMEOUT seconds with a clear message instead of hanging forever.
+M.THROTTLE_TIMEOUT = 10
+M.THROTTLE_TEXT = 'The auction house stopped accepting requests (its throttle is stuck). Try again in a moment, or /reload if Blizzard\'s auction house is stuck too.'
+
+-- 0.9: scan priority so background/watch scans never kill an explicit user action or Full scan.
+M.PRIORITY_BACKGROUND = 1 -- auto Full scan, background row refill
+M.PRIORITY_WATCH = 2      -- Sniper rounds, Live auto-refreshes
+M.PRIORITY_USER = 3       -- explicit Search, Post, Auctions, Buy refresh (default)
 
 local TIMEOUT = 20
 
@@ -126,6 +135,10 @@ function M.is_scanning()
     return state ~= nil
 end
 
+function M.is_throttled()
+    return state ~= nil and state.result ~= nil and state.result.throttled == true
+end
+
 -- 0.8.2 build 3 (review H-008, finding 2): code that wants every item's prices from a Full scan (the
 -- Sniper) registers f(at, key, flat): at is the same for every item of one scan, flat the unit prices
 -- and units as history.market_price takes them
@@ -166,7 +179,14 @@ function M.bidder_auctions()
 end
 
 function M.start(params)
+    local priority = params.priority or PRIORITY_USER
     if state then
+        -- 0.9: a lower-priority scan (background refill, Sniper/Live round) never kills a running
+        -- higher-priority scan (explicit user search, Post, Buy refresh, or Full scan).
+        if priority < (state.priority or PRIORITY_USER) then
+            do (params.on_abort or pass)() end
+            return false
+        end
         -- 0.8.2 (FB-037): a Full scan stopped before it finished leaves its prices incomplete, and the
         -- game still counts it; say so instead of losing it without a word
         if state.params.get_all and not params.get_all then
@@ -180,6 +200,7 @@ function M.start(params)
         state = {
             id = aux.coro_id(),
             params = params,
+            priority = priority,
             listener_ids = {},
             views = {}, -- price key -> unit prices and counts seen so far in this scan
         }
@@ -200,6 +221,7 @@ function M.start(params)
             do (on_abort or pass)() end
         end
     end)
+    return true
 end
 
 function M.abort()
@@ -220,6 +242,7 @@ end
 --   no_list       an item list was asked for and the auction house did not answer
 --   partial_list  an item list arrived only in part (a request for more of it failed)
 --   unread        how many single items could not be read (nil: none)
+--   throttled     the auction house throttle froze before a request could be sent
 --   full          the Full scan's timings (replicate)
 function complete()
     local on_complete = state.params.on_complete
@@ -228,11 +251,15 @@ function complete()
     state = nil
     timing_finish()
     if not quiet then
-        if result.partial_list then
-            aux.print(PARTIAL_LIST_TEXT)
-        end
-        if unread then
-            aux.print(unread_text(unread))
+        if result.throttled then
+            aux.print(THROTTLE_TEXT)
+        else
+            if result.partial_list then
+                aux.print(PARTIAL_LIST_TEXT)
+            end
+            if unread then
+                aux.print(unread_text(unread))
+            end
         end
     end
     do (on_complete or pass)(result) end
@@ -242,7 +269,7 @@ M.PARTIAL_LIST_TEXT = 'The auction house sent only part of the item list (it was
 
 -- whether a finished scan saw everything it asked for (result: what on_complete is handed)
 function M.saw_everything(result)
-    return not (result and (result.no_list or result.partial_list or result.unread))
+    return not (result and (result.no_list or result.partial_list or result.unread or result.throttled))
 end
 
 -- an item list that did not arrive, or only in part, is noted on the scan's result
@@ -251,7 +278,7 @@ local function note_list(results, whole)
     if not results then
         state.result.no_list = true
         -- quiet scans (Sniper rounds, the Auctions tab's check) say nothing in chat
-        if not state.params.quiet then
+        if not state.params.quiet and not state.result.throttled then
             aux.print('the auction house did not respond to the search')
         end
     elseif not whole then
@@ -323,7 +350,12 @@ function request(send, events, match, cached)
     for _ = 1, 3 do
         requests_sent = requests_sent + 1
         local t_throttle = GetTime()
-        wait_throttle()
+        if not wait_throttle() then
+            timing_add('throttle', GetTime() - t_throttle)
+            state.result = state.result or {}
+            state.result.throttled = true
+            return false
+        end
         timing_add('throttle', GetTime() - t_throttle)
         local t_answer = GetTime()
         local dropped
@@ -372,9 +404,14 @@ function request(send, events, match, cached)
 end
 
 function wait_throttle()
+    local t0 = GetTime()
     while not C_AuctionHouse.IsThrottledMessageSystemReady() do
+        if GetTime() - t0 >= THROTTLE_TIMEOUT then
+            return false
+        end
         aux.coro_wait()
     end
+    return true
 end
 
 function wait_item(item_id)
@@ -685,6 +722,9 @@ function scan_item_keys(item_keys)
         end
         do (state.params.on_page_scanned or pass)() end
         check_aborted(scan_state)
+        if state.result and state.result.throttled then
+            break
+        end
     end
 end
 
@@ -708,16 +748,40 @@ function scan_item_list(results)
         -- it was redrawn only every 100 items of the list, and a full read takes a request
         do (state.params.on_page_scanned or pass)() end
     end
+    -- 0.9 build 4 (FB-064, RushJet1): random-suffix greens with Equip: stats ("of the Channeler",
+    -- "of Healing", "of Shadow Protection") can come back from SetItemKey with 4+ lines (name, slot,
+    -- required level) and no stat line. Only fall back to read_full when a suffixed item has no + or
+    -- Equip: stat line (or shows <Random enchantment>) and has not already matched the validator.
+    local function needs_suffix_tooltip(record)
+        if (record.suffix_id or 0) == 0 and not has_ending(record) then
+            return false
+        end
+        local lines = record.tooltip
+        if not lines or #lines <= 1 then
+            return true
+        end
+        local equip = ITEM_SPELL_TRIGGER_ONEQUIP or 'Equip:'
+        local random_text = _G.ITEM_RANDOM_ENCHANT
+        local has_stat = false
+        for i = 2, #lines do
+            local line = lines[i]
+            if (random_text and strfind(line, random_text, 1, true)) or strfind(line, 'Random enchantment', 1, true) then
+                return true
+            end
+            if strfind(line, '+', 1, true) or strfind(line, equip, 1, true) then
+                has_stat = true
+            end
+        end
+        return not has_stat
+    end
     local function add(result)
         local record = info.browse_record(result)
         if not record then
             return false
         end
-        -- 0.8.2 (FB-025): tooltip text is checked on the fast row's own tooltip. Gear with an
-        -- ending gets it from its item key (build 6, record_mt in util/info.lua); only when the game
-        -- gives no more than the name there are its auctions read (build 1 read all of them: a
-        -- request each, so chest armor, mostly with endings, stayed slow)
-        if tooltip_text and has_ending(record) and #record.tooltip <= 1 then
+        -- 0.8.2 (FB-025) and 0.9 build 4 (FB-064): check tooltip text on the fast row first; only
+        -- read individual auctions for suffixed gear whose fast tooltip is missing suffix stats.
+        if tooltip_text and needs_suffix_tooltip(record) and not (validator and validator(record)) then
             read_full(result.itemKey)
             return true
         end
@@ -734,6 +798,9 @@ function scan_item_list(results)
                 tinsert(pending, result)
             end
             check_aborted(scan_state)
+            if state.result and state.result.throttled then
+                break
+            end
         end
         if i % 100 == 0 then
             do (state.params.on_page_scanned or pass)() end
@@ -953,7 +1020,7 @@ function scan()
             if not results then
                 -- said by note_list
             elseif state.params.on_item_list then
-                state.params.on_item_list(results)
+                state.params.on_item_list(results, get_query())
             else
                 scan_item_list(results)
             end
@@ -980,6 +1047,9 @@ function scan()
             end
         end
         check_aborted(scan_state)
+        if state.result and state.result.throttled then
+            break
+        end
         state.query_index = state.query_index + 1
     end
 	complete()

@@ -59,7 +59,7 @@ do
 	local ALPHA = "ALPHA"
 
 	local releaseType
-	local myGitHash = "9dab473" -- The ZIP packager will replace this with the Git hash.
+	local myGitHash = "d18584c" -- The ZIP packager will replace this with the Git hash.
 	local releaseString
 	--[=[@alpha@
 	-- The following code will only be present in alpha ZIPs.
@@ -217,6 +217,7 @@ local fakeZones = { -- Fake zones used as GUI menus
 }
 
 do
+	local forever = "BigWigs_Forever"
 	local c = "BigWigs_Classic"
 	local bc = "BigWigs_BurningCrusade"
 	local wotlk = "BigWigs_WrathOfTheLichKing"
@@ -229,6 +230,7 @@ do
 	local df = "BigWigs_Dragonflight"
 	local tww = "BigWigs_TheWarWithin"
 	local mn = "BigWigs_Midnight"
+	local lw_forever = "LittleWigs_Forever"
 	local lw_c = "LittleWigs_Classic"
 	local lw_bc = "LittleWigs_BurningCrusade"
 	local lw_wotlk = "LittleWigs_WrathOfTheLichKing"
@@ -246,10 +248,10 @@ do
 
 	if public.isForever then
 		public.currentExpansion = {
-			name = c,
+			name = forever,
 			bigWigsBundled = {},
-			littleWigsName = lw_c,
-			littleWigsDefault = lw_c,
+			littleWigsName = lw_forever,
+			littleWigsDefault = lw_forever,
 			littleWigsBundled = {},
 			currentSeason = {},
 			zones = {},
@@ -1427,6 +1429,7 @@ do
 		BigWigs_Core = true,
 		BigWigs_Plugins = true,
 		BigWigs_Options = true,
+		BigWigs_Forever = true,
 		BigWigs_Classic = true,
 		BigWigs_BurningCrusade = true,
 		BigWigs_WrathOfTheLichKing = true,
@@ -1439,6 +1442,7 @@ do
 		BigWigs_Dragonflight = true,
 		BigWigs_TheWarWithin = true,
 		LittleWigs = true,
+		LittleWigs_Forever = true,
 		LittleWigs_Classic = true,
 		LittleWigs_BurningCrusade = true,
 		LittleWigs_WrathOfTheLichKing = true,
@@ -1678,16 +1682,6 @@ end
 -- DBM version collection & faking
 --
 
-local myNameForDBMSync -- Why does DBM still complicate its comms with useless data? Who knows.
-if public.isForever then
-	myNameForDBMSync = public.UnitName("player")
-else
-	local name = public.UnitName("player")
-	local realm = GetRealmName()
-	local normalizedPlayerRealm = realm:gsub("[%s-]+", "") -- Has to mimic DBM code
-	myNameForDBMSync = name .."-".. normalizedPlayerRealm
-end
-
 do
 	local DBMdotRevision = "20261113062802" -- The changing version of the local client, changes with every new zip using the project-date-integer packager replacement.
 	local DBMdotDisplayVersion = "12.1.23" -- "N.N.N" for a release and "N.N.N alpha" for the alpha duration.
@@ -1699,7 +1693,7 @@ do
 	local timer = nil
 	local function sendDBMMsg()
 		if IsInGroup() then
-			local msg = myNameForDBMSync.."\t"..protocol.."\t".. versionPrefix .."\t".. DBMdotRevision.."\t"..DBMdotReleaseRevision.."\t"..DBMdotDisplayVersion.."\t"..myLocale.."\ttrue\t"..PForceDisable.."\t0\t0"
+			local msg = "\t"..protocol.."\t".. versionPrefix .."\t".. DBMdotRevision.."\t"..DBMdotReleaseRevision.."\t"..DBMdotDisplayVersion.."\t"..myLocale.."\ttrue\t"..PForceDisable.."\t0\t0"
 			local result = SendAddonMessage(dbmPrefix, msg, IsInGroup(2) and "INSTANCE_CHAT" or "RAID") -- LE_PARTY_CATEGORY_INSTANCE = 2
 			if type(result) == "number" and result ~= 0 then
 				if result == 3 or result == 8 or result == 9 then -- AddonMessageThrottle, ChannelThrottle, GeneralError
@@ -1752,7 +1746,7 @@ function mod:CHAT_MSG_ADDON(prefix, msg, channel, sender)
 		sender = Ambiguate(sender, "none")
 		if subPrefix == "V" or subPrefix == "H" then
 			self:DBM_VersionCheck(subPrefix, sender, arg1, arg2, arg3)
-		elseif subPrefix == "U" or subPrefix == "PT" or subPrefix == "M" or subPrefix == "BT" then
+		elseif subPrefix == "U" or subPrefix == "M" or subPrefix == "BT" then
 			if subPrefix == "BT" then
 				loadAndEnableCore() -- Force enable the core when receiving a break timer.
 			end
@@ -2089,7 +2083,7 @@ do
 				sysprint("Failed to ask for versions. Error code: ".. result)
 				geterrorhandler()("BigWigs: Failed to ask for versions. Error code: ".. result)
 			end
-			local dbmResult = SendAddonMessage(dbmPrefix, myNameForDBMSync.."\t1\tH\t", groupType == 3 and "INSTANCE_CHAT" or "RAID") -- Also request DBM versions
+			local dbmResult = SendAddonMessage(dbmPrefix, "\t1\tH\t", groupType == 3 and "INSTANCE_CHAT" or "RAID") -- Also request DBM versions
 			if type(dbmResult) == "number" and dbmResult ~= 0 and dbmResult ~= 11 then -- 0=Success, 11=AddOnMessageLockdown
 				sysprint("Failed to ask for _ versions. Error code: ".. dbmResult)
 				geterrorhandler()("BigWigs: Failed to ask for _ versions. Error code: ".. dbmResult)

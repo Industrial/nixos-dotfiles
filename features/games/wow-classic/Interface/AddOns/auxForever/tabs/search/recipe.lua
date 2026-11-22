@@ -307,7 +307,7 @@ end
 function M.recipe_cost_tooltip(tooltip, parts)
     local total, missing, rows = recipe_usual_cost(parts)
     tooltip:AddLine('Materials for 1 craft', 1, 1, 1)
-    tooltip:AddLine('Prices from your latest scans', aux.color.label.enabled())
+    tooltip:AddLine('From your latest scans', aux.color.label.enabled())
     for _, row in ipairs(rows) do
         local item_info = info.item(row.item_id)
         if not item_info then info.request_item(row.item_id) end
@@ -316,10 +316,12 @@ function M.recipe_cost_tooltip(tooltip, parts)
         if not row.cost then
             right = aux.color.label.disabled('no price yet')
         else
-            local source = row.source == 'vendor' and 'vendor' or ('seen ' .. (history.age_text(row.age) or '?'))
+            -- 0.9 build 3 (Tyler): put source/age and % in front of costs so all prices line up on the right
+            local source = row.source == 'vendor' and 'vendor' or (history.short_age_text(row.age) or '?')
             local dim = row.source == 'latest' and row.age and row.age >= history.OLD_DAYS
             local share = row.source == 'latest' and share_of_usual(row.latest, row.item_id .. ':0') or ''
-            right = money.to_string(row.cost, true) .. share .. '  ' .. (dim and aux.color.label.disabled or aux.color.label.enabled)(source)
+            local prefix = (dim and aux.color.label.disabled or aux.color.label.enabled)(source) .. share
+            right = prefix .. '  ' .. money.to_string(row.cost, true)
         end
         -- white on both sides, like aux's tables: the game's default right color is gold, which
         -- colored every price (Tyler, build 2)
@@ -342,14 +344,15 @@ function M.recipe_cost_tooltip(tooltip, parts)
         local r, g, b = aux.color.label.enabled()
         tooltip:AddLine(' ')
         if not net then
-            tooltip:AddDoubleLine(name .. ' sells for', aux.color.label.disabled('no price yet'), 1, 1, 1, 1, 1, 1)
+            tooltip:AddDoubleLine(name, aux.color.label.disabled('no price yet'), 1, 1, 1, 1, 1, 1)
             tooltip:AddLine('Search for it at the auction house to learn its price.', r, g, b)
             return
         end
         local dim = age and age >= history.OLD_DAYS
         local share = share_of_usual(gross / output.count, output.item_id .. ':0')
-        tooltip:AddDoubleLine(name .. ' sells for', money.to_string(gross, true) .. share .. '  ' .. (dim and aux.color.label.disabled or aux.color.label.enabled)('seen ' .. (history.age_text(age) or '?')), 1, 1, 1, 1, 1, 1)
-        tooltip:AddDoubleLine('After the ' .. AUCTION_CUT * 100 .. '% auction house cut', money.to_string(net, true), r, g, b, 1, 1, 1)
+        local prefix = (dim and aux.color.label.disabled or aux.color.label.enabled)(history.short_age_text(age) or '?') .. share
+        tooltip:AddDoubleLine(name, prefix .. '  ' .. money.to_string(gross, true), 1, 1, 1, 1, 1, 1)
+        tooltip:AddDoubleLine('After ' .. AUCTION_CUT * 100 .. '% AH cut', money.to_string(net, true), r, g, b, 1, 1, 1)
         local label, amount = profit_parts(parts, total, missing)
         tooltip:AddDoubleLine(label, amount, 1, 1, 1, 1, 1, 1)
     end
@@ -361,6 +364,15 @@ do
     local line, line_parts
 
     local function update_line(form)
+        -- 0.9 (FB-061, LLanwrst): allow hiding the Materials / profit line without affecting Search in aux
+        if aux.account_data and aux.account_data.crafting_cost == false then
+            line_parts = nil
+            if line then
+                line:Hide()
+                if GameTooltip:IsOwned(line) then GameTooltip:Hide() end
+            end
+            return
+        end
         local recipe = form.GetRecipeInfo and form:GetRecipeInfo()
         line_parts = recipe and recipe.recipeID and recipe_parts(recipe.recipeID)
         local reagents = type(form.Reagents) == 'table' and form.Reagents
@@ -377,6 +389,18 @@ do
     end
 
     M.update_cost_line = update_line
+
+    function M.refresh_cost_line()
+        if not line then return end
+        local form = ProfessionsFrame and ProfessionsFrame.CraftingPage and ProfessionsFrame.CraftingPage.SchematicForm
+        if aux.account_data and aux.account_data.crafting_cost == false then
+            line_parts = nil
+            line:Hide()
+            if GameTooltip:IsOwned(line) then GameTooltip:Hide() end
+        elseif type(form) == 'table' and form:IsShown() then
+            update_line(form)
+        end
+    end
 
     function M.create_cost_line()
         local form = ProfessionsFrame and ProfessionsFrame.CraftingPage and ProfessionsFrame.CraftingPage.SchematicForm

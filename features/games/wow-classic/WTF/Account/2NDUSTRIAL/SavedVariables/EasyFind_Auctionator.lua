@@ -1,0 +1,2 @@
+
+EasyFindAuctionatorDB = nil

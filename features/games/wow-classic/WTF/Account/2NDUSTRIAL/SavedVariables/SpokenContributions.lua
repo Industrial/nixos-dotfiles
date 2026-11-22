@@ -1,0 +1,6 @@
+
+SpokenContributionsDB = {
+["Tidied"] = true,
+["Lines"] = {
+},
+}

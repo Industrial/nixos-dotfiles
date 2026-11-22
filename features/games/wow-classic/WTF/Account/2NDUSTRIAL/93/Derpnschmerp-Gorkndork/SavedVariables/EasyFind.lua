@@ -1,0 +1,2 @@
+
+EasyFindCharDB = nil

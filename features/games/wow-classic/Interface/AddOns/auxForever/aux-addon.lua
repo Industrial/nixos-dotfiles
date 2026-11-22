@@ -94,6 +94,8 @@ TOOLTIP_DEFAULTS = {
     value = true,
     usually = true,
     crate = true, -- 0.8.2.1 build 7 (FB-041): the Waylaid Crate lines, now with a switch
+    -- 0.9 (FB-058, jebbush; Tyler): full stack by default, hold Shift for 1 item
+    stack = true,
     merchant_sell = true,
     merchant_buy = false,
     daily = false,
@@ -125,10 +127,19 @@ function event.AUX_LOADED()
         post_undercut = false,
         -- auxForever (0.8.2.2, FB-049): a second click on Confirm before anything is bought
         buy_confirm = false,
+        -- 0.9 build 4 (FB-066, user_ivpyccljovcjne72): Search buy bar starting quantity ('1' or 'stack')
+        buy_default = '1',
+        -- 0.9: Phase 1 switches (FB-061, FB-062, FB-032; Tyler 2026-11-21: right_click_post on by default)
+        crafting_cost = true,
+        right_click_post = true,
+        auto_full_scan = false,
         full_search = false,
         sniper_percent = 60,
         sniper_profit = 500,
         sniper_sound = true,
+        -- 0.9 build 4 (FB-055, khorrs; Tyler): narrower Sniper scope and minimum quality
+        sniper_scope = {kind = 'all'},
+        sniper_quality = 1,
         sniper_ignored = {},
         replicate_time = 0,
         window = {},
@@ -191,6 +202,29 @@ function M.tab(name)
 	return setmetatable({}, {__metatable=false, __newindex=function(_, k, v) tab_event[k](v) end})
 end
 
+function M.tab_index_by_name(name)
+	for i, tab in ipairs(tab_info) do
+		if tab.name == name then
+			return i
+		end
+	end
+end
+
+-- 0.9 (FB-057): shared by both /aux clear ... and the Options > AddOns > auxForever panel
+function M.clear_item_cache()
+	account_data.items = {}
+	account_data.item_ids = {}
+	account_data.unused_item_ids = {}
+	account_data.auctionable_items = {}
+	print('Item cache cleared.')
+end
+
+function M.clear_post_data()
+	-- emptied in place (outside review R-06): tabs/post keeps this same table reference
+	wipe(faction_data.post)
+	print('Post data cleared.')
+end
+
 do
 	local index
 	function M.get_tab() return tab_info[index] end
@@ -232,12 +266,15 @@ do
 			UIErrorsFrame:AddExternalErrorMessage(ERR_NOT_ENOUGH_MONEY)
 			return
 		end
-		C_AuctionHouse.PlaceBid(auction_id, amount)
 		locked = true
 		local result
+		local purchased = false
 		local listeners = {
 			event_listener('AUCTION_HOUSE_PURCHASE_COMPLETED', function(id)
-				if id == auction_id then result = true end
+				if id == auction_id then
+					result = true
+					purchased = true
+				end
 			end),
 			event_listener('BID_ADDED', function()
 				result = true
@@ -248,12 +285,17 @@ do
 			event_listener('AUCTION_HOUSE_SHOW_ERROR', function(error)
 				result = result or error
 			end),
+			event_listener('AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED', function()
+				result = result or 'throttled'
+			end),
+			event_listener('AUCTION_HOUSE_CLOSED', function()
+				result = result or 'closed'
+			end),
 		}
-		coro_thread(function()
-			local t0 = GetTime()
-			while result == nil and GetTime() - t0 < 5 do
-				coro_wait()
-			end
+		-- 0.9: register listeners and lock before calling PlaceBid so synchronous errors or
+		-- completions are captured instead of hanging 5s for a timeout.
+		C_AuctionHouse.PlaceBid(auction_id, amount)
+		local function finish()
 			for _, listener_id in ipairs(listeners) do
 				kill_listener(listener_id)
 			end
@@ -265,14 +307,29 @@ do
 				print('No answer from the auction house yet. The purchase may still go through: check your mail before buying again.')
 			end
 			if result == true then
-				tinsert(character_data.bid_auction_ids, auction_id)
-				while #character_data.bid_auction_ids > 200 do
-					tremove(character_data.bid_auction_ids, 1)
+				-- 0.9: only real bids belong in bid_auction_ids; gear buyouts end immediately and
+				-- used to push active bids out of the 200-entry list.
+				if not purchased then
+					tinsert(character_data.bid_auction_ids, auction_id)
+					while #character_data.bid_auction_ids > 200 do
+						tremove(character_data.bid_auction_ids, 1)
+					end
 				end
 				do (on_success or pass)() end
 			else
 				do (on_failure or pass)(result) end
 			end
+		end
+		if result ~= nil then
+			finish()
+			return
+		end
+		coro_thread(function()
+			local t0 = GetTime()
+			while result == nil and GetTime() - t0 < 5 do
+				coro_wait()
+			end
+			finish()
 		end)
 	end
 end
@@ -424,6 +481,11 @@ function AUCTION_HOUSE_SHOW()
     post.set_undercut_mode(false)
     query_owned_auctions()
     query_bids()
+    -- 0.9 (FB-032, Chawitsch): optional automatic Full scan when the auction house opens.
+    -- Quietly skipped if the 15-minute cooldown or another scan is already active.
+    if account_data.auto_full_scan and start_full_scan then
+        start_full_scan(true)
+    end
 end
 
 function M.query_owned_auctions()

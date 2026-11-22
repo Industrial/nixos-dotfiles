@@ -30,13 +30,30 @@ M.DURATION_2, M.DURATION_8, M.DURATION_24 = 1, 2, 3
 
 refresh = true
 
+-- 0.9: single state table for an in-flight post (replaces 6 loose flags). `posting` is kept in sync
+-- for existing tests and disabled_reason().
+local post_state
 posting = nil
-posting_item = nil -- the item being posted and how many were in the bags before
 other_endings_lowest = nil -- 0.8: the cheapest listing of the selected gear's other endings
 
-last_post_update = nil
-
 selected_item = nil
+
+local function set_post_state(state)
+    post_state = state
+    posting = state and state.mode or nil
+end
+
+local function finish_post_state(outcome)
+    if post_state then
+        if outcome and not post_state.outcome then
+            post_state.outcome = outcome
+        end
+        post_state.pending = nil
+        post_state.mode = nil
+        post_state.done = true
+    end
+    posting = nil
+end
 
 function get_default_settings()
 	return { duration = aux.account_data.post_duration, start_price = 0, buyout_price = 0, hidden = false }
@@ -56,11 +73,7 @@ StaticPopupDialogs.AUX_POST_CONFIRM = {
         confirm_post()
     end,
     OnCancel = function()
-        if pending_post then
-            post_outcome = 'cancelled'
-        end
-        pending_post = nil
-        posting = nil
+        finish_post_state(post_state and post_state.pending and 'cancelled' or nil)
     end,
     showAlert = 1,
     timeout = 0,
@@ -70,50 +83,52 @@ StaticPopupDialogs.AUX_POST_CONFIRM = {
 function aux.event.AUX_LOADED()
     -- Forever: the server can ask to confirm a post (e.g. a price far from the market); aux shows its own dialog
     aux.event_listener('AUCTION_HOUSE_POST_WARNING', function()
-        if pending_post then
+        if post_state and post_state.pending then
             aux.show_popup('AUX_POST_CONFIRM', CONFIRM_AUCTION_POSTING_TEXT)
         end
     end)
     aux.event_listener('AUCTION_HOUSE_POST_ERROR', function()
-        if pending_post then
+        if post_state and post_state.pending then
             aux.show_popup('AUX_POST_CONFIRM', AUCTION_POSTING_ERROR_TEXT)
         end
     end)
     -- auxForever (0.5, FB-003): the game's own error text while a post is under way (it shows it in
     -- red at the top of the screen, easy to miss) is repeated in the Post tab if the post fails
     aux.event_listener('UI_ERROR_MESSAGE', function(_, text)
-        if posting and type(text) == 'string' then
-            post_error_text = text
+        if post_state and not post_state.done and type(text) == 'string' then
+            post_state.error_text = text
         end
     end)
     aux.event_listener('AUCTION_HOUSE_SHOW_ERROR', function()
-        if posting then
-            post_outcome = 'refused'
+        if post_state and not post_state.done then
             aux.hide_popup('AUX_POST_CONFIRM')
-            pending_post = nil
-            posting = nil
-            last_post_update = nil
+            finish_post_state('refused')
         end
     end)
     -- only a bag change that took the posted item ends the wait: any other (loot, a quest item)
     -- ended it before the answer, said "Not posted" and let Post be clicked again (found with the
     -- slow test auction house)
     aux.event_listener('BAG_UPDATE', function()
-        if posting == 'single' and (not posting_item or bag_count(posting_item.key) < posting_item.before) then
-            posting = nil
-            last_post_update = nil
+        if post_state and post_state.mode == 'single' and bag_count(post_state.item_key) < post_state.bags_before then
+            finish_post_state()
         end
     end)
     aux.event_listener('AUCTION_MULTISELL_FAILURE', function()
-        if posting == 'multi' then
-            posting = nil
-            last_post_update = nil
+        if post_state and post_state.mode == 'multi' then
+            finish_post_state()
         end
     end)
     aux.event_listener('AUCTION_MULTISELL_UPDATE', function(count, total)
-        if posting == 'multi' and count == total then
-            posting = 'single'
-            last_post_update = GetTime()
+        if post_state and post_state.mode == 'multi' and count == total then
+            -- 0.9: if the final BAG_UPDATE already arrived before AUCTION_MULTISELL_UPDATE,
+            -- finish right away instead of hanging 5 seconds for another bag event.
+            if bag_count(post_state.item_key) < post_state.bags_before then
+                finish_post_state()
+            else
+                post_state.mode = 'single'
+                posting = 'single'
+                post_state.updated_at = GetTime()
+            end
         end
     end)
 end
@@ -417,10 +432,10 @@ function find_item_location(item_key)
 end
 
 function confirm_post()
-    last_post_update = GetTime()
-    if pending_post then
-        local post = pending_post
-        pending_post = nil
+    if post_state and post_state.pending then
+        post_state.updated_at = GetTime()
+        local post = post_state.pending
+        post_state.pending = nil
         if post.commodity then
             C_AuctionHouse.ConfirmPostCommodity(post.location, post.duration, post.quantity, post.unit_price)
         else
@@ -480,12 +495,11 @@ function post_auction()
     end
 
     aux.hide_popup('AUX_POST_CONFIRM')
-    post_outcome, post_error_text, message = nil, nil, nil
+    message = nil
     local bags_before = bag_count(item_key)
-    posting_item = {key = item_key, before = bags_before}
     local wanted = post_quantity()
     local name = selected_item.name or '?'
-    local post
+    local post, mode
     if selected_item.commodity then
         post = {
             commodity = true,
@@ -494,11 +508,7 @@ function post_auction()
             quantity = stack_size * stack_count,
             unit_price = round_price(get_unit_buyout_price()),
         }
-        pending_post = post
-        if not C_AuctionHouse.PostCommodity(post.location, post.duration, post.quantity, post.unit_price) then
-            pending_post = nil
-        end
-        posting = 'single'
+        mode = 'single'
     else
         local bid, buyout = item_post_prices(get_unit_start_price(), get_unit_buyout_price())
         post = {
@@ -508,36 +518,36 @@ function post_auction()
             bid = bid,
             buyout = buyout,
         }
-        pending_post = post
-        if not C_AuctionHouse.PostItem(post.location, post.duration, post.quantity, post.bid, post.buyout) then
-            pending_post = nil
-        end
-        posting = stack_count == 1 and 'single' or 'multi'
+        mode = stack_count == 1 and 'single' or 'multi'
     end
 
-    aux.coro_thread(function()
-        last_post_update = GetTime()
-        while posting do
-            -- waits longer while a confirmation dialog is open
-            if GetTime() - last_post_update > (pending_post and 60 or 5) then
-                post_outcome = post_outcome or 'timeout'
-                aux.hide_popup('AUX_POST_CONFIRM')
-                pending_post = nil
-                posting = nil
-                last_post_update = nil
-                break
-            end
-            -- auxForever: this goes on after the player leaves the tab or closes the auction
-            -- house; it used to stop there, and a post never answered left Post on "Posting..."
-            -- (found with the slow test auction house). The result is still said in chat.
-            aux.coro_wait()
-        end
+    -- 0.9: set post_state before calling Blizzard's API so synchronous AUCTION_HOUSE_SHOW_ERROR or
+    -- UI_ERROR_MESSAGE events are caught immediately instead of hanging 5 seconds for a timeout.
+    local current_post = {
+        mode = mode,
+        pending = post,
+        item_key = item_key,
+        bags_before = bags_before,
+        updated_at = GetTime(),
+    }
+    set_post_state(current_post)
+    local needs_confirm
+    if post.commodity then
+        needs_confirm = C_AuctionHouse.PostCommodity(post.location, post.duration, post.quantity, post.unit_price)
+    else
+        needs_confirm = C_AuctionHouse.PostItem(post.location, post.duration, post.quantity, post.bid, post.buyout)
+    end
+    if not needs_confirm and not current_post.done then
+        current_post.pending = nil
+    end
 
-        do
-            local posted = max(0, bags_before - bag_count(item_key))
-            show_post_message(post_result_text(post_outcome, wanted, posted, name, post_error_text))
-            post_outcome, post_error_text = nil, nil
+    local function complete_post()
+        local outcome, error_text = current_post.outcome, current_post.error_text
+        if post_state == current_post then
+            set_post_state(nil)
         end
+        local posted = max(0, bags_before - bag_count(item_key))
+        show_post_message(post_result_text(outcome, wanted, posted, name, error_text))
         update_inventory_records()
         local all_posted = true
         for _, record in pairs(inventory_records) do
@@ -558,6 +568,27 @@ function post_auction()
             end
         end
         refresh = true
+    end
+
+    if current_post.done then
+        complete_post()
+        return
+    end
+
+    aux.coro_thread(function()
+        while post_state == current_post and not current_post.done do
+            -- waits longer while a confirmation dialog is open
+            if GetTime() - current_post.updated_at > (current_post.pending and 60 or 5) then
+                aux.hide_popup('AUX_POST_CONFIRM')
+                finish_post_state('timeout')
+                break
+            end
+            -- auxForever: this goes on after the player leaves the tab or closes the auction
+            -- house; it used to stop there, and a post never answered left Post on "Posting..."
+            -- (found with the slow test auction house). The result is still said in chat.
+            aux.coro_wait()
+        end
+        complete_post()
     end)
 end
 
@@ -718,12 +749,23 @@ function update_item_configuration()
         item_detail:SetText(selected_item.count .. ' in your bags')
 
         local quantity = post_quantity()
-        local unit_price = get_unit_buyout_price() > 0 and get_unit_buyout_price() or get_unit_start_price()
+        local buyout = get_unit_buyout_price()
+        local start_price = get_unit_start_price()
+        -- 0.9 (S-09): trade goods have no bids, so when no valid buyout price is entered do not
+        -- fall back to the hidden starting-bid box or show "Starting bids" / a vendor warning.
+        local no_price = (selected_item.commodity and buyout <= 0) or (buyout <= 0 and start_price <= 0)
+        local unit_price = no_price and 0 or (buyout > 0 and buyout or start_price)
         local total = unit_price * quantity
         local items = quantity .. (quantity == 1 and ' item' or ' items')
-        posting_summary:SetText((get_unit_buyout_price() > 0 and 'Total, ' or 'Starting bids, ') .. items)
-        total_summary:SetText(money.to_string(total, true))
-        cut_summary:SetText(aux.color.negative('-') .. money.to_string(total - floor(total * (1 - AUCTION_CUT)), true, nil, aux.color.negative))
+        if no_price then
+            posting_summary:SetText('Total, ' .. items)
+            total_summary:SetText('-')
+            cut_summary:SetText('-')
+        else
+            posting_summary:SetText((buyout > 0 and 'Total, ' or 'Starting bids, ') .. items)
+            total_summary:SetText(money.to_string(total, true))
+            cut_summary:SetText(aux.color.negative('-') .. money.to_string(total - floor(total * (1 - AUCTION_CUT)), true, nil, aux.color.negative))
+        end
         do
             -- money going out in red (bright red when it is more than the player has), coming in green
             local amount = deposit_amount()
@@ -732,25 +774,31 @@ function update_item_configuration()
             deposit:SetText(amount > 0 and (out('-') .. money.to_string(amount, true, nil, out)) or money.to_string(0, true))
         end
         do
-            -- what the sale brings in; red, with the warning box, when a vendor would pay more
-            local net = floor(total * (1 - AUCTION_CUT))
             local vendor = (selected_item.unit_vendor_price or 0) * quantity
-            local below_vendor = vendor > 0 and net < vendor
-            local color = below_vendor and aux.color.red or aux.color.positive
-            net_summary:SetText(money.to_string(net, true, nil, color))
-            local parts = {}
-            if quantity > 1 then
-                tinsert(parts, money.to_string(floor(unit_price * (1 - AUCTION_CUT)), true) .. ' each')
-            end
-            if below_vendor then
-                vendor_warning.amount:SetText(money.to_string(vendor, true))
-            elseif vendor > 0 then
-                tinsert(parts, 'vendor pays ' .. money.to_string(vendor, true))
-            end
-            net_detail:SetText(table.concat(parts, ', '))
-            -- shown or hidden only when it changes (AGENTS.md: never hide and show every frame)
-            if below_vendor ~= vendor_warning:IsShown() then
-                if below_vendor then vendor_warning:Show() else vendor_warning:Hide() end
+            if no_price then
+                net_summary:SetText('-')
+                net_detail:SetText(vendor > 0 and ('vendor pays ' .. money.to_string(vendor, true)) or '')
+                if vendor_warning:IsShown() then vendor_warning:Hide() end
+            else
+                -- what the sale brings in; red, with the warning box, when a vendor would pay more
+                local net = floor(total * (1 - AUCTION_CUT))
+                local below_vendor = vendor > 0 and net < vendor
+                local color = below_vendor and aux.color.red or aux.color.positive
+                net_summary:SetText(money.to_string(net, true, nil, color))
+                local parts = {}
+                if quantity > 1 then
+                    tinsert(parts, money.to_string(floor(unit_price * (1 - AUCTION_CUT)), true) .. ' each')
+                end
+                if below_vendor then
+                    vendor_warning.amount:SetText(money.to_string(vendor, true))
+                elseif vendor > 0 then
+                    tinsert(parts, 'vendor pays ' .. money.to_string(vendor, true))
+                end
+                net_detail:SetText(table.concat(parts, ', '))
+                -- shown or hidden only when it changes (AGENTS.md: never hide and show every frame)
+                if below_vendor ~= vendor_warning:IsShown() then
+                    if below_vendor then vendor_warning:Show() else vendor_warning:Hide() end
+                end
             end
         end
         post_button:SetText('Post ' .. quantity .. (quantity == 1 and ' item' or ' items'))
@@ -967,7 +1015,20 @@ function refresh_entries()
         local key_info = type(key) == 'table' and C_AuctionHouse.GetItemKeyInfo(key)
         local by_key = type(key_info) == 'table' and not key_info.isEquipment
         local query = by_key and { item_keys = {key} } or scan_util.item_query(selected_item.item_id)
+        if not query and selected_item.name and selected_item.name ~= '' then
+            -- 0.9: if info.item(id) is not cached yet, search by the bag item's known name instead
+            -- of starting an empty {nil} scan that falsely claims "None for sale".
+            query = { blizzard_query = { name = strlower(selected_item.name), exact = (selected_item.suffix_id or 0) == 0 } }
+        end
         other_endings_lowest = nil
+        if not query then
+            info.request_item(item_id)
+            listings_stopped[item_key] = true
+            aux.status_bar:update_status(1, 1)
+            refresh = true
+            update_post_done()
+            return
+        end
 
 		scan.start{
             type = 'list',
@@ -991,10 +1052,6 @@ function refresh_entries()
                 if by_key and next(buyout_records[item_key]) then
                     listings_ready[item_key] = true
                     refresh = true
-                    if not aux.account_data.post_full_scan then
-                        scan.abort()
-                        aux.coro_wait()
-                    end
                 end
             end,
 			-- 0.8: only the versions of this item's own name are read; another ending is skipped and its

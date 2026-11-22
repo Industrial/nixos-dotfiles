@@ -1,0 +1,156 @@
+-- Title Class
+local _, app = ...
+local L = app.L;
+
+-- Blizzard
+local GetTitleName, UnitName, CALENDAR_PLAYER_NAME, IsTitleKnown, GetNumTitles
+	= GetTitleName, UnitName, CALENDAR_PLAYER_NAME, IsTitleKnown, GetNumTitles
+
+-- Module
+
+-- App
+local Colorize = app.Modules.Color.Colorize
+
+-- Title Lib!
+local KEY, CACHE = "titleID", "Titles"
+local CLASSNAME = "Title"
+
+local function CalculateTitleStyle(name)
+	if name then
+		local first = name:sub(1, 1);
+		if first == " " then
+			-- Suffix
+			first = name:sub(2, 2);
+			if first == first:upper() then
+				-- Comma Separated
+				return 3;
+			end
+
+			-- Player Name First
+			return 1;
+		else
+			local last = name:sub(-1);
+			if last == " " then
+				-- Prefix
+				return 0;
+			end
+
+			-- Suffix
+			if first == first:lower() then
+				-- Player Name First with a space
+				return 2;
+			end
+
+			-- Comma Separated
+			return 3;
+		end
+	end
+
+	return 1;	-- Player Name First
+end
+local function StylizePlayerTitle(title, style, me)
+	if title then
+		if style == 0 then
+			-- Prefix
+			return title .. me;
+		elseif style == 1 then
+			-- Player Name First
+			return me .. title;
+		elseif style == 2 then
+			-- Player Name First (with space)
+			return me .. " " .. title;
+		elseif style == 3 then
+			-- Comma Separated
+			return me .. ", " .. title;
+		end
+	end
+	return title or RETRIEVING_DATA;
+end
+local OnUpdateForSpecificGender = function(t, parent, defaultUpdate)
+	-- for gendered-titles matching the gender or in account mode, just let the default update sequence take place
+	if defaultUpdate and (app.MODE_DEBUG_OR_ACCOUNT or t.gender == app.Gender) then
+		defaultUpdate(t, parent)
+	else
+		-- otherwise for a non-matching title, just pretend it doesn't exist
+		t.visible = nil
+	end
+	return true
+end
+app.CreateTitle = app.CreateClass("Title", "titleID", {
+	CACHE = function() return CACHE end,
+	icon = function(t)
+		return app.asset("Category_Titles");
+	end,
+	description = function(t)
+		return L.TITLES_DESC;
+	end,
+	text = function(t)
+		return Colorize(t.name, app.Colors.Account)
+	end,
+	name = function(t)
+		local name = StylizePlayerTitle(t.titleName, t.style, UnitName("player"))
+		t.name = name
+		return name
+	end,
+	titleName = function(t)
+		return GetTitleName(t[KEY]);
+	end,
+	title = function(t)
+		return StylizePlayerTitle(t.titleName, t.style, "("..CALENDAR_PLAYER_NAME..")");
+	end,
+	style = function(t)
+		local style = CalculateTitleStyle(t.titleName);
+		if style then
+			t.style = style;
+			return style;
+		end
+	end,
+	collectible = function(t)
+		return app.Settings.Collectibles.Titles;
+	end,
+	collected = function(t)
+		return app.TypicalCharacterCollected(CACHE, t[KEY])
+	end,
+	saved = function(t)
+		return IsTitleKnown(t[KEY]);
+	end,
+}
+,"WithGender",{
+	OnUpdate = function(t)
+		return OnUpdateForSpecificGender
+	end
+},function(t) return t.gender end
+);
+app.AddEventHandler("OnSavedVariablesAvailable", function(currentCharacter, accountWideData)
+	if not currentCharacter[CACHE] then currentCharacter[CACHE] = {} end
+	if not accountWideData[CACHE] then accountWideData[CACHE] = {} end
+end)
+app.AddGenericFieldConverter(KEY)
+app.AddSimpleCollectibleSwap(CLASSNAME, CACHE)
+
+-- Title Refresh
+app.AddEventHandler("OnRefreshCollections", function()
+	local saved, none = {}, {}
+	for i=1,GetNumTitles() do
+		if IsTitleKnown(i) then
+			saved[i] = true
+		else
+			none[i] = true
+		end
+	end
+	-- Character Cache
+	app.SetBatchCached(CACHE, saved, 1)
+	app.SetBatchCached(CACHE, none)
+end);
+
+app.AddEventRegistration("KNOWN_TITLES_UPDATE", function(unit)
+	-- app.PrintDebug("KNOWN_TITLES_UPDATE",unit)
+	if unit ~= "player" then return end
+
+	local IsCached = app.IsCached
+	for i=1,GetNumTitles() do
+		if not IsCached(CACHE, i) and IsTitleKnown(i) then
+			app.SetThingCollected(KEY, i, nil, true)
+		end
+	end
+end);

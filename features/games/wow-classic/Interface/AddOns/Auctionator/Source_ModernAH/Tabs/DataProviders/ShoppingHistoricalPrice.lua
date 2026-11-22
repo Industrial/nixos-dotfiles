@@ -8,7 +8,9 @@ end
 
 function AuctionatorShoppingHistoricalPriceProviderMixin:ReceiveEvent(event, itemInfo)
   if event == Auctionator.Shopping.Tab.Events.ShowHistoricalPrices then
-    self:SetItem(Auctionator.Utilities.DBKeyFromBrowseResult({ itemKey = itemInfo.itemKey })[1])
+    Auctionator.Utilities.DBKeyFromItemKey(itemInfo.itemKey, function(dbKeys)
+      self:SetItem(dbKeys[1])
+    end)
   end
 end
 

@@ -449,16 +449,25 @@ function M.set_tooltip(itemstring, owner, anchor)
     GameTooltip:SetHyperlink(itemstring)
 end
 
+local TOOLTIP_SIDES = {'Left', 'Right'}
+
 function M.tooltip_match(entry, tooltip)
+    if type(entry) ~= 'string' then
+        return false
+    end
+    local target = strupper(entry)
     return aux.any(tooltip, function(text)
-        return strupper(entry) == strupper(text)
+        return type(text) == 'string' and target == strupper(text)
     end)
 end
 
 function M.tooltip_find(pattern, tooltip)
+    if type(pattern) ~= 'string' then
+        return 0
+    end
     local count = 0
     for _, entry in pairs(tooltip) do
-        if strfind(entry, pattern) then
+        if type(entry) == 'string' and strfind(entry, pattern) then
             count = count + 1
         end
     end
@@ -485,7 +494,7 @@ function M.auctionable(tooltip, quality)
             and status ~= ITEM_BIND_ON_PICKUP
             and status ~= ITEM_BIND_QUEST
             and status ~= ITEM_SOULBOUND
-            and (not tooltip_match(ITEM_CONJURED, tooltip) or tooltip_find(ITEM_MIN_LEVEL, tooltip) > 1)
+            and (not ITEM_CONJURED or not tooltip_match(ITEM_CONJURED, tooltip) or (ITEM_MIN_LEVEL ~= nil and tooltip_find(ITEM_MIN_LEVEL, tooltip) > 1))
 end
 
 function M.tooltip(setter, arg1, arg2)
@@ -498,18 +507,22 @@ function M.tooltip(setter, arg1, arg2)
     elseif setter == 'link' then
 	    AuxTooltip:SetHyperlink(arg1)
     elseif setter == 'item_key' then
-        -- 0.8.2 build 6: an auction house item key (arg2: required level), as Blizzard's item list
-        -- shows a row with no link of its own, its ending's stats included (Code: Blizzard's
-        -- Blizzard_AuctionHouseSharedTemplates.lua, branch forever; aux's own row hover since 0.3)
-        if AuxTooltip.SetItemKey then
+        -- 0.9 build 4 (FB-064, RushJet1): try Blizzard's sample link first (same as auction_listing.lua
+        -- and Blizzard_AuctionHouseSharedTemplates.lua, Code) so random-suffix Equip: stats ("of the
+        -- Channeler") appear when Forever provides a sample link, falling back to SetItemKey.
+        local sample = arg1 and C_AuctionHouse.GetItemKeySampleLink and C_AuctionHouse.GetItemKeySampleLink(arg1)
+        if type(sample) == 'string' and sample ~= '' then
+            AuxTooltip:SetHyperlink(sample)
+        elseif AuxTooltip.SetItemKey then
             AuxTooltip:SetItemKey(arg1.itemID, arg1.itemLevel or 0, arg1.itemSuffix or 0, arg2 or 0)
         end
     end
     local tooltip = {}
-    for i = 1, AuxTooltip:NumLines() do
-        for side in aux.iter('Left', 'Right') do
-            local text = _G['AuxTooltipText' .. side .. i]:GetText()
-            if text then
+    for i = 1, AuxTooltip:NumLines() or 0 do
+        for _, side in ipairs(TOOLTIP_SIDES) do
+            local line = _G['AuxTooltipText' .. side .. i]
+            local text = line and line:GetText()
+            if type(text) == 'string' and not (issecretvalue and issecretvalue(text)) then
                 tinsert(tooltip, text)
             end
         end

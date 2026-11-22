@@ -1,0 +1,17 @@
+## Interface: 120105, 50504, 20506, 11509, 16001
+## Title: EasyFind [Auctionator]
+## Notes: Your Auctionator shopping lists in EasyFind's search bar and Notes. Requires Auctionator and the EasyFind: Notes Extension.
+## Author: justawower
+## Version: 1.1.2
+## X-Curse-Project-ID: 1772197
+## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
+## Group: EasyFind
+## Category: UI
+## Dependencies: EasyFind
+## OptionalDeps: Auctionator
+## SavedVariables: EasyFindAuctionatorDB
+## DefaultState: enabled
+
+Locales/enUS.lua
+Prices.lua
+Lists.lua

@@ -1,0 +1,191 @@
+-- App locals
+local _, app = ...;
+local L = app.L;
+local math_floor
+	= math.floor;
+local Colorize = app.Modules.Color.Colorize;
+
+-- Local functions
+local DefaultRWP = ((math.ceil(app.GameBuildVersion / 10000) + 1) * 10000) - 1;
+local ExcludeNonCollectibles, MaximumRWP;
+local function GetPatchString(patch)
+	patch = tonumber(patch)
+	return patch and (math_floor(patch / 10000) .. "." .. (math_floor(patch / 100) % 100) .. "." .. (patch % 10))
+end
+local function ParseCommand(self, cmd)
+	if cmd and cmd ~= "" then
+		cmd = cmd:lower();
+		local patch = 0;
+		local major, minor, build = ("."):split(cmd);
+		major = tonumber(major)
+		if not major then return 0; end
+		if not minor then
+			if cmd == "default" then
+				patch = DefaultRWP;
+			elseif cmd == "classic" then
+				patch = 19999;
+			elseif cmd == "tbc" or cmd == "bc" then
+				patch = 29999;
+			elseif cmd == "wrath" then
+				patch = 39999;
+			elseif cmd == "cataclysm" or cmd == "cata" then
+				patch = 49999;
+			elseif cmd == "mop" then
+				patch = 59999;
+			elseif cmd == "wod" then
+				patch = 69999;
+			elseif cmd == "legion" then
+				patch = 79999;
+			elseif cmd == "bfa" then
+				patch = 89999;
+			elseif cmd == "shadowlands" or cmd == "sl" then
+				patch = 99999;
+			elseif cmd == "dragonflight" or cmd == "df" then
+				patch = 109999;
+			elseif cmd == "tww" then
+				patch = 119999;
+			elseif cmd == "midnight" or cmd == "mid" then
+				patch = 129999;
+			elseif cmd == "any" or cmd == "all" then
+				patch = 9999999999;
+			else
+				patch = tonumber(cmd);
+			end
+		else
+			if build then patch = patch + tonumber(build); end
+			patch = patch + (tonumber(minor) * 100);
+			patch = patch + (tonumber(major) * 10000);
+		end
+		if patch > 0 then
+			while patch < 10000 do patch = patch * 10; end
+			if MaximumRWP ~= patch then
+				MaximumRWP = patch;
+				wipe(self.data.g);
+				self:Rebuild();
+			end
+		else
+			app.print("Invalid patch format '" .. cmd .. "'");
+		end
+	end
+end
+
+-- Search Info
+local SearchInfo = {
+	field = "rwp",
+	value = app.GameBuildVersion,
+	-- drops = {},
+	searchcriteria = {
+		SearchValueCriteria = {
+			-- only include 'rwp' search results where the value is >= the current game version
+			function(o,field,value)
+				local rwp = o[field]
+				if not rwp then return end
+				return rwp >= value and rwp <= MaximumRWP
+			end
+		},
+		__RecursiveFilterCriteria = {
+			-- Exclusion of 'Things' which are non-collectible
+			function(o) return o.g or o.collectible end
+		},
+	},
+}
+local function UpdateRecursiveFilterCriteria()
+	SearchInfo.searchcriteria.RecursiveFilterCriteria = ExcludeNonCollectibles and SearchInfo.searchcriteria.__RecursiveFilterCriteria or nil
+end
+
+-- Implementation
+app:CreateWindow("Future Unobtainables", {
+	Commands = { "attrwp" },
+	RootCommands = { "rwp" },
+	OnCommand = function(self, args, params)
+		local cmd = args[1];
+		if cmd and cmd ~= "" then
+			ParseCommand(self, cmd);
+			if self:IsShown() then
+				return true;
+			end
+		end
+	end,
+	OnLoad = function(self, settings)
+		ExcludeNonCollectibles = settings.ExcludeNonCollectibles;
+		if ExcludeNonCollectibles == nil then ExcludeNonCollectibles = true; end
+		UpdateRecursiveFilterCriteria()
+		MaximumRWP = settings.MaximumRWP;
+		if not MaximumRWP or DefaultRWP > MaximumRWP then
+			MaximumRWP = DefaultRWP;
+		end
+	end,
+	OnSave = function(self, settings)
+		settings.ExcludeNonCollectibles = ExcludeNonCollectibles;
+		settings.MaximumRWP = MaximumRWP;
+	end,
+	OnInit = function(self, handlers)
+		local options = {
+			app.CreateRawText(L.FUTURE_UNOBTAINABLE_EXCLUDE_NONCOLLECTIBLES, {
+				icon = 134941,
+				description = L.FUTURE_UNOBTAINABLE_NONCOLLECTIBLE_DESC,
+				visible = true,
+				priority = 6,
+				SortPriority = -1.1,
+				OnClick = function(row, button)
+					ExcludeNonCollectibles = not ExcludeNonCollectibles;
+					UpdateRecursiveFilterCriteria()
+					wipe(self.data.g);
+					self:Rebuild();
+					return true;
+				end,
+				OnUpdate = function(data)
+					data.saved = ExcludeNonCollectibles;
+					return true;
+				end,
+			}),
+			app.CreateRawText(L.FUTURE_UNOBTAINABLE_MAXIMUM_PATCH, {
+				icon = 134941,
+				description = L.FUTURE_UNOBTAINABLE_MAX_PATCH_DESC,
+				visible = true,
+				priority = 6,
+				SortPriority = -1,
+				OnClick = function(row, button)
+					app:ShowPopupDialogWithEditBox(L.FUTURE_UNOBTAINABLE_MAX_RWP_POPUP, MaximumRWP, function(cmd)
+						ParseCommand(self, cmd);
+					end);
+					return true;
+				end,
+				OnUpdate = function(data)
+					data.summaryText = Colorize(GetPatchString(MaximumRWP), app.Colors.RemovedWithPatch);
+					return true;
+				end,
+			}),
+		};
+		self:SetData(app.CreateRawText(L.FUTURE_UNOBTAINABLE, {
+			icon = app.asset("Interface_Future_Unobtainable"),
+			description = L.FUTURE_UNOBTAINABLE_TOOLTIP,
+			visible = true,
+			expanded = true,
+			SortType = "Global",
+			back = 1,
+			indent = 0,
+			g = { },
+			OnUpdate = function(t)
+				local g = t.g;
+				if #g < 1 then
+					app.NestObjects(t, options);
+					local results = app:BuildSearchResponseRetailStyle(SearchInfo.field, SearchInfo.value, SearchInfo.drops, SearchInfo.searchcriteria)
+					app.NestObjects(t, results);
+					t.SortType = "Global";
+					-- sort children of top level groups
+					for i = 1, #g do
+						local child = g[i]
+						if child.g then
+							child.SortType = "expansion"
+						end
+					end
+					-- don't fill into groups if they are popped out
+					t.skipFull = true
+					app.NestObject(t, self.SearchAPI.BuildDynamicCategorySummaryForSearchResults(results));
+					self:AssignChildren();
+				end
+			end,
+		}));
+	end,
+});

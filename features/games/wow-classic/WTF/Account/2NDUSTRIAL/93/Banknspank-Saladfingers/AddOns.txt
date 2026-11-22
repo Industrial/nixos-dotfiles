@@ -29,7 +29,7 @@ Details_Vanguard: enabled
 ForeverLevelingGuide: enabled
 HandyNotes: enabled
 HandyNotes_DungeonLocations: enabled
-idAutomation: enabled
+idAutomation: disabled
 idAutomation_Bench: enabled
 LittleWigs: enabled
 ModernMapMarkers: enabled

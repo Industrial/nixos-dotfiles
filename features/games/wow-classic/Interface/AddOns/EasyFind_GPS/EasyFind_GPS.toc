@@ -1,0 +1,62 @@
+## Interface: 50504, 11509, 16001, 20506, 120105, 120100, 120007, 120001, 120000
+## Title: EasyFind [GPS]
+## Notes: Step-by-step directions to anywhere EasyFind can find. Requires EasyFind.
+## Author: justawower
+## X-Curse-Project-ID: 1774025
+## Version:1.9.1
+## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
+## Group: EasyFind
+## Category: UI
+## Dependencies: EasyFind
+## DefaultState: enabled
+
+Locales/enUS.lua
+Locales/deDE.lua [AllowLoadTextLocale deDE]
+Locales/esES.lua [AllowLoadTextLocale esES]
+Locales/esMX.lua [AllowLoadTextLocale esMX]
+Locales/frFR.lua [AllowLoadTextLocale frFR]
+Locales/itIT.lua [AllowLoadTextLocale itIT]
+Locales/koKR.lua [AllowLoadTextLocale koKR]
+Locales/ptBR.lua [AllowLoadTextLocale ptBR]
+Locales/ruRU.lua [AllowLoadTextLocale ruRU]
+Locales/zhCN.lua [AllowLoadTextLocale zhCN]
+Locales/zhTW.lua [AllowLoadTextLocale zhTW]
+Guard.lua
+
+Data.lua [AllowLoadGameType standard]
+Data_Forever.lua [AllowLoadGameType camelot]
+Data_Era.lua [AllowLoadGameType vanilla]
+Data_TBC.lua [AllowLoadGameType tbc]
+Data_Mists.lua [AllowLoadGameType mists]
+Buildings.lua [AllowLoadGameType standard]
+Walk_EasternKingdoms.lua [AllowLoadGameType camelot]
+Walk_Kalimdor.lua [AllowLoadGameType camelot]
+Walk_ZephrasIsle.lua [AllowLoadGameType camelot]
+Walk_EasternKingdoms_Era.lua [AllowLoadGameType vanilla]
+Walk_Kalimdor_Era.lua [AllowLoadGameType vanilla]
+Floors_Era.lua [AllowLoadGameType vanilla]
+Floors_Forever.lua [AllowLoadGameType camelot]
+Walk_EasternKingdoms_TBC.lua [AllowLoadGameType tbc]
+Floors_TBC.lua [AllowLoadGameType tbc]
+Walk_Kalimdor_TBC.lua [AllowLoadGameType tbc]
+Walk_Outland_TBC.lua [AllowLoadGameType tbc]
+Walk_EasternKingdoms_Mists.lua [AllowLoadGameType mists]
+Walk_Kalimdor_Mists.lua [AllowLoadGameType mists]
+Walk_Outland_Mists.lua [AllowLoadGameType mists]
+Walk_Northrend_Mists.lua [AllowLoadGameType mists]
+Walk_Pandaria_Mists.lua [AllowLoadGameType mists]
+Floors.lua
+Nav.lua
+Jumps.lua
+Route.lua
+Flights.lua
+Boats.lua
+Follow.lua
+WorldPin.lua
+Arrow.lua
+Preview.lua
+Minimap.lua
+GPS.lua
+Trip.lua
+MapClick.lua
+QuestDirections.lua

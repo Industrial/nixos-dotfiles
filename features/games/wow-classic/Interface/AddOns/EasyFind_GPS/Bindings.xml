@@ -1,0 +1,3 @@
+<Bindings>
+    <Binding name="CLICK EasyFindGPSTarget:LeftButton" header="EASYFIND_GPS" category="ADDONS"/>
+</Bindings>

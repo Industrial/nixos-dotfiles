@@ -1,0 +1,2 @@
+
+EasyFindDungeonJournalDB = nil

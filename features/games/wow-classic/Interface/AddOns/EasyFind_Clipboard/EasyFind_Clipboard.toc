@@ -1,0 +1,14 @@
+## Interface: 50504, 11509, 16001, 20506, 120105, 120100, 120007, 120001, 120000
+## Title: EasyFind [Clipboard History]
+## Notes: Clipboard history companion for EasyFind: what you copied and pasted in game, and every link that passed through chat
+## Author: justawower
+## Version: 5.5.0
+## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
+## Group: EasyFind
+## Category: UI
+## RequiredDeps: EasyFind
+## DefaultState: enabled
+
+Store.lua
+Clipboard.lua
+Pane.lua
