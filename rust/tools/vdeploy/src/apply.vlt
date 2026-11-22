@@ -337,6 +337,18 @@ switched sys a x prev =
     let j = judge(&activated, &verdict);
     ~concluded(sys, a, x, prev, j, verdict)
 
+-- The running generation is never bad. A mark on it is stale: an earlier
+-- apply rolled it back, and then it was switched to anyway (by hand, by root),
+-- and it is what the host runs now. The mark is removed, and the note says so.
+export cleared : &str -> &str -> String
+cleared dir x =
+  if is_bad dir x
+    path = bad_path dir x |> .to_string_lossy |> .to_string
+    removed (&path)
+    "#{x} was marked bad, but it is the running generation: the mark is cleared"
+  else
+    String::new ()
+
 -- What step 1 refuses, if anything.
 refusal : &Apply -> &str -> bool -> Option<String>
 refusal a x comin =
@@ -356,7 +368,8 @@ decided sys a x current comin =
 checked : SystemTool -> Apply -> String -> String -> Effect<Outcome, DeployError, HNil>
 checked sys a x current =
   if current == x
-    finished sys a x current Outcome::Already None (String::new ())
+    note = cleared (&a.state_dir) (&x)
+    finished sys a x current Outcome::Already None note
   else
     s = sys.clone ()
     sys.0.comin_active () |> .widen |> .flat_map (move \comin -> decided s a x current comin)
@@ -422,6 +435,7 @@ export data LiveSystem
   , export window u64
   , export every u64
   , export health_as Option<String>
+  , export health_group Option<String>
   , export setpriv String
   }
   deriving (Debug, Clone)
@@ -471,8 +485,9 @@ verdict_of code stdout stderr =
     _ -> Verdict { healthy = false, failing = Vec::new (), detail = "vhealth did not give a verdict (#{code:?}): #{tail_lines stderr 3}" }
 
 -- The vhealth command line for X. With `health_as`, the probes run as that
--- user (setpriv, no PAM), as vhealth's own daemon does (a DynamicUser): a
--- daemon that answers root and not other users is not healthy.
+-- user and its same-named group (setpriv, no PAM), the identity vhealth's own
+-- daemon runs as: a daemon that answers root and not other users is not
+-- healthy.
 export health_command : &LiveSystem -> &str -> (String, Vec<String>)
 health_command s x =
   vhealth = vhealth_of (&s.vhealth) x
@@ -480,7 +495,8 @@ health_command s x =
   case &s.health_as of
     None -> (vhealth, check)
     Some user ->
-      mut all = .to_vec ([.to_string "--reuid", user.clone (), .to_string "--regid", .to_string "nogroup", .to_string "--clear-groups", vhealth]) : Vec<String>
+      group = s.health_group.clone () |> .unwrap_or_else (\-> user.clone ())
+      mut all = .to_vec ([.to_string "--reuid", user.clone (), .to_string "--regid", group, .to_string "--clear-groups", vhealth]) : Vec<String>
       all.extend check
       (s.setpriv.clone (), all)
 
@@ -491,7 +507,8 @@ health_now s x =
     Verdict { healthy = true, failing = Vec::new (), detail = "#{x} declares no vhealth probes: the switch's exit status is all there is" }
   else
     (program, args) = health_command (&s) (&x)
-    out = Command::new (&program) |> .args (&args) |> .stdin (Stdio::null ()) |> .output ()
+    -- The same environment vhealth's daemon gives its command probes.
+    out = Command::new (&program) |> .args (&args) |> .env "XDG_CACHE_HOME" "/tmp/vhealth-cache" |> .stdin (Stdio::null ()) |> .output ()
     case out of
       Err e -> Verdict { healthy = false, failing = Vec::new (), detail = "running #{program}: #{e}" }
       Ok o -> verdict_of (o.status.code ()) (&String::from_utf8_lossy (&o.stdout)) (&String::from_utf8_lossy (&o.stderr))
@@ -649,11 +666,14 @@ test "vhealth's exit status and report become a verdict"
   assert! \-> !((verdict_of None "" "").healthy)
   assert_eq! \-> vhealth_of (&None) "/nix/store/x" \-> "/nix/store/x/sw/bin/vhealth"
   assert_eq! \-> probes_of "/nix/store/x" \-> "/nix/store/x/etc/vhealth/probes.json"
-  s = LiveSystem { current = .to_string "/run/current-system", profile = .to_string "/p", gcroot = .to_string "/g", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", systemctl = .to_string "systemctl", comin_unit = .to_string "comin.service", vhealth = None, window = 120, every = 2, health_as = None, setpriv = .to_string "/s/setpriv" }
+  s = LiveSystem { current = .to_string "/run/current-system", profile = .to_string "/p", gcroot = .to_string "/g", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", systemctl = .to_string "systemctl", comin_unit = .to_string "comin.service", vhealth = None, window = 120, every = 2, health_as = None, health_group = None, setpriv = .to_string "/s/setpriv" }
   (p, a) = health_command (&s) "/nix/store/x"
   assert_eq! \-> (p.as_str (), a.join " ") \-> ("/nix/store/x/sw/bin/vhealth", .to_string "check --config /nix/store/x/etc/vhealth/probes.json --json --wait 120s --every 2s")
   (q, b) = health_command (&LiveSystem { health_as = Some (.to_string "nobody"), ...s.clone () }) "/nix/store/x"
-  assert_eq! \-> (q.as_str (), b.iter () |> .take 6 |> .cloned |> .collect : Vec<String>) \-> ("/s/setpriv", .to_vec ([.to_string "--reuid", .to_string "nobody", .to_string "--regid", .to_string "nogroup", .to_string "--clear-groups", .to_string "/nix/store/x/sw/bin/vhealth"]))
+  assert_eq! \-> (q.as_str (), b.iter () |> .take 6 |> .cloned |> .collect : Vec<String>) \-> ("/s/setpriv", .to_vec ([.to_string "--reuid", .to_string "nobody", .to_string "--regid", .to_string "nobody", .to_string "--clear-groups", .to_string "/nix/store/x/sw/bin/vhealth"]))
+  (_, c) = health_command (&LiveSystem { health_as = Some (.to_string "vhealth"), health_group = Some (.to_string "probes"), ...s.clone () }) "/nix/store/x"
+  head4 = c.iter () |> .take 4 |> .cloned |> .collect : Vec<String>
+  assert_eq! \-> head4 \-> .to_vec ([.to_string "--reuid", .to_string "vhealth", .to_string "--regid", .to_string "probes"])
 
 test "a healthy generation is switched to, then made the boot default"
   w = world "/nix/store/x-old"
@@ -695,6 +715,20 @@ test "while comin is active nothing is switched; the running generation is alrea
   assert! \-> !(is_bad (&a.state_dir) "/nix/store/x-new")
   same = world "/nix/store/x-new"
   assert_eq! \-> applied (same.clone ()) (a.clone ()) \-> Ok Outcome::Already
+  fs::remove_dir_all (&a.state_dir) |> .ok
+
+test "the running generation is never bad: a stale mark is cleared, nothing switches"
+  a = scratch "running-bad"
+  -- An old apply rolled X back and marked it bad; then X was switched to by hand.
+  mark_bad (&a.state_dir) "/nix/store/x-new" "unhealthy: nix-daemon down" |> .expect "mark"
+  w = world "/nix/store/x-new"
+  assert_eq! \-> applied (w.clone ()) (a.clone ()) \-> Ok Outcome::Already
+  assert! \-> !(is_bad (&a.state_dir) "/nix/store/x-new")
+  assert! \-> !(log_of (&w) |> .iter |> .any (\l -> l.starts_with "test " || l.starts_with "health "))
+  assert! \-> last_of (&a) |> .get "note" |> .and_then (\n -> n.as_str ()) |> .map (\n -> n.contains "mark is cleared") |> .unwrap_or false
+  -- Later, from another generation, X is welcome again: no refusal.
+  w2 = world "/nix/store/x-old"
+  assert_eq! \-> applied (w2.clone ()) (a.clone ()) \-> Ok Outcome::Switched
   fs::remove_dir_all (&a.state_dir) |> .ok
 
 test "an apply interrupted in the health window is decided by the next one"

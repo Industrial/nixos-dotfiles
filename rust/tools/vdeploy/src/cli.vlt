@@ -11,7 +11,7 @@
 --           [--health-window DURATION] [--health-every DURATION]
 --           [--vhealth PROG] [--profile PATH] [--gcroot PATH]
 --           [--nix-env PROG] [--nix-store PROG] [--systemctl PROG]
---           [--comin-unit UNIT] [--health-as USER [--setpriv PROG]]
+--           [--comin-unit UNIT] [--health-as USER [--health-group GROUP] [--setpriv PROG]]
 --
 -- `--mode observe` (the default) plans and logs, and never switches.
 -- `--mode deploy` (#160) runs each switching plan through `vdeploy apply`
@@ -21,7 +21,7 @@
 
 import nix_store_core::db
 
-export const USAGE : &str = "usage: vdeploy --host NAME [--mode observe|deploy] [--once] [--url URL] [--branch NAME] [--repo DIR] [--interval DURATION] [--debounce DURATION] [--tick DURATION] [--state-dir DIR] [--textfile-dir DIR] [--db FILE] [--git PROG] [--nix PROG] [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP] [--dotfiles-home DIR]] [APPLY OPTIONS] [--systemd-run PROG]\n       vdeploy apply [--toplevel PATH] [--state-dir DIR] [--textfile-dir DIR] [APPLY OPTIONS]\nAPPLY OPTIONS: [--health-window DURATION] [--health-every DURATION] [--vhealth PROG] [--profile PATH] [--gcroot PATH] [--nix-env PROG] [--nix-store PROG] [--systemctl PROG] [--comin-unit UNIT] [--health-as USER [--setpriv PROG]]"
+export const USAGE : &str = "usage: vdeploy --host NAME [--mode observe|deploy] [--once] [--url URL] [--branch NAME] [--repo DIR] [--interval DURATION] [--debounce DURATION] [--tick DURATION] [--state-dir DIR] [--textfile-dir DIR] [--db FILE] [--git PROG] [--nix PROG] [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP] [--dotfiles-home DIR]] [APPLY OPTIONS] [--systemd-run PROG]\n       vdeploy apply [--toplevel PATH] [--state-dir DIR] [--textfile-dir DIR] [APPLY OPTIONS]\nAPPLY OPTIONS: [--health-window DURATION] [--health-every DURATION] [--vhealth PROG] [--profile PATH] [--gcroot PATH] [--nix-env PROG] [--nix-store PROG] [--systemctl PROG] [--comin-unit UNIT] [--health-as USER [--health-group GROUP] [--setpriv PROG]]"
 
 export const DEFAULT_URL : &str = "https://github.com/Industrial/nixos-dotfiles.git"
 
@@ -58,12 +58,13 @@ export data Options
   , export vhealth Option<String>
   , export comin_unit String
   , export health_as Option<String>
+  , export health_group Option<String>
   , export setpriv String
   }
   deriving (Clone, Debug, PartialEq)
 
 export defaults : Options
-defaults = Options { host = String::new (), once = false, url = DEFAULT_URL.to_string (), branch = .to_string "main", repo = .to_string "/var/lib/vdeploy/repo", interval = 60, debounce = 0, tick = 5, state_dir = None, textfile_dir = None, db = db::DEFAULT_DB.to_string (), git = .to_string "git", nix = .to_string "nix", dotfiles = None, dotfiles_user = None, dotfiles_group = None, dotfiles_home = None, help = false, deploy = false, apply = false, toplevel = None, health_window = 120, health_every = 2, systemd_run = .to_string "systemd-run", systemctl = .to_string "systemctl", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", profile = .to_string "/nix/var/nix/profiles/system", gcroot = .to_string "/nix/var/nix/gcroots/vdeploy/candidate", vhealth = None, comin_unit = .to_string "comin.service", health_as = None, setpriv = .to_string "setpriv" }
+defaults = Options { host = String::new (), once = false, url = DEFAULT_URL.to_string (), branch = .to_string "main", repo = .to_string "/var/lib/vdeploy/repo", interval = 60, debounce = 0, tick = 5, state_dir = None, textfile_dir = None, db = db::DEFAULT_DB.to_string (), git = .to_string "git", nix = .to_string "nix", dotfiles = None, dotfiles_user = None, dotfiles_group = None, dotfiles_home = None, help = false, deploy = false, apply = false, toplevel = None, health_window = 120, health_every = 2, systemd_run = .to_string "systemd-run", systemctl = .to_string "systemctl", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", profile = .to_string "/nix/var/nix/profiles/system", gcroot = .to_string "/nix/var/nix/gcroots/vdeploy/candidate", vhealth = None, comin_unit = .to_string "comin.service", health_as = None, health_group = None, setpriv = .to_string "setpriv" }
 
 -- A duration in seconds: bare seconds, or a number with s/m/h/d.
 export parse_duration : &str -> Option<u64>
@@ -139,6 +140,8 @@ parse_args args =
         o.health_as := Some ((value (it.next ()) "--health-as")?)
       "--setpriv" ->
         o.setpriv := (value (it.next ()) "--setpriv")?
+      "--health-group" ->
+        o.health_group := Some ((value (it.next ()) "--health-group")?)
       "--host" ->
         o.host := (value (it.next ()) "--host")?
       "--once" ->

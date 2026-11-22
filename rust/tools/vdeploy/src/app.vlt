@@ -41,6 +41,10 @@ apply_args_of o =
   if &o.health_as is Some u
     a.push (.to_string "--health-as")
     a.push (u.clone ())
+  if &o.health_group is Some g
+    a.push (.to_string "--health-group")
+    a.push (g.clone ())
+  if o.health_as.is_some ()
     a.push (.to_string "--setpriv")
     a.push (o.setpriv.clone ())
   a
@@ -60,7 +64,7 @@ settings_of o = Settings { host = o.host.clone (), interval = o.interval, quiet_
 
 -- The live host for `vdeploy apply`.
 export system_of : &Options -> LiveSystem
-system_of o = LiveSystem { current = .to_string "/run/current-system", profile = o.profile.clone (), gcroot = o.gcroot.clone (), nix_env = o.nix_env.clone (), nix_store = o.nix_store.clone (), systemctl = o.systemctl.clone (), comin_unit = o.comin_unit.clone (), vhealth = o.vhealth.clone (), window = o.health_window, every = o.health_every, health_as = o.health_as.clone (), setpriv = o.setpriv.clone () }
+system_of o = LiveSystem { current = .to_string "/run/current-system", profile = o.profile.clone (), gcroot = o.gcroot.clone (), nix_env = o.nix_env.clone (), nix_store = o.nix_store.clone (), systemctl = o.systemctl.clone (), comin_unit = o.comin_unit.clone (), vhealth = o.vhealth.clone (), window = o.health_window, every = o.health_every, health_as = o.health_as.clone (), health_group = o.health_group.clone (), setpriv = o.setpriv.clone () }
 
 export apply_of : &Options -> Apply
 apply_of o = Apply { toplevel = o.toplevel.clone (), state_dir = state_dir_of o, textfile_dir = o.textfile_dir.clone () }
