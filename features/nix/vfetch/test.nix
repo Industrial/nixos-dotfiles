@@ -9,19 +9,25 @@
 #           (nix-serve is not used: its Perl bindings fail to load in this nixpkgs.)
 #   client: the feature; its substituters are [vfetch serve, the cache]. It does not
 #           have `payload` (not in its closure), so `nix-store -r` must substitute it.
+#           Last, the vfetch CLI fetches `imported` into a fresh /tmp store and adds it
+#           over the worker protocol (nix-store-core's AddToStoreNar from a reader).
 #
 #   nix build .#checks.x86_64-linux.vfetch-vm
 {pkgs}: let
   payload = pkgs.writeText "vfetch-payload" "substituted through vfetch serve\n";
   # Fetched with vfetch serve stopped: Nix must go on to the cache by itself.
   fallback = pkgs.writeText "vfetch-fallback" "substituted around a stopped vfetch serve\n";
+  # Imported by the vfetch CLI over the worker protocol (AddToStoreNar from a reader,
+  # #215): a NAR of more than two 256 KiB frames.
+  imported = pkgs.runCommand "vfetch-imported" {} "head -c 700000 /dev/zero | tr '\\0' v > $out";
+  vfetch = pkgs.callPackage ../../../rust/tools/vfetch/default.nix {};
 in
   pkgs.testers.runNixOSTest {
     name = "vfetch-vm";
 
     nodes = {
       cache = {...}: {
-        system.extraDependencies = [payload fallback];
+        system.extraDependencies = [payload fallback imported];
         environment.systemPackages = [pkgs.python3];
         networking.firewall.allowedTCPPorts = [5000];
       };
@@ -43,8 +49,8 @@ in
       with subtest("the cache serves the payload, signed"):
           cache.succeed("mkdir -p /run/cache-key")
           cache.succeed("nix-store --generate-binary-cache-key vfetch-test-cache-1 /run/cache-key/secret /run/cache-key/public")
-          cache.succeed("nix --extra-experimental-features nix-command store sign --key-file /run/cache-key/secret ${payload} ${fallback}")
-          cache.succeed("nix --extra-experimental-features nix-command copy --to file:///srv/cache ${payload} ${fallback}")
+          cache.succeed("nix --extra-experimental-features nix-command store sign --key-file /run/cache-key/secret ${payload} ${fallback} ${imported}")
+          cache.succeed("nix --extra-experimental-features nix-command copy --to file:///srv/cache ${payload} ${fallback} ${imported}")
           # As a real cache does; with no Priority line Nix would sort it at 0, first.
           cache.succeed("echo 'Priority: 40' >> /srv/cache/nix-cache-info")
           cache.succeed("systemd-run --unit cache-http python3 -m http.server 5000 --directory /srv/cache")
@@ -89,5 +95,21 @@ in
           client.wait_for_open_port(5101)
           client.succeed("systemctl kill --signal=KILL vfetch-serve")
           client.wait_until_succeeds("curl -sf http://127.0.0.1:5101/nix-cache-info", timeout=30)
+
+      with subtest("the vfetch CLI imports over the worker protocol, a frame per read"):
+          # A `nix daemon --stdio` child for a fresh store; NIX_CONFIG carries the
+          # test key to it, as nix.conf would.
+          out = client.succeed(
+              f"NIX_CONFIG='extra-trusted-public-keys = {public}' ${vfetch}/bin/vfetch ${imported}"
+              f" --from http://cache:5000 --trusted-key '{public}' --to /tmp/vstore"
+              " --staging /tmp/vstaging 2>&1"
+          )
+          assert "imported" in out, out
+          client.succeed(
+              "nix --extra-experimental-features nix-command store verify --store /tmp/vstore --all"
+              f" --option extra-trusted-public-keys '{public}'"
+          )
+          client.succeed("test $(wc -c < /tmp/vstore${imported}) -eq 700000")
+          client.succeed("test -z \"$(ls -A /tmp/vstaging/nar)\"")
     '';
   }
