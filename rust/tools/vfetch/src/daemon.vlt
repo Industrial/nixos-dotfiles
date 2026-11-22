@@ -16,21 +16,17 @@
 -- Each wave is imported in parallel over a pool of connections (the daemon
 -- serves each connection in its own process).
 
-import std::io::Read
-import std::path::{Path, PathBuf}
+import std::path::PathBuf
 import std::sync::Arc
 import std::collections::BTreeMap
 import id_effect::{Concurrency, Effect, HNil, Pool, for_each_par, from_async, succeed, suspend}
 import nix_store_core::hash
 import nix_store_core::narinfo::NarInfo
-import nix_store_core::worker::{Conn, DEFAULT_SOCKET, Daemon, Op, PathInfo, WorkerError, connect, is_valid_path, op_code, open_halves, process_stderr, put_bool, put_frame, put_path_info, put_str, put_u64, send}
+import nix_store_core::worker::{DEFAULT_SOCKET, Daemon, PathInfo, Reader, WorkerError, add_to_store_nar_reader, connect, is_valid_path, open_halves}
 import crate::fault::VfetchError
 import crate::importer::{Importer, ImporterService}
 import crate::remote::lifted
 import crate::stage::{Staging, discard, nar_file}
-
--- Frames of at most this many bytes.
-const FRAME : usize = 262144
 
 -- Where a connection goes: the daemon's socket, or a `nix daemon --stdio`
 -- child for the store named.
@@ -94,39 +90,15 @@ link_to e =
     Socket s -> socket_link s
     Stdio store -> stdio_link store
 
--- AddToStoreNar with the NAR read from `file`, a frame per chunk.
-add_file_on : async &mut Conn -> &PathInfo -> &Path -> Result<(), WorkerError>
-add_file_on c info file =
-  mut head = Vec::new () : Vec<u8>
-  put_u64 (&mut head) (op_code Op::AddToStoreNar)
-  put_str (&mut head) (&info.path)
-  put_path_info (&mut head) info
-  put_bool (&mut head) false
-  put_bool (&mut head) false
-  s <- send c (&head)
-  s?
-  mut f = (std::fs::File::open file)?
-  mut buf = vec![0u8; FRAME]
-  mut more = true
-  while more
-    n = (f.read (&mut buf))?
-    mut frame = Vec::new () : Vec<u8>
-    if n == 0
-      put_u64 (&mut frame) 0
-      more := false
-    else
-      put_frame (&mut frame) (&buf[0 .. n])
-    s2 <- send c (&frame)
-    s2?
-  e <- process_stderr c
-  e
+boxed : tokio::fs::File -> Reader
+boxed f = Box::new f
 
-add_file_io : async Daemon -> PathInfo -> PathBuf -> Result<(), WorkerError>
-add_file_io d info file =
-  locked <- d.0.lock ()
-  mut g = locked
-  r <- add_file_on (&mut g) (&info) (&file)
-  r
+-- A staged NAR, opened for core's AddToStoreNar-from-a-reader (a frame per
+-- read, never read whole).
+open_nar : async PathBuf -> Result<Reader, VfetchError>
+open_nar file =
+  f <- tokio::fs::File::open (&file)
+  f |> .map boxed |> .map_err (move \e -> VfetchError::Io "#{file.display ()}: #{e}")
 
 -- What the daemon is told about a path: the narinfo's, signatures included.
 export path_info_of : &NarInfo -> Result<PathInfo, VfetchError>
@@ -139,7 +111,7 @@ add_one : Pool<Link, VfetchError> -> Staging -> NarInfo -> Effect<(), VfetchErro
 add_one pool staging info =
   file = nar_file (&staging) (&info.store_path)
   path = info.store_path.clone ()
-  suspend (move \-> lifted (path_info_of (&info))) |> .flat_map (move \pi -> Effect::scoped (move \scope -> pool.get (&scope) |> .flat_map (move \link -> from_async (move \-> add_file_io link.daemon pi file) |> .map_err (move \e -> VfetchError::Import "#{path}: #{e}"))))
+  suspend (move \-> lifted (path_info_of (&info))) |> .flat_map (move \pi -> from_async (move \-> open_nar file) |> .flat_map (move \nar -> Effect::scoped (move \scope -> pool.get (&scope) |> .flat_map (move \link -> add_to_store_nar_reader (&link.daemon) pi nar false false |> .map_err (move \e -> VfetchError::Import "#{path}: #{e}")))))
 
 -- The batch in waves: each path after every reference it has in the batch.
 export waves : &[NarInfo] -> Vec<Vec<NarInfo>>

@@ -1181,6 +1181,35 @@ add_to_store_nar_from_on c info local repair dont_check_sigs =
   e <- process_stderr c
   e
 
+-- Bytes per read, and so at most per frame, of an upload from a reader.
+const READER_FRAME : usize = 262144
+
+-- Upload a NAR read from `nar` (a file, a pipe, a download), sent a frame per
+-- read, so memory stays at one frame. The reader must yield exactly the NAR
+-- `info` describes. A read error mid-upload leaves the daemon waiting for
+-- frames, so it breaks the connection.
+export add_to_store_nar_reader_on : given <R: AsyncRead + Unpin> async &mut Conn -> &PathInfo -> R -> bool -> bool -> Result<(), WorkerError>
+add_to_store_nar_reader_on c info nar repair dont_check_sigs =
+  head = add_to_store_nar_header info repair dont_check_sigs
+  s <- send c (&head)
+  s?
+  mut src = nar
+  mut buf = vec![0u8; READER_FRAME]
+  mut more = true
+  while more
+    got <- src.read (&mut buf)
+    n = (poisoned c (got |> .map_err Io))?
+    mut frame = Vec::new () : Vec<u8>
+    if n == 0
+      put_u64 (&mut frame) 0
+      more := false
+    else
+      put_frame (&mut frame) (&buf[0 .. n])
+    s2 <- send c (&frame)
+    s2?
+  e <- process_stderr c
+  e
+
 ------------------------------------------------------------------------
 -- The connection as an id_effect resource
 
@@ -1373,6 +1402,20 @@ export add_to_store_nar_from : &Daemon -> PathInfo -> PathBuf -> bool -> bool ->
 add_to_store_nar_from d info local repair dont_check_sigs =
   h = d.clone ()
   from_async (move \-> add_to_store_nar_from_io h info local repair dont_check_sigs)
+
+add_to_store_nar_reader_io : async Daemon -> PathInfo -> Reader -> bool -> bool -> Result<(), WorkerError>
+add_to_store_nar_reader_io d info nar repair dont_check_sigs =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- add_to_store_nar_reader_on (&mut g) (&info) nar repair dont_check_sigs
+  r
+
+-- Add a path from a NAR read as it comes (a staged file, a download), a
+-- frame per read. `info.nar_hash` and `nar_size` must match what it yields.
+export add_to_store_nar_reader : &Daemon -> PathInfo -> Reader -> bool -> bool -> Effect<(), WorkerError, HNil>
+add_to_store_nar_reader d info nar repair dont_check_sigs =
+  h = d.clone ()
+  from_async (move \-> add_to_store_nar_reader_io h info nar repair dont_check_sigs)
 
 add_temp_root_io : async Daemon -> String -> Result<(), WorkerError>
 add_temp_root_io d path =
@@ -1703,6 +1746,55 @@ test "the client and server handshakes agree, and the client ops speak the proto
   assert_eq! \-> ok (&rt) (nar_from_path (&d) (path.clone ())) \-> nar
   assert! \-> rt.block_on (close d) |> .into_result |> .is_ok
   uploaded = ok (&rt) (server.join ())
+  assert_eq! \-> uploaded \-> nar
+
+-- Serve one AddToStoreNar and return what the grammar's decoders read: the
+-- info, both flags, each frame's length and the NAR the frames carried.
+#[cfg(test)]
+take_upload : async tokio::io::DuplexStream -> Result<(PathInfo, bool, bool, Vec<usize>, Vec<u8>), WorkerError>
+take_upload stream =
+  (r, w) = tokio::io::split stream
+  mut c = conn_of (Box::new r) (Box::new w)
+  hello = ServerHello { version = 293, nix_version = .to_string "2.31.0-fake", trusted = Some true, features = Vec::new () }
+  h <- server_handshake (&mut c) (&hello)
+  h?
+  p <- expect_op (&mut c) AddToStoreNar
+  path = p?
+  info <- next (&mut c) (move \b at -> take_path_info (path.clone ()) b at)
+  repair <- next (&mut c) take_bool
+  dont_check <- next (&mut c) take_bool
+  mut lens = Vec::new () : Vec<usize>
+  mut uploaded = Vec::new () : Vec<u8>
+  mut frames = true
+  while frames
+    f <- next (&mut c) take_frame
+    frame = f?
+    if frame.is_empty ()
+      frames := false
+    else
+      lens.push (frame.len ())
+      uploaded.extend_from_slice (&frame)
+  s <- send (&mut c) (&stderr_then (&[Last]))
+  s?
+  Ok ((info?, repair?, dont_check?, lens, uploaded))
+
+test "a NAR from a reader goes up a frame per read, with the flags as given"
+  rt = id_effect::Runtime::new () |> .expect "runtime"
+  (client_end, server_end) = tokio::io::duplex 4096
+  server = rt.fork (from_async (move \-> take_upload server_end))
+  d = ok (&rt) (open client_end)
+  path = .to_string "/nix/store/22222222222222222222222222222222-x"
+  -- A short first read, then more than two frames' worth.
+  head = b"nix-archive-1".to_vec ()
+  body = (0 .. 600000) |> .map (\i -> u8::try_from (i % 251) |> .unwrap_or 0) |> .collect : Vec<u8>
+  mut nar = head.clone ()
+  nar.extend_from_slice (&body)
+  reader = AsyncReadExt::chain (std::io::Cursor::new head) (std::io::Cursor::new body)
+  ok (&rt) (add_to_store_nar_reader (&d) (sample_info (path.clone ())) (Box::new reader) true false)
+  (info, repair, dont_check, lens, uploaded) = ok (&rt) (server.join ())
+  assert_eq! \-> info \-> sample_info path
+  assert_eq! \-> (repair, dont_check) \-> (true, false)
+  assert_eq! \-> lens \-> vec![13, READER_FRAME, READER_FRAME, 600000 - 2 * READER_FRAME]
   assert_eq! \-> uploaded \-> nar
 
 #[cfg(test)]

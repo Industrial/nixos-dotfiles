@@ -35,7 +35,8 @@ rusqlite = { version = "0.37", features = ["bundled"] }
 sha2 = "0.10"
 # The `nix daemon --stdio` children the worker importer talks to for a store
 # other than the system one (pipes for nix-store-core's worker::open_halves).
-tokio = { version = "1", features = ["process"] }
+# "fs": staged NARs opened as async readers for worker::add_to_store_nar_reader.
+tokio = { version = "1", features = ["fs", "process"] }
 
 [dev-dependencies]
 # A test signing key from a fixed seed, in Nix's key format.

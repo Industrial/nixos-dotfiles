@@ -18,6 +18,6 @@ in
     clientAsksVfetchFirst =
       assay.eq (builtins.head client.nix.settings.substituters) "http://127.0.0.1:5101";
     clientHasTheCacheBehindIt = assay.eq (builtins.elem "http://cache:5000" client.nix.settings.substituters) true;
-    cacheHasThePayloads = assay.eq (map (d: d.name) cache.system.extraDependencies) ["vfetch-payload" "vfetch-fallback"];
+    cacheHasThePayloads = assay.eq (map (d: d.name) cache.system.extraDependencies) ["vfetch-payload" "vfetch-fallback" "vfetch-imported"];
     cacheOpensItsPort = assay.eq cache.networking.firewall.allowedTCPPorts [5000];
   }
