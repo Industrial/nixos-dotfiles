@@ -107,10 +107,16 @@ last_of a =
 -- Tests
 
 #[cfg(test)]
-import nix_store_core::worker::{op_code, put_bool, put_str, put_u64}
+import nix_store_core::worker::{op_code, put_bool, put_str, put_strings, put_u64}
 
 #[cfg(test)]
 const A : &str = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a"
+
+#[cfg(test)]
+const B : &str = "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b"
+
+#[cfg(test)]
+const D : &str = "/nix/store/dddddddddddddddddddddddddddddddd-d"
 
 #[cfg(test)]
 store_on_test_db : Arc<Checker>
@@ -175,5 +181,44 @@ test "forwarded instead: not switched on, killed, split, or declined"
   std::fs::write ("#{dir}/forward-all") "" |> .expect "kill all"
   assert_eq! \-> decide (&m) 293 (&req) (&bytes) (&bytes) \-> None
   std::fs::remove_file ("#{dir}/forward-all") |> .expect "unkill all"
+  assert! \-> decide (&m) 293 (&req) (&bytes) (&bytes) |> .is_some
+  _gone = std::fs::remove_dir_all (&dir)
+
+#[cfg(test)]
+valid_paths_request : &[String] -> bool -> (Request, Vec<u8>)
+valid_paths_request paths substitute =
+  mut out = Vec::new () : Vec<u8>
+  put_u64 (&mut out) (op_code Op::QueryValidPaths)
+  put_strings (&mut out) paths
+  put_bool (&mut out) substitute
+  (Request { code = op_code Op::QueryValidPaths, op = Some Op::QueryValidPaths, paths = paths.to_vec () }, out)
+
+test "QueryValidPaths, on as on drakkar (#224): LAST, then the valid ones, sorted"
+  dir = switch_dir ()
+  m = native_mode (store_on_test_db ()) (&[Op::IsValidPath, Op::QueryValidPaths, Op::QueryPathInfo]) (dir.clone ())
+  asked = .to_vec ([D.to_string (), B.to_string (), A.to_string (), B.to_string ()]) : Vec<String>
+  (req, bytes) = valid_paths_request (&asked) false
+  mut want = last_bytes 293
+  put_strings (&mut want) (&[A.to_string (), B.to_string ()])
+  assert_eq! \-> decide (&m) 293 (&req) (&bytes) (&bytes) \-> Some (Bytes want)
+  -- Nothing valid among those asked: LAST and the empty set.
+  (none, none_bytes) = valid_paths_request (&[D.to_string ()]) false
+  mut empty = last_bytes 293
+  put_strings (&mut empty) (&Vec::new ())
+  assert_eq! \-> decide (&m) 293 (&none) (&none_bytes) (&none_bytes) \-> Some (Bytes empty)
+  _gone = std::fs::remove_dir_all (&dir)
+
+test "QueryValidPaths goes to the daemon: substitute, a split request, its kill switch"
+  dir = switch_dir ()
+  m = native_mode (store_on_test_db ()) (&[Op::QueryValidPaths]) (dir.clone ())
+  asked = .to_vec ([A.to_string (), D.to_string ()]) : Vec<String>
+  -- The daemon would ask the substituters: never answered here.
+  (sub, sub_bytes) = valid_paths_request (&asked) true
+  assert_eq! \-> decide (&m) 293 (&sub) (&sub_bytes) (&sub_bytes) \-> None
+  (req, bytes) = valid_paths_request (&asked) false
+  assert_eq! \-> decide (&m) 293 (&req) (&bytes) (&bytes[8 .. bytes.len ()]) \-> None
+  std::fs::write ("#{dir}/forward-QueryValidPaths") "" |> .expect "kill"
+  assert_eq! \-> decide (&m) 293 (&req) (&bytes) (&bytes) \-> None
+  std::fs::remove_file ("#{dir}/forward-QueryValidPaths") |> .expect "unkill"
   assert! \-> decide (&m) 293 (&req) (&bytes) (&bytes) |> .is_some
   _gone = std::fs::remove_dir_all (&dir)

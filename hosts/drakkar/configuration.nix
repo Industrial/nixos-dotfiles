@@ -49,9 +49,10 @@
   # ... in conformance mode (GH-183): native answers checked against the daemon's, which
   # clients still get. Counters: /run/vdaemon-proxy/conformance.prom. Rollback: delete.
   features.nix.vdaemon-proxy.conformance = true;
-  # ... and answering these itself (GH-183): the ops with 0 diffs in 133,768 real checks.
+  # ... and answering these itself (GH-183): the ops with 0 diffs in 133,768 real checks;
+  # QueryValidPaths after 311 matches and 0 diffs in the shadow (GH-224).
   # Kill switch (root): touch /run/vdaemon-proxy/forward-all. Rollback: lib.mkForce [].
-  features.nix.vdaemon-proxy.native = ["IsValidPath" "QueryPathInfo"];
+  features.nix.vdaemon-proxy.native = ["IsValidPath" "QueryPathInfo" "QueryValidPaths"];
   # vverify (Voltaic): the store checked against its database weekly, into node_exporter (GH-158).
   features.nix.vverify.enable = true;
   # vbump (Voltaic): per-input flake.lock bumps, one PR each; bin/update/flake runs it (GH-189).
