@@ -10,9 +10,10 @@ import crate::caps::{Caps, Wiring, live}
 import crate::cli::{Options, USAGE, parse_args}
 import crate::common::VciError
 import crate::common::VciError::Usage
+import crate::gate::Limits
 
 export wiring_of : &Options -> Wiring
-wiring_of o = Wiring { git = o.git.clone (), curl = o.curl.clone (), nix = o.nix.clone (), repo = o.repo.clone (), url = o.url.clone (), branch = o.branch.clone (), pulls_url = o.pulls_url.clone (), repo_slug = o.repo_slug.clone (), state = o.state_dir.clone (), textfile_dir = o.textfile_dir.clone (), db = o.db.clone (), api = o.api.clone (), token_file = o.token_file.clone () }
+wiring_of o = Wiring { git = o.git.clone (), curl = o.curl.clone (), nix = o.nix.clone (), repo = o.repo.clone (), url = o.url.clone (), branch = o.branch.clone (), pulls_url = o.pulls_url.clone (), repo_slug = o.repo_slug.clone (), state = o.state_dir.clone (), textfile_dir = o.textfile_dir.clone (), db = o.db.clone (), api = o.api.clone (), token_file = o.token_file.clone (), systemctl = o.systemctl.clone (), limits = Limits { max_load = o.max_load, min_free = o.min_free } }
 
 export settings_of : &Options -> Settings
 settings_of o = Settings { hosts = o.hosts.clone (), interval = o.interval }

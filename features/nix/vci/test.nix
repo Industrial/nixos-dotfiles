@@ -99,6 +99,10 @@ in
             interval = "3s";
             memoryMax = "1G";
             restrictedNixUsers = true;
+            # A 2-CPU, 2-GiB VM: the workstation defaults (load above the CPU count, under
+            # 10 GiB free) would keep it waiting. The switch check is kept, and tested.
+            maxLoad = 100;
+            minFreeMemory = "64M";
           };
           # The boot generation has no vci; the `vci` specialisation switches it in.
           systemd.services.vci.enable = config.vmtest.vci;
@@ -233,6 +237,21 @@ in
           t.assertEqual(r["beta"]["result"], "eval-failed")
           t.assertIn("beta is broken in this commit", r["beta"]["error"])
           cache.succeed(f"grep -q '^vci_last_result{{host=\"beta\",ref=\"main\",result=\"eval-failed\"}} 1$' {prom}")
+
+      with subtest("while a switch is in progress, vci waits; after it, it builds"):
+          # A stand-in for vdeploy's apply: the unit name vci checks.
+          cache.succeed("systemd-run --unit=vdeploy-apply --service-type=exec --collect sleep 600")
+          cache.wait_until_succeeds("journalctl -u vci -o cat | grep -q 'vci: waiting: a switch is in progress'", timeout=60)
+          cache.succeed("echo waits > /srv/work/waits.txt")
+          waited = commit("main: pushed during a switch")
+          git("push -q /srv/repo.git main")
+          # Several steps go by; the commit is not listed, evaluated or built.
+          cache.sleep(10)
+          cache.fail(f"test -e /var/lib/vci/done/{waited}")
+          t.assertEqual([x for x in records() if x["sha"] == waited], [])
+          cache.succeed("systemctl stop vdeploy-apply.service")
+          r = built(waited)
+          t.assertEqual(r["alpha"]["result"], "built")
 
       with subtest("a closed PR's roots are dropped; main's stay"):
           pulls([])

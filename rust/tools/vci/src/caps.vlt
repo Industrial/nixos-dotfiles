@@ -33,6 +33,7 @@ import crate::common::VciError::{Forge, Ledger}
 import crate::common::lifted
 import crate::refs::{Target, main_of, pulls_of, refspecs}
 import crate::report::{Built, Summary, metrics, record_json, record_of}
+import crate::gate::{Limits, available_of, busy_of, load_of}
 
 export class Forge_
   main : &self -> Effect<Option<Target>, VciError, HNil>
@@ -58,11 +59,16 @@ export class Ledger_
 export class Status
   post : &self -> String -> String -> String -> String -> Effect<(), Never, HNil>
 
+
+-- Whether the host is too busy for a step now (gate.vlt), and why.
+export class Gate
+  busy : &self -> Effect<Option<String>, Never, HNil>
 export newtype ForgeTool = ForgeTool (export Arc<dyn Forge_ + Send + Sync>)
 export newtype NixTool = NixTool (export Arc<dyn Nix + Send + Sync>)
 export newtype StoreTool = StoreTool (export Arc<dyn Store + Send + Sync>)
 export newtype LedgerTool = LedgerTool (export Arc<dyn Ledger_ + Send + Sync>)
 export newtype StatusTool = StatusTool (export Arc<dyn Status + Send + Sync>)
+export newtype GateTool = GateTool (export Arc<dyn Gate + Send + Sync>)
 
 instance Clone ForgeTool
   clone : &self -> Self
@@ -80,8 +86,11 @@ instance Clone StatusTool
   clone : &self -> Self
   clone self = StatusTool (Arc::clone (&self.0))
 
+instance Clone GateTool
+  clone : &self -> Self
+  clone self = GateTool (Arc::clone (&self.0))
 -- Everything vci needs, wired once at the edge.
-export data Caps { export forge ForgeTool, export nix NixTool, export store StoreTool, export ledger LedgerTool, export status StatusTool }
+export data Caps { export forge ForgeTool, export nix NixTool, export store StoreTool, export ledger LedgerTool, export status StatusTool, export gate GateTool }
   deriving (Clone)
 
 -- ---------------------------------------------------------------- live
@@ -324,6 +333,27 @@ instance Status LiveStatus
     s = self.clone ()
     suspend (move \-> posted s sha host state description)
 
+-- Live Gate: the kernel's load and memory, and whether a switch is running.
+export data LiveGate { export systemctl String, export limits Limits }
+  deriving (Debug, Clone)
+
+applying : &str -> bool
+applying systemctl =
+  Command::new systemctl |> .args ([.to_string "is-active", .to_string "--quiet", .to_string "vdeploy-apply.service"]) |> .stdin (Stdio::null ()) |> .status () |> .map (\s -> s.success ()) |> .unwrap_or false
+
+checked : LiveGate -> Option<String>
+checked g =
+  cpus = std::thread::available_parallelism () |> .map (\n -> u64::try_from (n.get ()) |> .unwrap_or 1) |> .unwrap_or 1
+  load = fs::read_to_string "/proc/loadavg" |> .ok |> .and_then (\t -> load_of (&t))
+  available = fs::read_to_string "/proc/meminfo" |> .ok |> .and_then (\t -> available_of (&t))
+  busy_of (&g.limits) cpus load available (applying (&g.systemctl))
+
+instance Gate LiveGate
+  busy : &self -> Effect<Option<String>, Never, HNil>
+  busy self =
+    g = self.clone ()
+    suspend (move \-> succeed (checked g))
+
 -- The live capabilities.
 export data Wiring
   { export git String
@@ -339,6 +369,8 @@ export data Wiring
   , export db String
   , export api String
   , export token_file Option<String>
+  , export systemctl String
+  , export limits Limits
   }
   deriving (Debug, Clone)
 
@@ -352,7 +384,8 @@ live w =
   store = StoreTool (Arc::new (LiveStore { roots = roots_dir (&w.state), db = w.db.clone () }))
   ledger = LedgerTool (Arc::new (LiveLedger { state = w.state.clone (), textfile_dir = w.textfile_dir.clone () }))
   status = StatusTool (Arc::new (LiveStatus { curl = w.curl.clone (), api = w.api.clone (), repo_slug = w.repo_slug.clone (), token_file = w.token_file.clone () }))
-  Caps { forge, nix, store, ledger, status }
+  gate = GateTool (Arc::new (LiveGate { systemctl = w.systemctl.clone (), limits = w.limits.clone () }))
+  Caps { forge, nix, store, ledger, status, gate }
 
 -- ---------------------------------------------------------------- scripted
 
@@ -370,6 +403,7 @@ export data Scripted
   , export roots Arc<Mutex<Vec<(String, String)>>>
   , export done Arc<Mutex<Vec<String>>>
   , export records Arc<Mutex<Vec<Built>>>
+  , export busy Option<String>
   , export log Arc<Mutex<Vec<String>>>
   }
   deriving (Clone, Default)
@@ -462,6 +496,10 @@ instance Ledger_ Scripted
     noted (&self.log) ("publish pending #{pending}")
     succeed (())
 
+instance Gate Scripted
+  busy : &self -> Effect<Option<String>, Never, HNil>
+  busy self = succeed (self.busy.clone ())
+
 instance Status Scripted
   post : &self -> String -> String -> String -> String -> Effect<(), Never, HNil>
   post self sha host state description =
@@ -471,7 +509,7 @@ instance Status Scripted
 export scripted_caps : Scripted -> Caps
 scripted_caps w =
   a = Arc::new w
-  Caps { forge = ForgeTool (a.clone ()), nix = NixTool (a.clone ()), store = StoreTool (a.clone ()), ledger = LedgerTool (a.clone ()), status = StatusTool a }
+  Caps { forge = ForgeTool (a.clone ()), nix = NixTool (a.clone ()), store = StoreTool (a.clone ()), ledger = LedgerTool (a.clone ()), status = StatusTool (a.clone ()), gate = GateTool a }
 
 test "a status body is GitHub's, and posting without a token file does nothing"
   body = status_body "success" "built in 3s" "vci/drakkar"

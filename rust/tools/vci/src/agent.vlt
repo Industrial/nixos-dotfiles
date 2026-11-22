@@ -176,7 +176,18 @@ warned e =
 export step : Caps -> Settings -> Effect<(), Never, HNil>
 step caps s =
   c = caps.clone ()
-  listed caps |> .flat_map (move \ts -> fetched c s ts) |> .catch warned
+  caps.gate.0.busy () |> .flat_map (move \why -> gated c s why)
+
+-- A busy host (gate.vlt) skips the step: nothing is listed, evaluated or built.
+gated : Caps -> Settings -> Option<String> -> Effect<(), Never, HNil>
+gated caps s why =
+  case why of
+    Some reason ->
+      eprintln! \-> "vci: waiting: #{reason}"
+      succeed (())
+    None ->
+      c = caps.clone ()
+      listed caps |> .flat_map (move \ts -> fetched c s ts) |> .catch warned
 
 -- The daemon: the step on a spaced Schedule.
 export daemon : Caps -> Settings -> Effect<(), Never, HNil>
@@ -256,6 +267,22 @@ test "every host gets a pending status, then its result"
   assert_eq! \-> statuses.len () \-> 4
   assert! \-> statuses[0].contains "drakkar pending" && statuses[1].contains "drakkar success: built in 7s (eval 3s)"
   assert! \-> statuses[2].contains "mimir pending" && statuses[3].contains "mimir failure: evaluation failed after 2s"
+
+test "a busy host skips the step: nothing is listed, fetched, evaluated or built"
+  w = Scripted { main = main_at 'a', busy = Some (.to_string "a switch is in progress"), ...Scripted::default () }
+  stepped (&w)
+  assert! \-> snapshot (&w.records) |> .is_empty
+  assert! \-> logged (&w) |> .is_empty
+  -- Once it is quiet, the next step builds.
+  quiet = Scripted { busy = None, ...w.clone () }
+  stepped (&quiet)
+  assert_eq! \-> snapshot (&w.done) \-> .to_vec ([sha 'a'])
+
+test "one request at a time: each host is evaluated and built before the next starts"
+  w = Scripted { main = main_at 'a', ...Scripted::default () }
+  stepped (&w)
+  work = logged (&w) |> .into_iter |> .filter (\l -> l.starts_with "eval " || l.starts_with "build ") |> .map (\l -> l.split_whitespace () |> .next |> .unwrap_or "" |> .to_string) |> .collect : Vec<String>
+  assert_eq! \-> work \-> .to_vec ([.to_string "eval", .to_string "build", .to_string "eval", .to_string "build"])
 
 test "a forge that is down builds nothing and the step does not fail"
   w = Scripted { forge_down = true, ...Scripted::default () }

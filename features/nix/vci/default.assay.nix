@@ -53,4 +53,7 @@ in
     # `nix eval` of a git+file flake runs git from PATH (the VM test found it missing).
     gitOnPath = assay.eq (builtins.any (p: (p.pname or "") == "git") svc.path) true;
     plainErrors = assay.eq svc.environment.NO_COLOR "1";
+    # A busy workstation makes it wait: the switch check needs systemctl; memory floor 10G;
+    # the load limit is the CPU count unless one is set.
+    waitsForAQuietHost = assay.eq [(has "--systemctl /nix/store/") (has "--min-free-memory 10G") (has "--max-load")] [true true false];
   }

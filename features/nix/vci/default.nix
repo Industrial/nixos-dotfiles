@@ -27,6 +27,13 @@
 # read-only except its state and the textfile directory. Builds run in the daemon's
 # sandbox as nixbld users, as any user's builds do.
 #
+# The host is a workstation. vci's own cgroup holds only the evaluations, one at a time
+# (one host after another, one commit per step). The builds run in the daemon's cgroup, at
+# the daemon's priority, max-jobs and cores, and an untrusted client cannot lower those.
+# So vci has at most one build request in flight, and a step does not start (nothing is
+# listed, evaluated or built) while vdeploy-apply is active, the 1-minute load is above
+# `maxLoad` (default: the number of CPUs), or MemAvailable is below `minFreeMemory` (10G).
+#
 # Rollback: `features.nix.vci.enable = lib.mkForce false;` stops it; its roots go with
 # /var/lib/vci's out-links (remove the directory to let vgc collect them).
 #
@@ -71,7 +78,12 @@
       "${pkgs.curl}/bin/curl"
       "--nix"
       "${config.nix.package}/bin/nix"
+      "--systemctl"
+      "${config.systemd.package}/bin/systemctl"
+      "--min-free-memory"
+      cfg.minFreeMemory
     ]
+    ++ lib.optionals (cfg.maxLoad != null) ["--max-load" (toString cfg.maxLoad)]
     ++ lib.optional (!cfg.pulls) "--no-pulls"
     ++ lib.optionals (cfg.pullsUrl != null) ["--pulls-url" cfg.pullsUrl]
     ++ lib.optionals (cfg.statusTokenFile != null) ["--status-token-file" "%d/status-token"];
@@ -119,6 +131,20 @@ in {
       type = types.str;
       default = "12G";
       description = "The unit's memory cap: the evaluations run in it (builds run in the daemon's).";
+    };
+    maxLoad = mkOption {
+      type = types.nullOr types.ints.positive;
+      default = null;
+      description = ''
+        Skip a step while the 1-minute load is above this (null: the number of CPUs). The
+        builds vci asks for run in the Nix daemon at the daemon's priority, which a client
+        that is not trusted cannot lower; vci waits for a quiet host instead.
+      '';
+    };
+    minFreeMemory = mkOption {
+      type = types.strMatching "[0-9]+[KMGT]?";
+      default = "10G";
+      description = "Skip a step while MemAvailable is below this (an evaluation of the largest host peaks near 7.2 GiB).";
     };
     statusTokenFile = mkOption {
       type = types.nullOr types.str;

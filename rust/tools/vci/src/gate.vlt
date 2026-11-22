@@ -1,0 +1,87 @@
+-- Whether this step may start: vci shares the cache host with a desktop.
+--
+-- vci's own cgroup (the evaluations) is niced, idle-scheduled and
+-- memory-capped by its unit. The builds it asks for run in the Nix daemon's
+-- cgroup, at the daemon's priority and with the daemon's max-jobs and cores:
+-- a client that is not trusted cannot lower those (the daemon ignores
+-- restricted settings from it), and vci is never trusted. So vci asks for one
+-- build at a time, and before a step it checks the host and skips the step
+-- when the host is busy:
+--
+--   * the 1-minute load is above `max_load` (default: the number of CPUs);
+--   * MemAvailable is below `min_free` bytes (default 10 GiB: an evaluation of
+--     the largest host peaks near 7.2 GiB);
+--   * vdeploy-apply.service is active (a switch is in progress).
+--
+-- A skipped step changes nothing; the next one looks again.
+
+-- The limits.
+export data Limits { export max_load Option<f64>, export min_free u64 }
+  deriving (Debug, Clone, PartialEq)
+
+export const DEFAULT_MIN_FREE : u64 = 10737418240
+
+-- The 1-minute load from /proc/loadavg.
+export load_of : &str -> Option<f64>
+load_of text = text.split_whitespace () |> .next |> .and_then (\w -> (w.parse () : Result<f64, std::num::ParseFloatError>) |> .ok)
+
+-- MemAvailable from /proc/meminfo, in bytes.
+export available_of : &str -> Option<u64>
+available_of text =
+  line = text.lines () |> .find (\l -> l.starts_with "MemAvailable:")
+  kib = line |> .and_then (\l -> l.split_whitespace () |> .nth 1) |> .and_then (\n -> (n.parse () : Result<u64, std::num::ParseIntError>) |> .ok)
+  kib |> .and_then (\k -> k.checked_mul 1024)
+
+-- A size with an optional K, M, G or T suffix (powers of 1024).
+export size_parsed : &str -> Option<u64>
+size_parsed s =
+  (digits, unit) = case s.char_indices () |> .find (\ic -> !(ic.1.is_ascii_digit ())) of
+    Some (i, _) -> s.split_at i
+    None -> (s, "")
+  n = (digits.parse () : Result<u64, std::num::ParseIntError>) |> .ok
+  scale = case unit of
+    "" -> Some 1
+    "K" -> Some 1024
+    "M" -> Some 1048576
+    "G" -> Some 1073741824
+    "T" -> Some 1099511627776
+    _ -> None
+  n |> .zip scale |> .and_then (\p -> p.0.checked_mul p.1)
+
+-- Why the step must wait, or None. Unknown readings never block.
+export busy_of : &Limits -> u64 -> Option<f64> -> Option<u64> -> bool -> Option<String>
+busy_of limits cpus load available applying =
+  max = limits.max_load |> .unwrap_or_else (\-> cpus_f cpus)
+  l = load |> .unwrap_or 0.0
+  a = available |> .unwrap_or u64::MAX
+  free_mib = a / 1048576
+  want_mib = limits.min_free / 1048576
+  if applying
+    Some (.to_string "a switch is in progress (vdeploy-apply.service)")
+  else if load.is_some () && l > max
+    Some "the load #{l} is above #{max}"
+  else if available.is_some () && a < limits.min_free
+    Some "#{free_mib} MiB available, below #{want_mib} MiB"
+  else
+    None
+
+cpus_f : u64 -> f64
+cpus_f n = u32::try_from n |> .map f64::from |> .unwrap_or 1.0
+
+test "the readings, as the kernel writes them"
+  assert_eq! \-> load_of "3.50 2.10 1.00 2/900 12345\n" \-> Some 3.5
+  assert_eq! \-> load_of "" \-> None
+  assert_eq! \-> available_of "MemTotal:  65536000 kB\nMemAvailable:   1024 kB\n" \-> Some 1048576
+  assert_eq! \-> available_of "MemTotal: 1 kB\n" \-> None
+  assert_eq! \-> (size_parsed "10G", size_parsed "512M", size_parsed "7", size_parsed "1Q") \-> (Some 10737418240, Some 536870912, Some 7, None)
+
+test "a switch, a high load or little memory makes the step wait; unknowns do not"
+  l = Limits { max_load = None, min_free = DEFAULT_MIN_FREE }
+  gib = 1073741824
+  assert_eq! \-> busy_of (&l) 16 (Some 3.0) (Some (40 * gib)) false \-> None
+  assert! \-> busy_of (&l) 16 (Some 3.0) (Some (40 * gib)) true |> .map (\w -> w.contains "vdeploy-apply") |> .unwrap_or false
+  assert! \-> busy_of (&l) 16 (Some 17.0) (Some (40 * gib)) false |> .map (\w -> w.contains "above 16") |> .unwrap_or false
+  assert! \-> busy_of (&l) 16 (Some 3.0) (Some (6 * gib)) false |> .map (\w -> w.contains "6144 MiB available") |> .unwrap_or false
+  assert_eq! \-> busy_of (&l) 16 None None false \-> None
+  strict = Limits { max_load = Some 2.0, min_free = gib }
+  assert! \-> busy_of (&strict) 16 (Some 3.0) (Some (40 * gib)) false |> .is_some

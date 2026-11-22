@@ -39,6 +39,7 @@ macro_rules! voltaic {
 }
 
 voltaic!(common);
+voltaic!(gate);
 voltaic!(refs);
 voltaic!(report);
 voltaic!(caps);
