@@ -63,6 +63,24 @@ in
     carriesVwhyNotNixTree = assay.eq [(has "cli.vwhy") (has "cli.nix-tree")] [true false];
     nixTreeRollsBack = assay.eq [(builtins.elem "cli.vwhy" rolledBack) (builtins.elem "cli.nix-tree" rolledBack)] [true true];
 
+    # vswitch took over from nh and nixos-rebuild (GH-241): bin/update/system switches
+    # through it, and nh is not installed beside it.
+    vswitchReplacesNh = assay.eq [(has "cli.vswitch") (has "cli.nh")] [true false];
+
+    # The rollback is one option: a host that turns vswitch off gets nh back (and
+    # bin/update/system falls back to nixos-rebuild), with nothing else to change.
+    rollbackRestoresNh = let
+      off = features.enabledFeatures (features.evalSelection {
+        modules = [
+          ({lib, ...}: {
+            profiles.cli-core.enable = true;
+            features.cli.vswitch.enable = lib.mkForce false;
+          })
+        ];
+      });
+    in
+      assay.eq [(builtins.elem "cli.vswitch" off) (builtins.elem "cli.nh" off)] [false true];
+
     # cli-core is CLI only: nothing outside features/cli.
     onlyCliFeatures = assay.eq (builtins.filter (f: builtins.substring 0 4 f != "cli.") on) [];
   }

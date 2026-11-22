@@ -163,6 +163,11 @@ expect "bin/dev build prefers vmon" 0 '^    builder=\(vmon -- nix\)$' cat "$DEV"
 has "and falls back to nom after it" '^  elif command -v nom >/dev/null 2>&1; then$'
 expect "bin/update/system builds the closure through vmon" 0 '^  vmon -- nix build --no-link "\$toplevel"$' \
     cat "$DOT/bin/update/system"
+# vswitch took over the local switch (GH-241): bin/update/system switches through it, and
+# only a host without it (the rollback) reaches nixos-rebuild.
+expect "bin/update/system switches through vswitch" 0 '^  switch="vswitch switch --flake ' \
+    cat "$DOT/bin/update/system"
+has "and nixos-rebuild only without it" '^if \[ -z "\$.vswitched:-." \]; then$'
 expect "bin/fleet builds each node's profile through vmon" 0 '^  vmon -- nix build --no-link ".#deploy.nodes.\$1.profiles.system.path"$' \
     cat "$DOT/bin/fleet"
 has "and before every deploy" '^        if ! prebuild "\$h" \|\| ! deploy_cmd'
