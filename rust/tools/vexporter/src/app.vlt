@@ -1,0 +1,191 @@
+-- The program. Every `--interval` (a spaced id_effect Schedule): read every
+-- source (sources.vlt), render the text (render.vlt) and write it atomically
+-- into the textfile directory (a temp file, then rename, so node_exporter
+-- never reads half a file). `--once` writes once and exits.
+--
+--   vexporter --textfile-dir DIR [--once] [--interval DURATION] [--db FILE]
+--             [--nix DIR] [--gcroots DIR] [--profiles DIR] [--current PATH]
+--             [--booted PATH] [--vdeploy-state DIR] [--nixos-version PROG]
+
+import std::fs
+import std::io::Write
+import std::path::Path
+import std::time::{Duration, Instant, SystemTime, UNIX_EPOCH}
+import id_effect::{Effect, HNil, Never, Schedule, effect, fail, succeed, suspend}
+import crate::render::metrics
+import crate::sources::{Paths, read_all}
+
+export const USAGE : &str = "usage: vexporter --textfile-dir DIR [--once] [--interval DURATION] [--db FILE] [--nix DIR] [--gcroots DIR] [--profiles DIR] [--current PATH] [--booted PATH] [--vdeploy-state DIR] [--nixos-version PROG]"
+
+export const FILE : &str = "vexporter.prom"
+
+export data Options { export textfile_dir String, export once bool, export interval u64, export paths Paths, export help bool }
+  deriving (Debug, Clone)
+
+export defaults : Options
+defaults = Options { textfile_dir = String::new (), once = false, interval = 60, paths = Paths { db = nix_store_core::db::DEFAULT_DB.to_string (), nix = .to_string "/nix", gcroots = .to_string "/nix/var/nix/gcroots", profiles = .to_string "/nix/var/nix/profiles", current = .to_string "/run/current-system", booted = .to_string "/run/booted-system", vdeploy_state = .to_string "/var/lib/vdeploy", nixos_version = .to_string "/run/current-system/sw/bin/nixos-version" }, help = false }
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+-- Seconds, or a number with s/m/h.
+export seconds_of : &str -> Option<u64>
+seconds_of s =
+  (digits, unit) = case s.char_indices () |> .find (\ic -> !(ic.1.is_ascii_digit ())) of
+    Some (i, _) -> s.split_at i
+    None -> (s, "")
+  n = (digits.parse () : Result<u64, std::num::ParseIntError>) |> .ok
+  scale = case unit of
+    "" -> Some 1
+    "s" -> Some 1
+    "m" -> Some 60
+    "h" -> Some 3600
+    _ -> None
+  n |> .zip scale |> .and_then (\p -> p.0.checked_mul p.1) |> .filter (\n -> *n > 0)
+
+export parse_args : &[String] -> Result<Options, String>
+parse_args args =
+  mut o = defaults ()
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "--textfile-dir" ->
+        o.textfile_dir := (value (it.next ()) "--textfile-dir")?
+      "--once" ->
+        o.once := true
+      "--interval" ->
+        v = (value (it.next ()) "--interval")?
+        o.interval := (seconds_of (&v) |> .ok_or ("--interval: not a positive duration: #{v}"))?
+      "--db" ->
+        o.paths.db := (value (it.next ()) "--db")?
+      "--nix" ->
+        o.paths.nix := (value (it.next ()) "--nix")?
+      "--gcroots" ->
+        o.paths.gcroots := (value (it.next ()) "--gcroots")?
+      "--profiles" ->
+        o.paths.profiles := (value (it.next ()) "--profiles")?
+      "--current" ->
+        o.paths.current := (value (it.next ()) "--current")?
+      "--booted" ->
+        o.paths.booted := (value (it.next ()) "--booted")?
+      "--vdeploy-state" ->
+        o.paths.vdeploy_state := (value (it.next ()) "--vdeploy-state")?
+      "--nixos-version" ->
+        o.paths.nixos_version := (value (it.next ()) "--nixos-version")?
+      "-h" ->
+        o.help := true
+      "--help" ->
+        o.help := true
+      other ->
+        return Err "unknown argument: #{other}"
+  if !o.help && o.textfile_dir.is_empty ()
+    return Err (.to_string "--textfile-dir is required")
+  Ok o
+
+-- A temp file beside the target, synced, then renamed over it.
+export write_atomic : &Path -> &str -> std::io::Result<()>
+write_atomic file text =
+  dir = file.parent () |> .unwrap_or (Path::new ".")
+  name = file.file_name () |> .map (\n -> n.to_string_lossy () |> .into_owned) |> .unwrap_or_default
+  tmp = dir.join (".#{name}.tmp")
+  mut out = (fs::File::create (&tmp))?
+  (out.write_all (text.as_bytes ()))?
+  (out.sync_all ())?
+  fs::rename (&tmp) file
+
+now_secs : u64
+now_secs = SystemTime::now () |> .duration_since UNIX_EPOCH |> .map (\d -> d.as_secs ()) |> .unwrap_or 0
+
+-- One run: every source, the text, the file.
+export ran : Options -> Result<(), String>
+ran o =
+  start = Instant::now ()
+  readings = read_all (&o.paths)
+  elapsed = start.elapsed ().as_millis ()
+  took = u64::try_from elapsed |> .unwrap_or u64::MAX
+  text = metrics (&readings) (now_secs ()) took
+  file = Path::new (&o.textfile_dir) |> .join FILE
+  write_atomic (&file) (&text) |> .map_err (\e -> "writing #{file.display ()}: #{e}")
+
+tick : Options -> Effect<(), Never, HNil>
+tick o =
+  suspend (move \-> said (ran o))
+
+said : Result<(), String> -> Effect<(), Never, HNil>
+said r =
+  if r is Err e
+    eprintln! \-> "vexporter: #{e}"
+  succeed (())
+
+-- The daemon: a run now, then one every `interval` seconds.
+export daemon : Options -> Effect<(), Never, HNil>
+daemon o =
+  eprintln! \-> "vexporter: writing #{o.textfile_dir}/#{FILE} every #{o.interval}s"
+  every = Schedule::spaced (Duration::from_secs o.interval)
+  Effect::repeat (move \-> tick (o.clone ())) every |> .map (\_ -> ())
+
+-- `--once`: one run; its failure is the exit code.
+once : Options -> Effect<(), String, HNil>
+once o =
+  suspend (move \-> done_or (ran o))
+
+done_or : Result<(), String> -> Effect<(), String, HNil>
+done_or r =
+  case r of
+    Ok () -> succeed (())
+    Err e -> fail e
+
+program : Options -> Effect<(), String, HNil>
+program o =
+  if o.once
+    once o
+  else
+    daemon o |> .widen
+
+-- On a fiber of the runtime's executor (as rust/tools/vdeploy's app.vlt).
+supervised : Effect<(), String, HNil> -> Effect<(), String, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  case parse_args (&args) of
+    Err why ->
+      eprintln! \-> "#{why}\n#{USAGE}"
+      std::process::ExitCode::from 64
+    Ok o -> if o.help
+      println! \-> "#{USAGE}"
+      std::process::ExitCode::SUCCESS
+    else
+      id_effect_cli::run_main (supervised (program o)) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+args : &[&str] -> Vec<String>
+args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "the command line: a directory is all it needs"
+  o = parse_args (&args (&["--textfile-dir", "/t"])) |> .expect "options"
+  assert_eq! \-> (o.textfile_dir.as_str (), o.interval, o.once, o.paths.gcroots.as_str ()) \-> ("/t", 60, false, "/nix/var/nix/gcroots")
+  p = parse_args (&args (&["--textfile-dir", "/t", "--once", "--interval", "5m", "--db", "/d", "--vdeploy-state", "/v"])) |> .expect "options"
+  assert_eq! \-> (p.once, p.interval, p.paths.db.as_str (), p.paths.vdeploy_state.as_str ()) \-> (true, 300, "/d", "/v")
+  assert! \-> parse_args (&args (&[])) |> .is_err
+  assert! \-> parse_args (&args (&["--textfile-dir", "/t", "--interval", "0"])) |> .is_err
+  assert! \-> parse_args (&args (&["--textfile-dir", "/t", "--frob"])) |> .is_err
+
+test "one run writes the whole file atomically, even with every source missing"
+  d = std::env::temp_dir () |> .join ("vexporter-run-#{std::process::id ()}")
+  fs::remove_dir_all (&d) |> .ok
+  fs::create_dir_all (&d) |> .ok
+  base = parse_args (&args (&["--textfile-dir", &d.to_string_lossy ()])) |> .expect "options"
+  o = Options { paths = Paths { db = .to_string "/nonexistent/db", nix = .to_string "/nonexistent", gcroots = .to_string "/nonexistent", profiles = .to_string "/nonexistent", current = .to_string "/nonexistent", booted = .to_string "/nonexistent", vdeploy_state = .to_string "/nonexistent", nixos_version = .to_string "/nonexistent" }, ...base }
+  assert! \-> ran o |> .is_ok
+  text = fs::read_to_string (d.join FILE) |> .unwrap_or_default
+  assert! \-> text.contains "vexporter_source_up{source=\"store\"} 0\n" && text.contains "vexporter_last_run_timestamp_seconds "
+  assert! \-> !(d.join (".#{FILE}.tmp") |> .exists)
+  fs::remove_dir_all (&d) |> .ok

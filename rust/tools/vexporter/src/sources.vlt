@@ -1,0 +1,209 @@
+-- The live readings, one per source, each a Result so one failing never
+-- stops the others (render.vlt writes what was read).
+--
+--   store        the database, opened read-only (WAL, no write lock) for one
+--                short query and closed: no read transaction is held across a
+--                tick, so nix-daemon's checkpoints never wait on vexporter.
+--                27 ms on drakkar's 188,755 paths.
+--   fs           statvfs(3) of /nix.
+--   gcroots      a walk of /nix/var/nix/gcroots that never follows a link:
+--                links and files are roots, real directories are walked (to a
+--                bounded depth), and an entry it cannot read is counted, never
+--                fatal.
+--   generations  the system profile's `system-<N>-link`s and their link
+--                times, and whether /run/booted-system, /run/current-system
+--                and the profile resolve to the same toplevel.
+--   deploy       vdeploy's status.json (main's head) and plan.json (its commit
+--                time), against the running system's configurationRevision.
+
+import std::fs
+import std::path::Path
+import std::process::{Command, Stdio}
+import serde_json::Value
+import nix_store_core::db
+import nix_store_core::generations::parse_generation
+import crate::render::{Deploy, Fs, Gens, Readings, Roots, Store}
+
+export data Paths
+  { export db String
+  , export nix String
+  , export gcroots String
+  , export profiles String
+  , export current String
+  , export booted String
+  , export vdeploy_state String
+  , export nixos_version String
+  }
+  deriving (Debug, Clone)
+
+-- How deep the gcroots walk goes (gcroots/auto, per-user, profiles: shallow).
+export const ROOTS_DEPTH : u64 = 6
+
+-- One query on a read-only connection, closed when it returns.
+export store_of : &str -> Result<Store, String>
+store_of path =
+  conn = (db::open path |> .map_err (\e -> "opening #{path}: #{e}"))?
+  row = (conn.query_row "SELECT COUNT(*), COALESCE(SUM(narSize), 0) FROM ValidPaths" () (\r -> Ok ((r.get 0)?, (r.get 1)?)) |> .map_err (\e -> "#{path}: #{e}"))? : (i64, i64)
+  Ok (Store { paths = u64::try_from row.0 |> .unwrap_or 0, nar_bytes = u64::try_from row.1 |> .unwrap_or 0 })
+
+rust """
+  /// statvfs(3) of `path`: the file system's size, and the bytes available
+  /// to unprivileged users.
+  #[allow(clippy::unnecessary_cast)]
+  pub fn fs_of(path: &str) -> Result<Fs, String> {
+      let c = std::ffi::CString::new(path).map_err(|e| format!("{path}: {e}"))?;
+      // SAFETY: a zeroed statvfs is a valid out-parameter; `c` is a valid C string.
+      let mut s: libc::statvfs = unsafe { std::mem::zeroed() };
+      let r = unsafe { libc::statvfs(c.as_ptr(), &mut s) };
+      if r != 0 {
+          return Err(format!("statvfs {path}: {}", std::io::Error::last_os_error()));
+      }
+      let block = s.f_frsize as u64;
+      Ok(Fs { size_bytes: (s.f_blocks as u64).saturating_mul(block), free_bytes: (s.f_bavail as u64).saturating_mul(block) })
+  }
+"""
+
+-- The walk: links and files count as roots, real directories are entered to
+-- `depth`, links are never followed, an unreadable entry is counted.
+export roots_in : &Path -> u64 -> Roots
+roots_in dir depth =
+  case fs::read_dir dir of
+    Err _ -> Roots { roots = 0, unreadable = 1 }
+    Ok entries ->
+      mut total = Roots { roots = 0, unreadable = 0 }
+      for e in entries
+        case e of
+          Err _ ->
+            total.unreadable := total.unreadable + 1
+          Ok entry ->
+            p = entry.path ()
+            case fs::symlink_metadata (&p) of
+              Err _ ->
+                total.unreadable := total.unreadable + 1
+              Ok m -> if m.file_type ().is_dir ()
+                if depth > 0
+                  sub = roots_in (&p) (depth - 1)
+                  total.roots := total.roots + sub.roots
+                  total.unreadable := total.unreadable + sub.unreadable
+              else
+                total.roots := total.roots + 1
+      total
+
+export roots_of : &str -> Result<Roots, String>
+roots_of dir =
+  if Path::new dir |> .is_dir
+    Ok (roots_in (Path::new dir) ROOTS_DEPTH)
+  else
+    Err "#{dir} is not a directory"
+
+link_time : &Path -> Option<i64>
+link_time p =
+  m = fs::symlink_metadata p |> .ok
+  t = m |> .and_then (\m -> m.modified () |> .ok)
+  t |> .and_then (\t -> t.duration_since std::time::UNIX_EPOCH |> .ok) |> .and_then (\d -> i64::try_from (d.as_secs ()) |> .ok)
+
+canonical : &str -> Option<std::path::PathBuf>
+canonical p = fs::canonicalize p |> .ok
+
+export gens_of : &Paths -> Result<Gens, String>
+gens_of p =
+  entries = (fs::read_dir (&p.profiles) |> .map_err (\e -> "#{p.profiles}: #{e}"))?
+  mut times = Vec::new () : Vec<i64>
+  for e in entries |> .filter_map (\e -> e.ok ())
+    name = e.file_name ().to_string_lossy () |> .to_string
+    if parse_generation "system" (&name) |> .is_some
+      if link_time (&e.path ()) is Some t
+        times.push t
+  if times.is_empty ()
+    return Err "no system generations in #{p.profiles}"
+  current = canonical (&p.current)
+  profile_link = Path::new (&p.profiles) |> .join "system" |> .to_string_lossy () |> .to_string
+  newest = times.iter () |> .max |> .copied |> .unwrap_or 0
+  oldest = times.iter () |> .min |> .copied |> .unwrap_or 0
+  Ok (Gens { count = u64::try_from (times.len ()) |> .unwrap_or 0, newest, oldest, booted_is_current = canonical (&p.booted) == current, profile_is_current = canonical (&profile_link) == current })
+
+read_json : &Path -> Option<Value>
+read_json path = fs::read_to_string path |> .ok |> .and_then (\t -> serde_json::from_str (&t) |> .ok)
+
+text_at : &Option<Value> -> &str -> Option<String>
+text_at v key = v |> .as_ref |> .and_then (\d -> d.get key) |> .and_then (\x -> x.as_str ()) |> .map (\s -> s.to_string ())
+
+running_rev : &str -> Option<String>
+running_rev program =
+  out = Command::new program |> .arg "--configuration-revision" |> .stdin (Stdio::null ()) |> .stderr (Stdio::null ()) |> .output () |> .ok
+  out |> .filter (\o -> o.status.success ()) |> .map (\o -> String::from_utf8_lossy (&o.stdout) |> .trim |> .to_string) |> .filter (\r -> !(r.is_empty ()) && r != "unknown")
+
+-- Pure: on main, and the head's commit time when the plan names it.
+export deploy_from : &Option<Value> -> &Option<Value> -> Option<String> -> Result<Deploy, String>
+deploy_from status plan running =
+  case text_at status "head" of
+    None -> Err (.to_string "vdeploy's status.json names no head (no vdeploy here, or no poll yet)")
+    Some head ->
+      on_main = running.as_deref () == Some (head.as_str ())
+      planned = text_at plan "commit"
+      head_time = if planned.as_deref () == Some (head.as_str ())
+        plan |> .as_ref |> .and_then (\d -> d.get "commitTime") |> .and_then (\x -> x.as_u64 ())
+      else
+        None
+      Ok (Deploy { on_main, head_time })
+
+export deploy_of : &Paths -> Result<Deploy, String>
+deploy_of p =
+  d = Path::new (&p.vdeploy_state)
+  status = read_json (&d.join "status.json")
+  plan = read_json (&d.join "plan.json")
+  deploy_from (&status) (&plan) (running_rev (&p.nixos_version))
+
+-- Every reading now.
+export read_all : &Paths -> Readings
+read_all p = Readings { store = store_of (&p.db), fs = fs_of (&p.nix), roots = roots_of (&p.gcroots), gens = gens_of p, deploy = deploy_of p }
+
+#[cfg(test)]
+scratch : &str -> std::path::PathBuf
+scratch name =
+  d = std::env::temp_dir () |> .join ("vexporter-#{name}-#{std::process::id ()}")
+  fs::remove_dir_all (&d) |> .ok
+  fs::create_dir_all (&d) |> .ok
+  d
+
+test "the gcroots walk counts links and files, never follows a link, and counts what it cannot read"
+  d = scratch "roots"
+  outside = scratch "outside"
+  fs::create_dir_all (d.join "auto") |> .ok
+  fs::create_dir_all (d.join "per-user" |> .join "tom") |> .ok
+  std::os::unix::fs::symlink ("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-x") (d.join "auto" |> .join "1") |> .ok
+  std::os::unix::fs::symlink ("/nonexistent") (d.join "auto" |> .join "dangling") |> .ok
+  fs::write (d.join "per-user" |> .join "tom" |> .join "root") "" |> .ok
+  -- A link to a directory full of entries outside the tree: one root, not walked.
+  for i in 0 .. 5
+    fs::write (outside.join "f#{i}") "" |> .ok
+  std::os::unix::fs::symlink (&outside) (d.join "elsewhere") |> .ok
+  r = roots_in (&d) ROOTS_DEPTH
+  assert_eq! \-> r \-> Roots { roots = 4, unreadable = 0 }
+  assert! \-> roots_of "/nonexistent/vexporter/gcroots" |> .is_err
+  fs::remove_dir_all (&d) |> .ok
+  fs::remove_dir_all (&outside) |> .ok
+
+test "the store: one read-only query on the database"
+  d = scratch "db"
+  path = d.join "db.sqlite"
+  conn = rusqlite::Connection::open (&path) |> .expect "db"
+  conn.execute_batch "CREATE TABLE ValidPaths (id INTEGER PRIMARY KEY, path TEXT, narSize INTEGER); INSERT INTO ValidPaths (path, narSize) VALUES ('/nix/store/a', 10), ('/nix/store/b', 32);" |> .expect "schema"
+  drop conn
+  assert_eq! \-> store_of (&path.to_string_lossy ()) \-> Ok (Store { paths = 2, nar_bytes = 42 })
+  assert! \-> store_of "/nonexistent/db.sqlite" |> .is_err
+  fs::remove_dir_all (&d) |> .ok
+
+test "deploy lag from vdeploy's files: on main, behind with a known head time, no vdeploy"
+  status = serde_json::from_str "{\"head\":\"abc\"}" |> .ok : Option<Value>
+  plan = serde_json::from_str "{\"commit\":\"abc\",\"commitTime\":700}" |> .ok : Option<Value>
+  assert_eq! \-> deploy_from (&status) (&plan) (Some (.to_string "abc")) \-> Ok (Deploy { on_main = true, head_time = Some 700 })
+  assert_eq! \-> deploy_from (&status) (&plan) (Some (.to_string "old")) \-> Ok (Deploy { on_main = false, head_time = Some 700 })
+  older = serde_json::from_str "{\"commit\":\"old\",\"commitTime\":1}" |> .ok : Option<Value>
+  assert_eq! \-> deploy_from (&status) (&older) None \-> Ok (Deploy { on_main = false, head_time = None })
+  assert! \-> deploy_from (&None) (&plan) None |> .is_err
+
+test "the store's file system answers statvfs"
+  f = fs_of "/" |> .expect "statvfs /"
+  assert! \-> f.size_bytes >= f.free_bytes && f.size_bytes > 0
+  assert! \-> fs_of "/nonexistent/vexporter" |> .is_err
