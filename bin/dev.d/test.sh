@@ -75,7 +75,7 @@ expect "check --hosts covers every nixosConfigurations host" 0 '^  check-install
 for h in drakkar huginn mimir muninn; do has "check --hosts has $h" "^  check-$h "; done
 expect "check --rust adds the cargo jobs" 0 '^  cargo-clippy ' "$DEV" check -n --rust
 has "check --rust has cargo-test" '^  cargo-test '
-has "check --rust has cargo-nix-drift" '^  cargo-nix-drift '
+has "check --rust has cargo-nix-drift, crate2nix on the workspace members" '^  cargo-nix-drift +bin/ci/cargo-standalone workspace-drift$'
 has "check --rust has cargo-standalone, every standalone crate" '^  cargo-standalone +bin/ci/cargo-standalone all$'
 expect "check --flake-checks runs bin/ci/flake-checks" 0 '^  flake-checks +bin/ci/flake-checks$' "$DEV" check -n --no-rust --flake-checks
 expect "check --scans adds clamav, lynis, stig" 0 '^  stig +bin/ci/stig$' "$DEV" check -n --no-rust --scans
@@ -120,15 +120,30 @@ crate "$T/rust/tools/beta" 1
 expect "cargo-standalone --list finds the standalone crates, sorted" 0 '^\["alpha", "beta"\]$' \
     env RUST_DIR="$T/rust" "$CS" --list
 lacks "cargo-standalone --list leaves out workspace members" 'member'
+# --members is what workspace-drift (ci.yml's cargo-nix-drift) regenerates (#165).
+expect "cargo-standalone --members finds the workspace members" 0 '^\["member"\]$' \
+    env RUST_DIR="$T/rust" "$CS" --members
 crate "$T/rust/tools/orphan" 0
 expect "cargo-standalone --list fails on a crate no job checks" 1 'orphan: neither a member' \
     env RUST_DIR="$T/rust" "$CS" --list
+expect "cargo-standalone --members fails on a crate no job checks" 1 'orphan: neither a member' \
+    env RUST_DIR="$T/rust" "$CS" --members
 rm -rf "$T/rust/tools/orphan" "$T/rust/tools/alpha" "$T/rust/tools/beta"
 expect "cargo-standalone --list fails when it finds nothing" 1 'no standalone crate' \
     env RUST_DIR="$T/rust" "$CS" --list
+# No member left: the cargo-nix-drift job would check nothing, so it says so and fails
+# rather than passing green forever.
+rm -rf "$T/rust/tools/member"
+crate "$T/rust/tools/alpha" 1
+expect "cargo-standalone --members fails when no member is left" 1 'no workspace member.*remove it' \
+    env RUST_DIR="$T/rust" "$CS" --members
+expect "cargo-standalone workspace-drift fails when no member is left" 1 'no workspace member' \
+    env RUST_DIR="$T/rust" "$CS" workspace-drift
 expect "cargo-standalone --list on this tree has nixos-update-notifier and vcache" 0 '"vcache"' "$CS" --list
 has "and nixos-update-notifier" '"nixos-update-notifier"'
 lacks "and not the workspace member oomkiller" 'oomkiller'
+expect "cargo-standalone --members on this tree is oomkiller" 0 '^\["oomkiller"\]$' "$CS" --members
+expect "cargo-standalone usage lists workspace-drift" 64 'workspace-drift +`drift` for every workspace member' "$CS"
 expect "cargo-standalone rejects a bad crate name" 1 "not a crate name" "$CS" clippy 'x;y'
 expect "cargo-standalone rejects a crate it did not find" 1 "not a standalone crate" "$CS" test oomkiller
 expect "cargo-standalone package rejects a bad crate name" 1 "not a crate name" "$CS" package 'x;y'
