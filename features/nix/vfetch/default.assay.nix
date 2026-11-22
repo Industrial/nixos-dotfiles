@@ -31,6 +31,8 @@ in
     startsAtBoot = assay.eq service.wantedBy ["multi-user.target"];
     restartsWhenItDies = assay.eq [service.serviceConfig.Restart service.serviceConfig.RestartSec] ["always" "2s"];
     sandboxed = assay.eq [service.serviceConfig.DynamicUser service.serviceConfig.ProtectSystem] [true "strict"];
+    # Its narinfo disk cache lives in its own state directory, nowhere else (#216).
+    keepsNarinfoCacheInItsStateDir = assay.eq service.serviceConfig.StateDirectory "vfetch";
 
     # Rollback: one switch drops the substituter and the service.
     rollbackDropsTheSubstituter = assay.eq (builtins.elem local off.nix.settings.substituters) false;

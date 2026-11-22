@@ -42,6 +42,7 @@ voltaic!(config);
 voltaic!(fault);
 voltaic!(plan);
 voltaic!(remote);
+voltaic!(narcache);
 voltaic!(target);
 voltaic!(stage);
 voltaic!(importer);
