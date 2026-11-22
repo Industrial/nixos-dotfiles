@@ -120,6 +120,7 @@ local function buildQuestieDB(flavor)
     factionIDs = pick("factionIDs", flavor),
     questFlags = pick("questFlags", flavor),
     npcFlags = pick("npcFlags", flavor),
+    npcRanks = pick("npcRanks", flavor),
     itemClasses = pick("itemClasses", flavor),
     waypointPresets = pick("waypointPresets", flavor),
   }

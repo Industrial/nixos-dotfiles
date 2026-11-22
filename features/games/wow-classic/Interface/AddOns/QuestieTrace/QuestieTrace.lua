@@ -6,7 +6,7 @@ local Core = QuestieTraceCore
 ---@type string
 local ADDON_NAME = "QuestieTrace"
 ---@type number
-local SCHEMA_VERSION = 19
+local SCHEMA_VERSION = 20
 ---@type number Safety cap on QuestieTraceCharacter.sessions -- a pure size
 --- backstop for players who never open the export window, not a substitute
 --- for reporting. Oldest sessions are dropped first; there is no
@@ -242,7 +242,7 @@ local EVENT_ARG_SANITIZERS = {
   CHAT_MSG_LOOT = Core.SanitizeChatMsgArgs,
   CHAT_MSG_MONEY = Core.SanitizeChatMsgArgs,
   CHAT_MSG_SKILL = Core.SanitizeChatMsgArgs,
-  CHAT_MSG_TRADESKILLS = Core.SanitizeChatMsgArgs,
+  CHAT_MSG_TRADESKILLS = Core.SanitizeTradeskillChatMsgArgs,
   CHAT_MSG_COMBAT_FACTION_CHANGE = Core.SanitizeChatMsgArgs,
   CHAT_MSG_COMBAT_XP_GAIN = Core.SanitizeChatMsgArgs,
 }

@@ -1,6 +1,6 @@
 ## Interface: 120100, 120105, 16001, 50504, 38000, 20506, 11508, 11509
 ## Title: Auctionator
-## Version: 349
+## Version: 350
 ## Author: plusmouse, Borjamacare
 ## X-Website: https://www.curseforge.com/wow/addons/auctionator
 ## X-Category: Auction/Economy
@@ -53,3 +53,4 @@ Source_LegacyAH\Manifest.xml [AllowLoadGameType vanilla, tbc, wrath]
 
 Source_TBC\Constants\Main.lua [AllowLoadGameType tbc, wrath]
 Source_Forever\Constants.lua [AllowLoadGameType camelot][ExcludeLoadGameType classic, standard]
+Data_Forever\Suffixes.lua [AllowLoadGameType camelot][ExcludeLoadGameType classic, standard]

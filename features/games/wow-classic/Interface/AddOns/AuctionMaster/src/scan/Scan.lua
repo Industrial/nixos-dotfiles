@@ -23,7 +23,6 @@ local Scan = AM.Scan
 -- The addon only starts a scan by itself when the auction house opens if the player switched that on in the options
 -- (Scan.IsAutoEnabled), AUTO_DELAY seconds after it opened; otherwise every scan is started with the scan button.
 local THROTTLE_SECONDS = 15 * 60
-local READY_WAIT = 30
 local READY_POLL = 0.5
 local READY_SETTLE = 1
 
@@ -54,6 +53,7 @@ local requestedAt = nil -- time() of the last ReplicateItems call
 local loadedAt = GetTime() -- when this file loaded, about the login or reload (debug log only)
 local manual = false -- the player started the running scan (a click), not the addon by itself: see AM.Chat
 local sent = false -- the running scan has called ReplicateItems
+local busy = false -- the running scan waits to send because the game's message system is busy
 local expectedAt = nil -- GetTime() at which the answer of the running scan is expected, for its progress
 local loginPending = false -- a login was seen and no scan has called ReplicateItems since
 local notBefore = 0 -- GetTime() before which no call is sent: LOGIN_OPEN_DELAY after the opening of the first scan after a login
@@ -103,6 +103,102 @@ end
 local function IsThrottled()
   local last = GetState().lastScan
   return last ~= nil and time() - last < THROTTLE_SECONDS
+end
+
+-- Another addon (Auctionator, TSM, ...) that calls ReplicateItems uses the one call the server allows per 15 minutes
+-- for the whole account, and ours would be ignored. A secure hook sees every call to C_AuctionHouse.ReplicateItems;
+-- ours is told apart by ownCall, set around it. A foreign call counts like ours (lastScan) and is marked
+-- (lastScanForeign) so the scan button can say who blocks. A call during the throttle changes nothing: the server
+-- ignored it as well. The hook is installed once the function exists (at load, else on the first scan or opening).
+local ownCall = false
+local hookInstalled = false
+
+local function OnOtherAddonCall()
+  if IsThrottled() then
+    return
+  end
+  local global = GetState()
+  global.lastScan = time()
+  global.lastScanForeign = true
+  AM.DebugLog.Log("scan", "another addon called ReplicateItems")
+  if state == WAITING and not sent then
+    -- our call would be ignored by the server and run into the timeout
+    scanId = scanId + 1
+    Finish()
+  end
+  AM.Events.Fire("SCAN_CHANGED")
+end
+
+local function InstallHook()
+  if hookInstalled or not (C_AuctionHouse and C_AuctionHouse.ReplicateItems) then
+    return
+  end
+  hookInstalled = true
+  hooksecurefunc(C_AuctionHouse, "ReplicateItems", function()
+    if not ownCall then
+      OnOtherAddonCall()
+    end
+  end)
+end
+InstallHook()
+
+-- The same from the effect, in case the hook does not see a call: the game's answer to ANY addon's request fires
+-- REPLICATE_ITEM_LIST_UPDATE. One arriving outside the 15 minutes of our own call (lastScan is set before ours is
+-- sent) belongs to another addon. The first one starts the throttle, so the many that follow return at once.
+--
+-- A scan by browsing (Auctionator's incremental scan) sends no ReplicateItems call but keeps the game's message system
+-- busy with a chain of requests, one every 0.6 s. The system is busy when BUSY_SENDS messages were sent in the last
+-- BUSY_WINDOW seconds, whoever sent them; the scan button greys out and says so (Scan.IsSystemBusy). The messages of
+-- the game's own opening of the auction house (about 16 at once) count too, which ends within seconds. The busy state
+-- lasts BUSY_HOLD seconds after the last message of a burst, so the pauses between the bursts of one flow (the game's
+-- search of another addon) do not make the button flicker. Our own searches need no guess: the system is busy exactly
+-- while one runs, and the messages they sent count no longer once it is done.
+local BUSY_SENDS = 4
+local BUSY_WINDOW = 3
+local BUSY_HOLD = 5
+local sentAt = {} -- GetTime() of the last messages, newest last, at most BUSY_SENDS
+local busyUntil = 0 -- GetTime() until which the system counts as busy
+local ownSearching = false -- one of our own searches ran at the last check
+
+-- True while one of our own searches runs (the player's auctions, the sell list, bargains, recipes).
+local function IsOwnSearchRunning()
+  return AM.OwnAuctions.IsRunning() or AM.SellScan.IsRunning() or AM.SearchQueue.IsAnyRunning()
+end
+
+local watch = CreateFrame("Frame")
+watch:RegisterEvent("REPLICATE_ITEM_LIST_UPDATE")
+watch:RegisterEvent("AUCTION_HOUSE_THROTTLED_MESSAGE_SENT")
+watch:SetScript("OnEvent", function(_, event)
+  if event == "REPLICATE_ITEM_LIST_UPDATE" then
+    OnOtherAddonCall()
+    return
+  end
+  sentAt[#sentAt + 1] = GetTime()
+  if #sentAt > BUSY_SENDS then
+    table.remove(sentAt, 1)
+  end
+  local now = sentAt[#sentAt]
+  if #sentAt >= BUSY_SENDS and now - sentAt[1] < BUSY_WINDOW then
+    busyUntil = now + BUSY_HOLD
+  end
+end)
+
+-- True while requests keep the game's message system busy (see above), or the running scan waits for it.
+function Scan.IsSystemBusy()
+  if state == WAITING and not sent and busy then
+    return true
+  end
+  if IsOwnSearchRunning() then
+    ownSearching = true
+    return true
+  end
+  if ownSearching then
+    -- our search is done: its messages say nothing about anyone else
+    ownSearching = false
+    busyUntil = 0
+    sentAt = {}
+  end
+  return GetTime() < busyUntil
 end
 
 -- Equipment is stored per item level (see AM.ItemDbKey), which the game works out from the link, and the link is only
@@ -474,6 +570,16 @@ function Scan.GetWaitSeconds()
   return math.max(0, THROTTLE_SECONDS - (time() - last))
 end
 
+-- True while another addon's full scan holds the server's 15 minutes (see OnOtherAddonCall).
+function Scan.IsBlockedByOtherAddon()
+  return GetState().lastScanForeign == true and Scan.GetWaitSeconds() > 0
+end
+
+-- True while the scan waits to send its call until the game's message system is no longer busy.
+function Scan.IsWaitingForSystem()
+  return state == WAITING and not sent and busy
+end
+
 function Scan.GetStartTime()
   return startTime
 end
@@ -513,12 +619,19 @@ function Scan.Start(isManual)
     return
   end
 
+  -- its auctions would not be stored (AM.AuctionHouse), so the server's 15 minutes are not spent on it
+  if AM.AuctionHouse.IsNeutral() then
+    AM.DebugLog.Log("scan", "not started, neutral auction house")
+    return
+  end
+
   manual = isManual == true
 
   state = WAITING
   scanId = scanId + 1
   startTime = GetTime()
   sent = false
+  busy = false
   local hold = math.max(0, notBefore - startTime)
   expectedAt = startTime + hold + READY_SETTLE + AnswerSeconds()
 
@@ -530,8 +643,10 @@ function Scan.Start(isManual)
   AM.Events.Fire("SCAN_CHANGED")
 
   -- Right after opening the auction house the game's message system is busy with the game's own requests. The call
-  -- waits until the system is ready and READY_SETTLE seconds longer, and is only sent if it is still ready then (all of
-  -- it at most READY_WAIT seconds). The response timeout starts with the call.
+  -- waits until the system is ready and READY_SETTLE seconds longer, and is only sent if it is still ready then. It is
+  -- never sent into a busy system, whoever keeps it busy (another addon's scan, the game): the game answers a request
+  -- sent then with "You are doing that too quickly" and drops it. The scan button says so (Scan.IsWaitingForSystem);
+  -- closing the auction house ends the wait. The response timeout starts with the call.
   local id = scanId
   local waited = 0
   local settled = false
@@ -545,7 +660,8 @@ function Scan.Start(isManual)
       return
     end
     local ready = C_AuctionHouse.IsThrottledMessageSystemReady()
-    if waited < READY_WAIT and (not ready or not settled) then
+    busy = not ready
+    if not ready or not settled then
       -- a pause after the first ready, and again after the system was busy once more in it
       local delay = ready and READY_SETTLE or READY_POLL
       settled = ready
@@ -567,7 +683,10 @@ function Scan.Start(isManual)
     loginPending = false
     requestedAt = time()
     GetState().lastScan = requestedAt
+    GetState().lastScanForeign = nil
+    ownCall = true
     C_AuctionHouse.ReplicateItems()
+    ownCall = false
     C_Timer.After(ResponseTimeout(), function()
       if id == scanId and state == WAITING then
         OnTimeout()
@@ -593,6 +712,7 @@ events:SetScript("OnEvent", function(_, event, isInitialLogin)
       loginPending = true
     end
   elseif event == "AUCTION_HOUSE_SHOW" then
+    InstallHook()
     openId = openId + 1
     shownAt = GetTime()
     if loginPending then

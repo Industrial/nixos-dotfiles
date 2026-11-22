@@ -77,6 +77,19 @@ local function IsRepeat(itemDbKey, fingerprint)
   return false
 end
 
+-- Searches the auctions of equipment as the game's sell form does: with the sell search and a copy of the key without
+-- item level and suffix (the server does not answer a key with a level). Every level is listed then, each result with
+-- a key of its own. Returns the key the results are read with.
+function ItemSearch.SendEquipmentSearch(ahItemKey, sorts)
+  local key = {}
+  for field, value in pairs(ahItemKey) do
+    key[field] = value
+  end
+  key.itemLevel, key.itemSuffix = 0, 0
+  C_AuctionHouse.SendSellSearchQuery(key, sorts, false)
+  return key
+end
+
 -- What one item can be sold for now (per item in copper), nil if no search of it was seen within CACHE_SECONDS.
 function ItemSearch.GetSellPrice(itemDbKey)
   local entry = sellPrices[itemDbKey]

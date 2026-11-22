@@ -1,0 +1,28 @@
+Map corrections in DungeonJournal 2.0.40 (built from 2.0.39)
+
+SUNKEN TEMPLE (Original Vanilla / WoW Classic):
+- Removed Cataclysm map id 220, modern WorldMap texture and fallback BLP.
+- Added five isolated, real pre-Cataclysm levels from the Classic Dungeon
+  Walkthrough map by eintr.net (source artwork, not Blizzard official art):
+  https://eintr.net/WoW/World-of-Warcraft-Classic-Dungeon-Walkthrough.html
+- Original Classic did not provide in-game dungeon maps. The source is an
+  accurate community walkthrough of the vanilla dungeon layout.
+- Boss pins recalibrated against the cropped pre-Cataclysm map images.
+
+BLACKMAW HOLD (Forever):
+- Added six levels, original cartography by Santiago Reyes:
+  https://sreyesmaps.com/mapas/bastion-faucenegra
+- Boss positions left empty until their exact locations are independently
+  verified; this prevents inaccurate placement.
+
+THE DROWNED CITY (Forever):
+- Preserved the existing first-floor art and all its boss pins.
+- Added Atal'Byzal as second floor (Santiago Reyes):
+  https://sreyesmaps.com/mapas/la-ciudad-ahogada
+
+All new images are embedded RGB TGA textures (1024x1024, cropped at
+vertical texture coordinate 683/1024) for the WoW client. No live URLs are
+required to display the maps.
+
+2.0.49: Sunken Temple's five floors above were replaced by one map (the game's own Temple of Atal'Hakkar map, sent by M); the five SunkenTempleVanilla*Map.tga files are no longer in the addon.
+

@@ -12,9 +12,9 @@ ModernMapMarkersDB = {
 ["showSkyships"] = true,
 ["showMarkers"] = true,
 ["transportFaction"] = "all",
-["showRaids"] = true,
+["showTransportHints"] = true,
 ["showBoats"] = true,
 ["bgFaction"] = "all",
 ["showConvergences"] = true,
-["showTransportHints"] = true,
+["showRaids"] = true,
 }

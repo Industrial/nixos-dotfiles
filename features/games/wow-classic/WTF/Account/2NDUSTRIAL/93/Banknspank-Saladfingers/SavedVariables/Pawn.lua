@@ -1,7 +1,7 @@
 
 PawnOptions = {
 ["LastVersion"] = 2.1316,
-["LastPlayerFullName"] = "Banknspank-CAMWOW EU4 Realm 1 PvE",
+["LastPlayerFullName"] = "Banknspank-",
 ["AutoSelectScales"] = false,
 }
 PawnMrRobotScaleProviderOptions = nil

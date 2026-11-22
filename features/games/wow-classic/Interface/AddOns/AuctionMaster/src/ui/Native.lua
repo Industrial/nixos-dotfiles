@@ -82,6 +82,7 @@ function Native.CreateInset(parent, darken)
     fill:SetPoint("TOPLEFT", Native.PANEL_INSET, -Native.PANEL_INSET)
     fill:SetPoint("BOTTOMRIGHT", -Native.PANEL_INSET, Native.PANEL_INSET)
     fill:SetAtlas(LIST_BACKGROUND, false)
+    panel.fill = fill
   end
   return panel
 end
@@ -112,7 +113,7 @@ function Native.CreateListPanel(parent, itemList)
   end
   header:SetHeight(Native.HEADER_HEIGHT)
   body:SetPoint("BOTTOMRIGHT", -Native.PANEL_INSET, Native.PANEL_INSET)
-  return { frame = frame, header = header, body = body }
+  return { frame = frame, header = header, body = body, panel = panel }
 end
 
 -- Width a list leaves free on its right for the scroll bar: the bar of the auction house of the client plus its gap.

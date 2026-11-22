@@ -1,6 +1,6 @@
 # Auctionator
 
-## [349](https://github.com/TheMouseNest/Auctionator/tree/349) (2026-11-18)
-[Full Changelog](https://github.com/TheMouseNest/Auctionator/compare/348...349) 
+## [350](https://github.com/TheMouseNest/Auctionator/tree/350) (2026-11-21)
+[Full Changelog](https://github.com/TheMouseNest/Auctionator/compare/349...350) 
 
-- Forever: Auto-import from existing ruleset with faction shift in price database  
+- Forever: Use suffixes when computing item value  

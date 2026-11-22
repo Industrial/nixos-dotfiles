@@ -82,8 +82,8 @@ OPie_SavedData = {
 ["sliceToken"] = "ABueUoBZOrs",
 },
 ["save"] = true,
-["limit"] = "Derpnschmerp-Gorkndork",
 ["name"] = "Hunter Aspects",
+["limit"] = "Derpnschmerp-Gorkndork",
 },
 ["Hunter"] = {
 {
@@ -117,8 +117,8 @@ OPie_SavedData = {
 ["sliceToken"] = "ABueUoBZOrw",
 },
 ["save"] = true,
-["name"] = "Pet Control",
 ["limit"] = "Derpnschmerp-Gorkndork",
+["name"] = "Pet Control",
 },
 ["OPieFlagStore"] = {
 ["StoreVersion"] = 3,

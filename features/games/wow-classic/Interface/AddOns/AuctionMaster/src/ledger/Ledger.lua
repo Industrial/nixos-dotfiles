@@ -154,6 +154,16 @@ local function State()
   return state
 end
 
+-- The ledger to book into; nil while the demo is shown (StartDemo): nothing is booked then, so the demo stays as built
+-- and nothing real is mixed into it (or lost with it when it is thrown away).
+local function Writable()
+  local state = State()
+  if state.demo then
+    return nil
+  end
+  return state
+end
+
 local function CharIndex(state, guid)
   for index, known in ipairs(state.chars) do
     if known == guid then
@@ -167,7 +177,10 @@ end
 -- Adds the "auction created" event of an auction and remembers it as open. An auction we already know is ignored,
 -- unless it was only adopted from the owned auctions list (the list came before the game confirmed our post).
 function Ledger.RecordCreated(auctionId, guid, item, count, price, deposit, duration)
-  local state = State()
+  local state = Writable()
+  if not state then
+    return
+  end
   local known = state.open[auctionId]
   if known and known[OPEN_CREATED] then
     return
@@ -259,7 +272,10 @@ end
 -- known yet: such an auction is no candidate. sentAt: when the mail was sent, nil if not known (then now, the time it
 -- was sold by). False if no auction matches: nothing is booked then, never a guess.
 function Ledger.BookSale(guid, itemName, count, price, deposit, fee, sentAt, nameOf)
-  local state = State()
+  local state = Writable()
+  if not state then
+    return false
+  end
   local char = FindChar(state, guid)
   sentAt = sentAt or time()
   local bestId, best
@@ -297,7 +313,10 @@ local function BookTrade(kind, label, guid, item, count, price, at)
     AM.DebugLog.Log("ledger", "%s not booked: item %s x%s price %s", label, item, count, price)
     return false
   end
-  local state = State()
+  local state = Writable()
+  if not state then
+    return false
+  end
   state.events[#state.events + 1] = { at or time(), kind, CharIndex(state, guid), item, count, price }
   AM.DebugLog.Log("ledger", "%s %s x%s for %s", label, item, count, price)
   AM.Events.Fire("LEDGER_CHANGED")
@@ -383,7 +402,10 @@ function Ledger.BookCraft(guid, item, count, reagents, at)
     AM.DebugLog.Log("ledger", "craft not booked: item %s x%s, %s reagents", item, count, #flat / 2)
     return false
   end
-  local state = State()
+  local state = Writable()
+  if not state then
+    return false
+  end
   at = at or time()
   local char = CharIndex(state, guid)
   if not MergeIntoLast(state, Ledger.CRAFTED, char, item, count, flat, nil, at) then
@@ -417,7 +439,10 @@ function Ledger.BookDisenchant(guid, item, count, materials, at)
     AM.DebugLog.Log("ledger", "disenchant not booked: item %s x%s, %s materials", item, count, #flat / 2)
     return false
   end
-  local state = State()
+  local state = Writable()
+  if not state then
+    return false
+  end
   at = at or time()
   local char = CharIndex(state, guid)
   if not MergeIntoLast(state, Ledger.DISENCHANTED, char, item, count, flat, values, at) then
@@ -436,7 +461,10 @@ function Ledger.BookLoot(guid, item, count, at)
     AM.DebugLog.Log("ledger", "loot not booked: item %s x%s", item, count)
     return false
   end
-  local state = State()
+  local state = Writable()
+  if not state then
+    return false
+  end
   state.events[#state.events + 1] = { at or time(), Ledger.LOOTED, CharIndex(state, guid), item, count }
   AM.DebugLog.Log("ledger", "looted %s x%s", item, count)
   AM.Events.Fire("LEDGER_CHANGED")
@@ -449,7 +477,10 @@ function Ledger.BookJunk(guid, count, price, at)
   if not count or count <= 0 or not price then
     return false
   end
-  local state = State()
+  local state = Writable()
+  if not state then
+    return false
+  end
   state.events[#state.events + 1] = { at or time(), Ledger.JUNK_SOLD, CharIndex(state, guid), nil, count, price }
   AM.DebugLog.Log("ledger", "junk sold: %s items for %s", count, price)
   AM.Events.Fire("LEDGER_CHANGED")
@@ -475,7 +506,10 @@ end
 -- holding more: the rest was sold and its mail is not taken yet. That part loses the deposit a part sale would not give
 -- back (a part sale gives back floor(deposit * sold / count)); the rest stays open for its sale. False if none matches.
 local function BookReturn(kind, label, guid, item, count, sentAt, fits)
-  local state = State()
+  local state = Writable()
+  if not state then
+    return false
+  end
   local char = FindChar(state, guid)
   sentAt = sentAt or time()
   local bestId, best = OldestOpen(state, char, item, sentAt, function(open)
@@ -541,7 +575,10 @@ end
 -- is booked as canceled, losing the deposit left in it. Any other missing one has ended; it stays open for its mail
 -- and is closed as unknown once missing for longer than a mail stays in the inbox.
 function Ledger.ReconcileOwned(guid, owned)
-  local state = State()
+  local state = Writable()
+  if not state then
+    return
+  end
   local now = time()
   local changed = false
   local listed = {}
@@ -1037,7 +1074,10 @@ end
 -- another level) are compared together; the units missing are taken at no cost first, then the oldest, as CostBasis
 -- does when reading the event. Returns how many events were booked.
 function Ledger.ReconcileStock(guid, held, at)
-  local state = State()
+  local state = Writable()
+  if not state then
+    return 0
+  end
   local _, _, lots = CostBasis(state)
   local inAuctions = {}
   for _, open in pairs(state.open) do
@@ -1575,6 +1615,62 @@ function Ledger.Reset()
   wipe(state.days)
   wipe(state.months)
   wipe(state.stock)
+  wipe(cancelRequests)
+  wipe(pendingPosts)
+  AM.Events.Fire("LEDGER_CHANGED")
+end
+
+-- Demo mode (hidden developer command "/am demo", LedgerDemo builds the trades): the real ledger of this auction house
+-- is moved aside to the faction object "ledgerDemoStash" and a demo ledger (flag `demo`) takes its place until
+-- StopDemo moves it back. Nothing is booked while the demo is shown (Writable).
+local DEMO_STASH = "ledgerDemoStash"
+
+-- True while this auction house shows the demo ledger.
+function Ledger.IsDemo()
+  return State().demo == true
+end
+
+-- Replaces the ledger with a demo built from trades, booked by the character guid: { at, type (BOUGHT, SOLD or
+-- VENDOR_BOUGHT), item, count, price, deposit, fee, createdAt }; a sale also gets its "auction created" event at
+-- createdAt. The real ledger is moved aside first, unless the demo is already shown (then only the demo is built anew).
+-- False if a stash is there although no demo is shown: it is never overwritten.
+function Ledger.StartDemo(guid, trades)
+  local Database = AM.Database
+  if not Ledger.IsDemo() then
+    if Database.HasFactionObject(DEMO_STASH) then
+      AM.DebugLog.Log("ledger", "demo not started: a stashed ledger is there already")
+      return false
+    end
+    Database.MoveFactionObject("ledger", DEMO_STASH)
+  else
+    Database.RemoveFactionObject("ledger")
+  end
+  local state = State()
+  state.demo = true
+  local char = CharIndex(state, guid)
+  for _, trade in ipairs(trades) do
+    if trade.type == Ledger.SOLD then
+      state.events[#state.events + 1] = { trade.createdAt, Ledger.CREATED, char, trade.item, trade.count, trade.price,
+        trade.deposit }
+    end
+    state.events[#state.events + 1] = { trade.at, trade.type, char, trade.item, trade.count, trade.price,
+      trade.deposit, trade.fee }
+  end
+  table.sort(state.events, function(a, b)
+    return a[TIME] < b[TIME]
+  end)
+  wipe(cancelRequests)
+  wipe(pendingPosts)
+  AM.Events.Fire("LEDGER_CHANGED")
+  return true
+end
+
+-- Throws the demo away and moves the real ledger back. Nothing if no demo is shown.
+function Ledger.StopDemo()
+  if not Ledger.IsDemo() then
+    return
+  end
+  AM.Database.MoveFactionObject(DEMO_STASH, "ledger")
   wipe(cancelRequests)
   wipe(pendingPosts)
   AM.Events.Fire("LEDGER_CHANGED")

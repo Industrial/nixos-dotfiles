@@ -66,6 +66,23 @@ function Database.GetFactionObject(name, defaultValue)
   return GetObject(GetFactionContainer(), name, defaultValue)
 end
 
+-- True if the current auction house has an object of this name (none is created).
+function Database.HasFactionObject(name)
+  return GetFactionContainer()[name] ~= nil
+end
+
+-- Moves the object `from` of the current auction house to the name `to`, replacing what `to` held; with no object
+-- `from`, `to` is removed. Only the current auction house is touched.
+function Database.MoveFactionObject(from, to)
+  local container = GetFactionContainer()
+  container[to], container[from] = container[from], nil
+end
+
+-- Removes the object of this name from the current auction house.
+function Database.RemoveFactionObject(name)
+  GetFactionContainer()[name] = nil
+end
+
 -- For an object that used to be account-wide and is now kept per auction house under the same name: moves the
 -- entries of the old account-wide object whose key claim(key) accepts into the faction object (an entry it already
 -- has wins). The others wait there for their own auction house; the account-wide object is deleted once it is empty.

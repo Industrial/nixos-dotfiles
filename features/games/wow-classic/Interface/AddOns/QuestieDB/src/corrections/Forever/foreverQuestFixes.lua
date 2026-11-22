@@ -327,6 +327,9 @@ function ForeverQuestFixes:LoadDynamic()
             [questKeys.startedBy] = {{211022}},
             [questKeys.finishedBy] = {{211022}},
         },
+        [97287] = { -- Shrewd Negotiations
+            [questKeys.finishedBy] = {{269127}},
+        },
     }
 
     local questFixesAlliance = {

@@ -276,6 +276,10 @@ end
 -- Replaces the stored prices with the result of a new scan, given as a list of auctions
 -- ({ itemDbKey, count, price }), and blends the market prices with it.
 function ItemStore.Replace(auctions)
+  if AM.AuctionHouse.IsNeutral() then
+    AM.DebugLog.Log("store", "Replace: neutral auction house, not stored")
+    return
+  end
   local byItem = {}
   for _, auction in ipairs(auctions) do
     local list = byItem[auction.itemDbKey]
@@ -320,6 +324,10 @@ end
 -- an empty list for a complete answer (the game also fires empty ones while it restarts a search).
 function ItemStore.UpdateItem(itemDbKey, auctions)
   assert(type(itemDbKey) == "string", "ItemStore.UpdateItem needs an itemDbKey")
+  if AM.AuctionHouse.IsNeutral() then
+    AM.DebugLog.Log("store", "UpdateItem %s: neutral auction house, not stored", itemDbKey)
+    return
+  end
   if #auctions == 0 then
     local items = Items()
     if items[itemDbKey] then

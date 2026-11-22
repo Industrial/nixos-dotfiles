@@ -1,19 +1,22 @@
-# QuestieDB 1.1.3
+# QuestieDB 1.1.4
+
+### General fixes
+
+- Show QuestieDB version in addon list ([Cabro](https://github.com/Questie/QuestieDB/commit/0dc2169173c463e72afc4f93ff1e34197f7e186f))
 
 ### Quest fixes
 
-- Fix Raene's Cleansing quests ([Cabro](https://github.com/Questie/QuestieDB/commit/996cea9bc5aae3d410cee5a193dc1d08904d1e1f))
-- [Forever] Update quest XP data ([BreakBB](https://github.com/Questie/QuestieDB/commit/d85f6e1874687049573d8c8156575dd887705c5b))
-- [Forever] require Neutral reputation for "Buying Friendship" quests ([babyhuey](https://github.com/Questie/QuestieDB/commit/4a73dc6513f05714101cfc93eda147947b75574a), [Claude Sonnet 5.5](https://github.com/Questie/QuestieDB/commit/4a73dc6513f05714101cfc93eda147947b75574a))
+- [Forever] Update quest XP data ([BreakBB](https://github.com/Questie/QuestieDB/commit/89f208e26ba06f387a87b64953678883fe846450))
 
 ### Database fixes
 
-- Update race required for Stalk With The Earthmother quests ([Cabro](https://github.com/Questie/QuestieDB/commit/000495c2198ce12ea27ba5271d018c7382faf512))
-- [Forever] Fix location of "Image of Archmage Modera" ([BreakBB](https://github.com/Questie/QuestieDB/commit/e97375f66ce21e4c8da092660e669e727a77b99f))
-- [Forever] Update quests, NPCs, objects and items data ([BreakBB](https://github.com/Questie/QuestieDB/commit/405d648da766edf487ba2c1e3a9d23b1fde633e1))
+- [Forever] Fix location of "Henrig Lonebrow's Journal" ([BreakBB](https://github.com/Questie/QuestieDB/commit/0388969651832b7dea5a6ee5a9d19f767cd4ce86))
+- [Forever] Rename "Elixir of Fortitude" to "Elixir of Lesser Fortitude" (item 3825) ([BreakBB](https://github.com/Questie/QuestieDB/commit/4eca55553db99c8142f83ec07975b7dec8f6e28f))
+- [Forever] Update quests, NPCs, objects and items data ([BreakBB](https://github.com/Questie/QuestieDB/commit/1a1edf3116490fa371c9f1b21b8acae008e7ad60))
 
 ### Localization fixes
 
-- [Forever] Update all translations ([BreakBB](https://github.com/Questie/QuestieDB/commit/45264013cca3c4db6fcfb0c169d1e6bf7066030d))
+- Restore profession station object translations ([anon1231823](https://github.com/Questie/QuestieDB/commit/9cf27d6491dd80f1998aa0a846dbea9a3c5daad9))
+- [Forever] Update all translations ([BreakBB](https://github.com/Questie/QuestieDB/commit/51ebc17d853f1cd67f24a9e79e266a5cd2e2833a))
 
-[All changes since v1.1.2](https://github.com/Questie/QuestieDB/compare/v1.1.2..8b8df2dc12a34e2eb82bc7105b40405dce1c01f7)
+[All changes since v1.1.3](https://github.com/Questie/QuestieDB/compare/v1.1.3..933ec77a8151441c31a6356816feadaf145af73d)

@@ -46,7 +46,7 @@ local eventsLocales = {
         ["esES"] = "Festival Lunar",
         ["esMX"] = "Festival Lunar",
         ["frFR"] = "Fête lunaire",
-        ["koKR"] = (Expansions:IsEra() and "설날") or "달의 축제",
+        ["koKR"] = (Expansions.Current == Expansions.Era and "설날") or "달의 축제",
         ["ptBR"] = "Festival da Lua",
         ["ruRU"] = "Лунный фестиваль",
         ["zhCN"] = "新年",
@@ -98,7 +98,7 @@ local eventsLocales = {
         ["ptBR"] = "Solstício",
         ["ruRU"] = "Огненный солнцеворот",
         ["zhCN"] = "仲夏",
-        ["zhTW"] = (Expansions:IsEra() and "仲夏") or "仲夏節",
+        ["zhTW"] = (Expansions.Current == Expansions.Era and "仲夏") or "仲夏節",
     },
     ["Brewfest"] = {
         ["enUS"] = true,
@@ -363,6 +363,18 @@ local eventsLocales = {
         ["ruRU"] = "Разбить лагерь",
         ["zhCN"] = "露营",
         ["zhTW"] = "紮營",
+    },
+    ["Crafting"] = {
+        ["enUS"] = true,
+        ["deDE"] = "Handwerk",
+        ["esES"] = "Fabricación",
+        ["esMX"] = "Fabricación",
+        ["frFR"] = "Artisanat",
+        ["koKR"] = "제작 기술",
+        ["ptBR"] = "Criação",
+        ["ruRU"] = "Изготовление",
+        ["zhCN"] = "制造区",
+        ["zhTW"] = "製作",
     },
 }
 

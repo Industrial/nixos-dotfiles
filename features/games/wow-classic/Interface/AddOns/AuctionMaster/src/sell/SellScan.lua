@@ -15,7 +15,6 @@ local ANSWER_TIMEOUT = 5 -- an item nobody sells gets no answer at all
 local running = false
 local scanId = 0
 local queue, done, current = {}, 0, nil
-local formUsed, formBefore = false, nil -- the game's sell form was used to search, and what it held before
 local searched = {} -- itemDbKey -> time of the last search seen (also the game's own), nothing listed or not
 
 local searchedEmpty = {} -- itemId -> time of the last search that came back without any auction
@@ -51,33 +50,11 @@ function SellScan.GetProgress()
   return done, #queue
 end
 
--- The item in the game's sell form, nil if there is none.
-local function GetFormItem()
-  local house = AuctionHouseFrame
-  for _, name in ipairs({ "ItemSellFrame", "CommoditiesSellFrame" }) do
-    local frame = house and house[name]
-    local location = frame and frame.GetItem and frame:GetItem()
-    if location and location:IsValid() then
-      return location
-    end
-  end
-end
-
 local function Finish()
   AM.DebugLog.Log("sellscan", "finished after %d of %d", done, #queue)
   running = false
   scanId = scanId + 1
   current = nil
-  -- the form shows what the player had in it before the scan again
-  local house = AuctionHouseFrame
-  if formUsed and house and house:IsShown() then
-    if formBefore and formBefore:IsValid() then
-      house:SetPostItem(formBefore)
-    else
-      house:ClearPostItem()
-    end
-  end
-  formUsed, formBefore = false, nil
   AM.Portrait.StopAnimate("sell")
   AM.Events.Fire("SELL_SCAN_CHANGED")
 end
@@ -95,14 +72,6 @@ local function Advance(token)
   AM.DebugLog.Log("sellscan", "item %s done (%d of %d)", token.itemDbKey, done, #queue)
   AM.Events.Fire("SELL_SCAN_CHANGED")
   local id = scanId
-  if token.form then
-    -- the form is emptied again as soon as it has answered, once the game has handled the event itself
-    C_Timer.After(0, function()
-      if id == scanId and AuctionHouseFrame then
-        AuctionHouseFrame:ClearPostItem()
-      end
-    end)
-  end
   C_Timer.After(PAUSE, function()
     if id == scanId then
       SendNext()
@@ -129,10 +98,10 @@ function SendNext()
     end)
     return
   end
-  local token = { itemId = item.itemId, itemDbKey = item.itemDbKey, form = item.equipment }
+  local token = { itemId = item.itemId, itemDbKey = item.itemDbKey }
   current = token
   AM.DebugLog.Log("sellscan", "search item %s (%d of %d) via %s", item.itemDbKey, done + 1, #queue,
-    item.equipment and "sell form" or "query")
+    item.equipment and "sell query" or "query")
   -- like the game's sell form: item searches (equipment, pets) are sorted by buyout then bid, commodities get no sort
   local sorts = {}
   if C_AuctionHouse.GetItemCommodityStatus(item.location) == Enum.ItemCommodityStatus.Item then
@@ -142,11 +111,9 @@ function SendNext()
     }
   end
   if item.equipment then
-    -- The game searches equipment without item level (to compare it with similar items) and lists every
-    -- level; the server stays silent to the same query sent from here. So the item is put into the game's own sell
-    -- form, as a click does, and the form sends it. What is found is stored per level (ItemSearch).
-    formUsed = true
-    AuctionHouseFrame:SetPostItem(item.location)
+    -- The game searches equipment with its sell search, which lists every level. What is found is stored per level
+    -- (ItemSearch). Never through the game's sell form: writing into it taints it and the bags (doc/taint-issue.md).
+    AM.ItemSearch.SendEquipmentSearch(item.ahItemKey, sorts)
   else
     C_AuctionHouse.SendSearchQuery(item.ahItemKey, sorts, false)
   end
@@ -163,7 +130,6 @@ function SellScan.Start(entries, rescan)
     return
   end
   queue, done = {}, 0
-  formBefore = GetFormItem()
   for _, entry in ipairs(entries) do
     local ahItemKey = not entry.ignored and (rescan or not IsCurrent(entry.itemDbKey)) and C_AuctionHouse.GetItemKeyFromItem(entry.location)
     if ahItemKey then

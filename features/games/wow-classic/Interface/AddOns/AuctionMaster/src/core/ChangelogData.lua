@@ -4,6 +4,16 @@ local addonName, AM = ...
 AM.ChangelogMarkdown = [====[
 # Changelog
 
+## 11.8.2
+
+- Sell tab: Double-clicking an auction takes you to the Buy tab again
+
+## 11.8.1
+
+- Sell tab: Fixed an occasional Lua error when selling, with a sell form of its own; Blizzard's form is still one tab away
+- Full scan: Shows when another addon has used up the server's scan and greys out the button until the next one is possible
+- Neutral auction house: Prices seen in Booty Bay, Gadgetzan and Everlook no longer mix into your faction's prices
+
 ## 11.8.0
 
 - Sell tab: Before you post, see how the item sold for you so far, at which of your prices and what it really earned, so you stop sinking money into items that never sold
@@ -217,6 +227,8 @@ AM.ChangelogMarkdown = [====[
 
 -- Chat message per version and language (enUS is the fallback).
 AM.ChangelogAnnounce = {
+  ["11.8.2"] = { silent = true },
+  ["11.8.1"] = { silent = true },
   ["11.8.0"] = { enUS = "Sell tab: Know your past sales before you post, and stop losing gold on items that never sell", deDE = "Verkaufen-Tab: Kenne deine bisherigen Verkäufe und verliere kein Gold mehr an Unverkauftes" },
   ["11.7.2"] = { silent = true },
   ["11.7.1"] = { silent = true },

@@ -6,7 +6,7 @@ local L = AM.L
 -- with what it nets at the auction house after the cut, what the stack is worth and a hint what to do with it:
 -- sell it at the auction house, to a vendor, keep it as a reagent of a recipe that pays, or hold it while the
 -- auction house pays far less than the market value. Without a recent search of an item (AM.SellScan) nothing is
--- known about it and the hint says to scan. A click puts the item into the game's sell form. Items the game does not let you auction are left out.
+-- known about it and the hint says to scan. A click puts the item into our sell form (AM.SellForm). Items the game does not let you auction are left out.
 AM.SellPanel = {}
 local SellPanel = AM.SellPanel
 local Widgets = AM.Widgets
@@ -61,16 +61,9 @@ local function IsSellMode()
   return mode ~= nil and (mode == modes.ItemSell or mode == modes.CommoditiesSell)
 end
 
--- The key of the item in the game's sell form, nil if there is none.
+-- The key of the item in our sell form, nil if there is none.
 local function GetPostedItemDbKey()
-  local house = AuctionHouseFrame
-  for _, name in ipairs({ "ItemSellFrame", "CommoditiesSellFrame" }) do
-    local frame = house[name]
-    local location = frame and frame.GetItem and frame:GetItem()
-    if location and location:IsValid() then
-      return (AM.ItemDbKey.FromLocation(location))
-    end
-  end
+  return AM.SellForm.GetItemDbKey()
 end
 
 -- The items that are reagents of recipes one of the characters knows: selling them would be a pity. Maps the item to
@@ -329,24 +322,10 @@ local function CreateRow(parent)
       SellPanel.OpenRowMenu(self, self.entry)
       return
     end
-    local house = AuctionHouseFrame
-    if self.entry and house and house.SetPostItem then
+    -- into our own form, never the game's (writing into the game's form taints it and the bags)
+    if self.entry then
       holdOrder = true
-      house:SetPostItem(self.entry.location)
-      -- the game offers the one stack selected, the quantity is everything there is of the item
-      for _, name in ipairs({ "ItemSellFrame", "CommoditiesSellFrame" }) do
-        local frame = house[name]
-        local item = frame and frame.GetItem and frame:GetItem()
-        if item and item:IsValid() and frame.QuantityInput and frame.QuantityInput:IsShown() then
-          local available = C_AuctionHouse.GetAvailablePostCount and C_AuctionHouse.GetAvailablePostCount(item)
-          frame.QuantityInput:SetQuantity(available or self.entry.count)
-          if frame.UpdatePostState then
-            frame:UpdatePostState()
-          end
-          -- the box was shown in this very frame: without this its text stays scrolled out of view (the game does the same)
-          frame.QuantityInput.InputBox:SetCursorPosition(0)
-        end
-      end
+      AM.SellForm.SetItem(self.entry.location)
     end
   end)
   row.hover = Widgets.CreateItemHover(row, function(self)
@@ -528,7 +507,8 @@ function SellPanel.Update()
   if not AuctionHouseFrame then
     return
   end
-  local sell = IsSellMode()
+  -- with the game's own sell form in use the panel steps aside too: its rows could not put an item into that form
+  local sell = IsSellMode() and AM.SellForm.IsEnabled()
   if not sell then
     dismissed = false
     holdOrder = false
@@ -567,15 +547,8 @@ local function Install()
     return
   end
   installed = true
-  AM.SellHistory.Install()
   if AuctionHouseFrame.SetDisplayMode then
     hooksecurefunc(AuctionHouseFrame, "SetDisplayMode", SellPanel.Update)
-  end
-  -- the row of the item in the sell form is highlighted
-  for _, name in ipairs({ "SetPostItem", "ClearPostItem" }) do
-    if AuctionHouseFrame[name] then
-      hooksecurefunc(AuctionHouseFrame, name, UpdateSoon)
-    end
   end
   AuctionHouseFrame:HookScript("OnShow", function()
     -- no half slid panel from the last time
@@ -644,3 +617,9 @@ AM.Events.Register("SELL_SCAN_CHANGED", function()
 end)
 -- An item was ignored or no longer ignored, or the filter for them changed.
 AM.Events.Register("SELL_FILTER_CHANGED", UpdateSoon)
+-- Another item in our sell form: its row is highlighted, its history shown.
+AM.Events.Register("SELL_FORM_CHANGED", function(what)
+  if what == "item" then
+    UpdateSoon()
+  end
+end)
