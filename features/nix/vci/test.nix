@@ -23,7 +23,10 @@
 #   5. one host failing to evaluate is that host's result: the other host is built and the
 #      commit is done;
 #   6. a closed PR's roots are dropped, main's stay;
-#   7. switched out live: the unit is gone, the roots stay; switched back in, it carries on.
+#   7. switched out live: the unit is gone, the roots stay; switched back in, it carries on;
+#   8. veval (GH-243): each built host's record is in /var/lib/vci/veval (world-readable,
+#      unsigned) and vcache serves it to the client signed with its own key; a record filed
+#      under another id, an unknown id and a traversal are 404s; an eval-failed host has none.
 {pkgs}: let
   inherit (pkgs) lib;
 
@@ -78,6 +81,10 @@ in
       }: {
         imports = [../vcache/default.nix ./default.nix noNetworkCaches];
 
+        # The flag vci's feature wrapper declares on a host: vcache serves vci's veval
+        # records where it is on (GH-243).
+        options.features.nix.vci.enable = lib.mkOption {default = true;};
+
         options.vmtest.vci = lib.mkOption {
           type = lib.types.bool;
           default = false;
@@ -125,7 +132,8 @@ in
         };
       };
 
-      client = {...}: {
+      client = {pkgs, ...}: {
+        environment.systemPackages = [pkgs.curl];
         imports = [noNetworkCaches];
         virtualisation.memorySize = 1024;
       };
@@ -162,6 +170,14 @@ in
       def roots():
           return cache.succeed("ls /var/lib/vci/roots").split()
 
+      def veval_id(sha, host, nixv):
+          # nix-store-core's veval::key_id (GH-243), recomputed from the repository.
+          import hashlib
+          tree = cache.succeed(f"git -C /srv/repo.git rev-parse {sha}^{{tree}}").strip()
+          lock = cache.succeed(f"git -C /srv/repo.git rev-parse {sha}:flake.lock").strip()
+          text = f"veval-1\nform=git+file?rev\ncommit={sha}\ntree={tree}\nlock={lock}\nhost={host}\nnix={nixv}\n"
+          return hashlib.sha256(text.encode()).hexdigest()
+
       def as_vci(cmd):
           return f"setpriv --reuid vci --regid vci --clear-groups -- {cmd}"
 
@@ -173,6 +189,8 @@ in
       # The forge: a work tree, its bare clone, and an empty open-PR list.
       cache.succeed("mkdir -p /srv/work && git -C /srv/work init -q -b main")
       cache.succeed("cp ${flake} /srv/work/flake.nix && chmod u+w /srv/work/flake.nix")
+      # A flake without inputs still has a lock; the veval key (GH-243) names its blob.
+      cache.succeed("echo '{\"nodes\":{\"root\":{}},\"root\":\"root\",\"version\":7}' > /srv/work/flake.lock")
       main1 = commit("main 1")
       cache.succeed("git clone -q --bare /srv/work /srv/repo.git")
       pulls([])
@@ -197,6 +215,32 @@ in
           cache.succeed(f"grep -q '^vci_commits_built_total 1$' {prom}")
           # The ledger and the metrics are readable by anyone.
           cache.succeed(as_vci(f"cat {prom}") + " > /dev/null")
+
+
+      with subtest("veval: vcache serves each built host's record signed; an eval-failed host has none"):
+          nixv = cache.succeed("nix --version").splitlines()[0].strip()
+          pub = cache.succeed("cat /var/lib/vcache/public-key").strip()
+          r = records()
+          for host in ["alpha", "beta"]:
+              rec = [x for x in r if x["sha"] == main1 and x["host"] == host][0]
+              rid = veval_id(main1, host, nixv)
+              # vci's file: world-readable, unsigned, under the key id.
+              cache.succeed(as_vci(f"test -r /var/lib/vci/veval/{rid}.veval"))
+              cache.fail(f"grep -q '^Sig:' /var/lib/vci/veval/{rid}.veval")
+              # vcache's answer, from another host: signed with the cache's own key.
+              text = client.succeed(f"curl -sf http://cache:5100/veval/{rid}.veval")
+              fields = dict(l.split(": ", 1) for l in text.splitlines() if ": " in l)
+              t.assertEqual((fields["Key"], fields["Host"], fields["Commit"], fields["Drv"], fields["Out"]), (rid, host, main1, rec["drv"], rec["out"]), text)
+              t.assertEqual(fields["Nix"], nixv, text)
+              t.assertTrue(fields["Sig"].startswith(pub.split(":")[0] + ":"), text)
+          # A record filed under another key's id is never signed or served.
+          wrong = veval_id(main1, "gamma", nixv)
+          cache.succeed(f"cp /var/lib/vci/veval/{veval_id(main1, 'alpha', nixv)}.veval /var/lib/vci/veval/{wrong}.veval")
+          client.fail(f"curl -sf http://cache:5100/veval/{wrong}.veval")
+          cache.succeed(f"rm /var/lib/vci/veval/{wrong}.veval")
+          client.fail("curl -sf http://cache:5100/veval/" + "0" * 64 + ".veval")
+          client.fail("curl -sf http://cache:5100/veval/..%2F..%2Fvcache%2Fsecret-key.veval")
+          cache.wait_until_succeeds("grep -q 'vcache_veval_requests_total{result=\"hit\"} 2' /var/lib/prometheus-node-exporter-text/vcache.prom", timeout=60)
 
       with subtest("a deploy of a vci-built commit does zero local builds"):
           out = records()[0]["out"]
@@ -237,6 +281,9 @@ in
           t.assertEqual(r["beta"]["result"], "eval-failed")
           t.assertIn("beta is broken in this commit", r["beta"]["error"])
           cache.succeed(f"grep -q '^vci_last_result{{host=\"beta\",ref=\"main\",result=\"eval-failed\"}} 1$' {prom}")
+          # GH-243: no record for the host that failed to evaluate.
+          cache.fail(f"test -e /var/lib/vci/veval/{veval_id(main2, 'beta', cache.succeed('nix --version').splitlines()[0].strip())}.veval")
+          cache.succeed(f"test -e /var/lib/vci/veval/{veval_id(main2, 'alpha', cache.succeed('nix --version').splitlines()[0].strip())}.veval")
 
       with subtest("while a switch is in progress, vci waits; after it, it builds"):
           # A stand-in for vdeploy's apply: the unit name vci checks.

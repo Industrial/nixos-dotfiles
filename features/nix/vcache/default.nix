@@ -27,6 +27,7 @@
 #     && curl -sf http://<tailscaleIp>:5100/$(basename $(readlink -f /run/current-system) | cut -c1-32).narinfo
 {
   config,
+  lib,
   pkgs,
   settings,
   ...
@@ -43,6 +44,13 @@
   # directory (setgid prometheus-textfile), as vhealth and vverify do.
   textfileDir = "/var/lib/prometheus-node-exporter-text";
   keyName = "${settings.hostname}-vcache-1";
+  # veval (GH-243): where vci, when it runs on this host, writes its evaluation records.
+  # vcache serves them at /veval/<key id>.veval, signed with its key at serve time, so
+  # vci never holds the key. /var/lib/vci is 0755 and its files 0644: readable here.
+  vevalDir =
+    if config.features.nix.vci.enable or false
+    then "/var/lib/vci/veval"
+    else null;
 
   # First start: a fresh key. Every start: the public half, to a file and the journal.
   ensureKey = pkgs.writeShellScript "vcache-ensure-key" ''
@@ -101,6 +109,9 @@ in {
       VCACHE_SIGN_KEY_FILE = "${stateDir}/secret-key";
       # GH-248: the request counters, flushed every 30 s (off the request path).
       VCACHE_TEXTFILE_DIR = textfileDir;
+    }
+    // lib.optionalAttrs (vevalDir != null) {
+      VCACHE_VEVAL_DIR = vevalDir;
     };
 
     serviceConfig = {

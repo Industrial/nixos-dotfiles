@@ -12,7 +12,8 @@
 # out, eval and build seconds, vdiff's summary of a PR against main), and vci.prom in
 # node_exporter's textfile directory (vci_eval_seconds, vci_build_seconds,
 # vci_last_result, vci_pending_commits, ...). The eval seconds are the measurement veval
-# (#243) starts from.
+# (#243) starts from. For each built host, also a veval record in /var/lib/vci/veval (GH-243),
+# which vcache on this host serves signed: vdeploy and vswitch use it instead of evaluating.
 #
 # GitHub commit statuses are OFF by default, and the CI result on PRs stays GitHub
 # Actions'. `statusTokenFile` (a root-only file, handed to the unit with LoadCredential,

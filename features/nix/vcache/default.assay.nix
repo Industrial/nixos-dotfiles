@@ -27,6 +27,15 @@ let
       modules = [./default.nix];
       settings.hostname = hostname;
     });
+  # The same host with vci on (GH-243): the option vci's feature wrapper declares.
+  withVci = nixos.eval {
+    modules = [
+      ./default.nix
+      {options.features.nix.vci.enable = lib.mkOption {default = true;};}
+    ];
+    settings.hostname = serving;
+  };
+  vciEnv = withVci.systemd.services.vcache.environment;
 in
   assay.suite "vcache-server" {
     installsVcache = assay.eq (nixos.hasPackage cfg "vcache") true;
@@ -84,4 +93,11 @@ in
     countersInTheTextfileDir = assay.eq [env.VCACHE_TEXTFILE_DIR sc.SupplementaryGroups sc.ReadWritePaths] ["/var/lib/prometheus-node-exporter-text" ["prometheus-textfile"] ["/var/lib/prometheus-node-exporter-text"]];
     noCopierUnit = assay.eq (cfg.systemd.services ? vcache-metrics) false;
     sandboxKept = assay.eq [sc.PrivateUsers sc.UMask sc.DynamicUser] [true "0077" true];
+
+    # veval (GH-243): with vci on this host, vcache serves its records from vci's state;
+    # without it there is no directory, and every /veval/ request is a 404. The sandbox
+    # is unchanged: the directory is world-readable, so nothing is added to ReadOnlyPaths.
+    servesVciRecords = assay.eq (vciEnv.VCACHE_VEVAL_DIR or null) "/var/lib/vci/veval";
+    noRecordsWithoutVci = assay.eq (env ? VCACHE_VEVAL_DIR) false;
+    vevalKeepsTheSandbox = assay.eq withVci.systemd.services.vcache.serviceConfig.ReadOnlyPaths sc.ReadOnlyPaths;
   }
