@@ -1,8 +1,13 @@
 name: 'Shell Startup Budget'
-description: 'Benchmark interactive Nushell startup against the nu -n floor on the same runner'
+description: 'Benchmark interactive Nushell startup against its base commit and the nu -n floor on the same runner'
 runs:
   using: 'composite'
   steps:
+    # The base is HEAD^1 (the job checks out with fetch-depth 2): on a pull request GitHub's
+    # merge commit, whose first parent is the branch it merges into; on main the previous
+    # main commit. bin/ci/shell-budget fails if it does not resolve.
     - name: Nushell startup budget
       shell: bash
+      env:
+        SHELL_BUDGET_BASE: HEAD^1
       run: ./bin/ci/shell-budget

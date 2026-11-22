@@ -104,12 +104,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # HEAD^1 is the base the differential compares against (bin/ci/shell-budget).
+          fetch-depth: 2
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
-      # The threshold is a ratio against `nu -n` measured in the same hyperfine run on this
-      # runner, so a slower and noisier machine than the one the number came from does not
-      # move it, and main gets no stricter gate than a pull request. The step summary
-      # carries the measurement; the log line carries the trend.
+      # GH-217: the gate is this tree's startup against its base's, measured side by side on
+      # this runner (runners differ by more than one completer costs), with a hard ratio
+      # backstop above the runner-to-runner noise. The step summary carries the
+      # measurement; the log line carries the trend.
       - name: Shell startup budget
         uses: ./.github/actions/shell-budget
   stig:
