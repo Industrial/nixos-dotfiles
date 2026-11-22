@@ -171,6 +171,26 @@ in
           machine.wait_until_succeeds(planned(newer), timeout=300)
           assert machine.succeed("readlink -f /run/current-system").strip() == system
 
+      with subtest("a restart keeps the totals: no reset, nothing counted twice (GH-221)"):
+          time.sleep(6)
+          before = {m: int(metric(m)) for m in ["vdeploy_plans_started_total", "vdeploy_plans_finished_total", "vdeploy_commits_skipped_total", "vdeploy_polls_total"]}
+          saved = json.loads(machine.succeed("cat /var/lib/vdeploy/counters.json"))
+          assert saved["schema"] == 1 and saved["plansStarted"] == before["vdeploy_plans_started_total"], (saved, before)
+          # A restarted agent does not know which commit it planned last, so it plans main's
+          # tip once more: exactly one more plan started and finished per restart. A reset
+          # would read lower, a base added twice higher.
+          for n in [1, 2]:
+              lines = int(machine.succeed("wc -l < /var/lib/vdeploy/plans.jsonl").strip())
+              machine.succeed("systemctl restart vdeploy")
+              machine.wait_until_succeeds(f"test $(wc -l < /var/lib/vdeploy/plans.jsonl) -gt {lines}", timeout=300)
+              want = before["vdeploy_plans_started_total"] + n
+              machine.wait_until_succeeds(f"grep -qx 'vdeploy_plans_finished_total {want}' ${dir}/vdeploy.prom", timeout=60)
+              assert metric("vdeploy_plans_started_total") == want, (n, metric("vdeploy_plans_started_total"), want)
+              assert metric("vdeploy_commits_skipped_total") == before["vdeploy_commits_skipped_total"]
+              assert metric("vdeploy_polls_total") > before["vdeploy_polls_total"]
+              saved = json.loads(machine.succeed("cat /var/lib/vdeploy/counters.json"))
+              assert saved["plansFinished"] == want, (saved, want)
+
       with subtest("node_exporter serves the metrics"):
           machine.wait_for_open_port(9100)
           machine.succeed("curl -sf http://127.0.0.1:9100/metrics | grep -q '^vdeploy_plans_started_total '")

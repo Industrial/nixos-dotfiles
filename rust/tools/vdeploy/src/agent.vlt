@@ -20,7 +20,7 @@ import id_effect::{Effect, HNil, Never, Ref, Schedule, effect, fail, succeed}
 import crate::caps::{BuilderTool, Caps, DifferTool, SourceTool}
 import crate::common::{DeployError, now_secs}
 import crate::dotfiles::{Checkout, state_name}
-import crate::report::{Plan, SAME, json_of, line_of, publish_metrics, publish_plan}
+import crate::report::{Plan, SAME, json_of, line_of, publish_metrics, publish_plan, publish_totals, totals_in}
 import crate::wake::{Wakes, publish_status, reader, waited, wakes}
 import crate::watch::{Decision, Head, Status, decide, failed_with, finished_with, observed, taken, unobserved, woke_still}
 
@@ -103,10 +103,19 @@ said s news =
     eprintln! \-> "vdeploy: #{crate::dotfiles::describe (&s.dotfiles) "main" c} [#{state_name c}]"
   succeed (())
 
+-- The Status a process starts from: its mode, and the totals the state
+-- directory kept across the last restart (GH-221).
+export started_status : &Settings -> Status
+started_status s = Status { deploy = s.deploy, base = totals_in (s.state_dir.clone ()), ...Status::default () }
+
 metered : Settings -> Status -> Effect<(), Never, HNil>
 metered s st =
   -- What `vdeploy wake --wait` reads (GH-246): the poll it waits for.
   if publish_status (s.state_dir.clone ()) (&st) s.quiet_polls s.deploy is Err e
+    eprintln! \-> "vdeploy: #{e}"
+  -- The totals before the metrics that show them (GH-221): a restart between the
+  -- two leaves the metrics behind the file, never ahead of it.
+  if publish_totals (s.state_dir.clone ()) (&st) is Err e
     eprintln! \-> "vdeploy: #{e}"
   if publish_metrics (s.textfile_dir.clone ()) (&st) is Err e
     eprintln! \-> "vdeploy: #{e}"
@@ -268,7 +277,7 @@ woken_daemon caps s fifo =
   eprintln! \-> "vdeploy: polling main every #{s.interval}s, and on a wake (#{fifo})"
   w = wakes ()
   work = Schedule::spaced (Duration::from_secs s.tick)
-  state = Ref::new (Status { deploy = s.deploy, ...Status::default () })
+  state = Ref::new (started_status (&s))
   c2 = caps.clone ()
   s2 = s.clone ()
   w2 = w.clone ()
@@ -302,7 +311,7 @@ daemon caps s =
   mode_said (&s)
   work = Schedule::spaced (Duration::from_secs s.tick)
   polls = Schedule::spaced (Duration::from_secs s.interval)
-  state = Ref::new (Status { deploy = s.deploy, ...Status::default () })
+  state = Ref::new (started_status (&s))
   c2 = caps.clone ()
   s2 = s.clone ()
   prepared caps s |> .flat_map (move \_ -> agent c2 s2 state work polls)
@@ -320,7 +329,7 @@ judged st =
 export once : Caps -> Settings -> Effect<(), DeployError, HNil>
 once caps s =
   effect!
-    let state = Ref::new(Status::default());
+    let state = Ref::new(started_status(&s));
     let now = Settings { quiet_polls: 0, ..s };
     ~poll(caps.clone(), now.clone(), state.clone()).widen();
     ~step(caps, now, state.clone()).widen();
