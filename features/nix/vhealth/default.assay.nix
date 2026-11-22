@@ -41,6 +41,17 @@ let
     };
   };
   cfg = nixos.eval {modules = [./default.nix declaring];};
+  # A host that restricts who may use the Nix daemon, as features/nixos/users does.
+  restricted = nixos.eval {
+    modules = [
+      ./default.nix
+      declaring
+      {
+        nix.settings.allowed-users = ["@wheel"];
+        features.nix.vhealth.restrictedNixUsers = true;
+      }
+    ];
+  };
   inherit ((builtins.fromJSON (builtins.unsafeDiscardStringContext cfg.features.nix.vhealth.probesJson))) probes;
   byName = builtins.listToAttrs (map (p: lib.nameValuePair p.name p) probes);
 
@@ -132,7 +143,13 @@ in
     restartsAlways = assay.eq sc.Restart "always";
 
     # Sandbox: the textfile directory is the one write; network allowed (it probes services).
-    dynamicUser = assay.eq sc.DynamicUser true;
+    # A static system user, the identity vdeploy's post-switch check also runs as (#160).
+    staticUser = assay.eq [sc.User sc.Group (sc.DynamicUser or false) cfg.users.users.vhealth.isSystemUser] ["vhealth" "vhealth" false true];
+    # Where the host restricts the Nix daemon, vhealth is added to the list (merged, never
+    # replacing it, never trusted); elsewhere nixpkgs' default stays.
+    mayUseTheRestrictedDaemon =
+      assay.eq [(lib.sort lib.lessThan restricted.nix.settings.allowed-users) (builtins.elem "vhealth" restricted.nix.settings.trusted-users)] [["@wheel" "vhealth"] false];
+    leavesAnUnrestrictedDaemonAlone = assay.eq cfg.nix.settings.allowed-users ["*"];
     protectSystemStrict = assay.eq sc.ProtectSystem "strict";
     onlyWritesTheTextfileDir = assay.eq sc.ReadWritePaths [dir];
     writesThroughTheTextfileGroup = assay.eq [sc.SupplementaryGroups sc.UMask] [["prometheus-textfile"] "0022"];
