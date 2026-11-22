@@ -1,0 +1,148 @@
+-- The pure core: what there is to build, which commit is next, and which
+-- result roots are no longer wanted. Nothing here runs anything.
+--
+-- A target is a ref and its head commit: `main`, or an open PR (`pull/N`).
+-- PRs come from GitHub's open-PR list, never from refs/pull/*/head (which
+-- GitHub keeps for every PR ever opened), and only same-repository ones: a
+-- fork's PR is someone else's code, and vci evaluates and builds what it is
+-- given on the cache host.
+
+import serde_json::Value
+
+export data Target { export name String, export sha String, export number Option<u64> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- `main` as `git ls-remote <url> refs/heads/<branch>` prints it.
+export main_of : &str -> &str -> Option<Target>
+main_of listing branch =
+  want = "refs/heads/#{branch}"
+  line = listing.lines () |> .find (\l -> l.split_whitespace () |> .nth 1 |> .map (\r -> r == want) |> .unwrap_or false)
+  sha = line |> .and_then (\l -> l.split_whitespace () |> .next) |> .map (\s -> s.to_string ())
+  sha |> .filter (\s -> is_sha s) |> .map (\s -> Target { name = .to_string "main", sha = s, number = None })
+
+-- A full git sha (40 hex digits, or 64 for SHA-256 repositories).
+export is_sha : &str -> bool
+is_sha s = (s.len () == 40 || s.len () == 64) && (s.chars () |> .all (\c -> c.is_ascii_hexdigit ()))
+
+text_at : &Value -> &[&str] -> Option<String>
+text_at v path =
+  mut cur = Some v
+  for key in path
+    cur := cur |> .and_then (\c -> c.get key)
+  cur |> .and_then (\c -> c.as_str ()) |> .map (\s -> s.to_string ())
+
+-- One entry of GitHub's open-PR list, when it is a same-repository PR.
+pull_of : &Value -> &str -> Option<Target>
+pull_of pr repo =
+  number = pr.get "number" |> .and_then (\n -> n.as_u64 ())
+  sha = text_at pr (&["head", "sha"]) |> .filter (\s -> is_sha s)
+  head_repo = text_at pr (&["head", "repo", "full_name"])
+  base_repo = text_at pr (&["base", "repo", "full_name"])
+  same = head_repo.is_some () && head_repo == base_repo && base_repo.as_deref () == Some repo
+  if same
+    number |> .zip sha |> .map (\p -> Target { name = "pull/#{p.0}", sha = p.1, number = Some p.0 })
+  else
+    None
+
+-- The open PRs worth building, from `GET /repos/<repo>/pulls?state=open`.
+export pulls_of : &str -> &str -> Result<Vec<Target>, String>
+pulls_of body repo =
+  v = (serde_json::from_str body |> .map_err (\e -> "the open-PR list is not JSON: #{e}"))? : Value
+  case v.as_array () of
+    None -> Err (.to_string "the open-PR list is not a JSON array")
+    Some prs -> Ok (prs.iter () |> .filter_map (\pr -> pull_of pr repo) |> .collect)
+
+-- What to fetch into vci's own clone: main, and each open PR's head.
+export refspecs : &[Target] -> &str -> Vec<String>
+refspecs targets branch =
+  targets.iter () |> .map (\t -> refspec_of t branch) |> .collect
+
+refspec_of : &Target -> &str -> String
+refspec_of t branch =
+  case t.number of
+    Some n -> "+refs/pull/#{n}/head:refs/vci/pull/#{n}"
+    None -> "+refs/heads/#{branch}:refs/vci/main"
+
+-- The next commit to build: main first (deploys follow it), then the open
+-- PRs newest first. A commit already built (for any ref) is not built again,
+-- so a PR merged by fast-forward costs nothing on main.
+export next_of : &[Target] -> &[String] -> Option<Target>
+next_of targets done =
+  mut order = targets.to_vec ()
+  order.sort_by_key (\t -> std::cmp::Reverse (t.number |> .map (\n -> n + 1) |> .unwrap_or u64::MAX))
+  order.into_iter () |> .find (\t -> !(done.contains (&t.sha)))
+
+-- The name of the out-link that keeps a ref's result for a host alive (an
+-- indirect GC root): `main-<host>`, `pull-<n>-<host>`.
+export root_of : &Target -> &str -> String
+root_of t host =
+  case t.number of
+    Some n -> "pull-#{n}-#{host}"
+    None -> "main-#{host}"
+
+-- The roots no open ref wants any more (a closed or merged PR, a host that
+-- left the fleet): dropped, so vgc can collect what only they kept.
+export stale_roots : &[String] -> &[Target] -> &[String] -> Vec<String>
+stale_roots existing targets hosts =
+  mut wanted = Vec::new () : Vec<String>
+  for t in targets
+    for h in hosts
+      wanted.push (root_of t h)
+  existing.iter () |> .filter (\r -> !(wanted.contains r)) |> .cloned |> .collect
+
+-- A sha as people read it.
+export short : &str -> String
+short sha = sha.chars () |> .take 9 |> .collect
+
+#[cfg(test)]
+sha : char -> String
+sha c = std::iter::repeat_n c 40 |> .collect
+
+#[cfg(test)]
+target : Option<u64> -> char -> Target
+target n c =
+  case n of
+    Some k -> Target { name = "pull/#{k}", sha = sha c, number = Some k }
+    None -> Target { name = .to_string "main", sha = sha c, number = None }
+
+test "main from ls-remote; anything that is not a sha is nothing"
+  a = sha 'a'
+  listing = "#{a}\trefs/heads/main\n#{sha 'b'}\trefs/heads/mainline\n"
+  assert_eq! \-> main_of (&listing) "main" \-> Some (target None 'a')
+  assert_eq! \-> main_of (&listing) "dev" \-> None
+  assert_eq! \-> main_of "nonsense\trefs/heads/main\n" "main" \-> None
+  assert! \-> is_sha (&a) && !(is_sha "abc") && !(is_sha (&sha 'g'))
+
+test "only open same-repository PRs are built; forks and deleted head repos are not"
+  same = sha 'a'
+  fork = sha 'b'
+  gone = sha 'c'
+  body = "[{\"number\":12,\"head\":{\"sha\":\"#{same}\",\"repo\":{\"full_name\":\"I/d\"}},\"base\":{\"repo\":{\"full_name\":\"I/d\"}}},{\"number\":13,\"head\":{\"sha\":\"#{fork}\",\"repo\":{\"full_name\":\"evil/d\"}},\"base\":{\"repo\":{\"full_name\":\"I/d\"}}},{\"number\":14,\"head\":{\"sha\":\"#{gone}\",\"repo\":null},\"base\":{\"repo\":{\"full_name\":\"I/d\"}}}]"
+  assert_eq! \-> pulls_of (&body) "I/d" \-> Ok (.to_vec ([target (Some 12) 'a']))
+  -- Another repository's list is not this one's.
+  assert_eq! \-> pulls_of (&body) "other/d" \-> Ok (Vec::new ())
+  assert! \-> pulls_of "{\"message\":\"rate limited\"}" "I/d" |> .is_err
+  assert! \-> pulls_of "<html>" "I/d" |> .is_err
+
+test "main first, then PRs newest first; a commit built once is never built again"
+  m = target None 'a'
+  p7 = target (Some 7) 'b'
+  p9 = target (Some 9) 'c'
+  all = .to_vec ([p7.clone (), m.clone (), p9.clone ()]) : Vec<Target>
+  assert_eq! \-> next_of (&all) (&[]) \-> Some (m.clone ())
+  assert_eq! \-> next_of (&all) (&[sha 'a']) \-> Some (p9.clone ())
+  assert_eq! \-> next_of (&all) (&[sha 'a', sha 'c']) \-> Some (p7.clone ())
+  assert_eq! \-> next_of (&all) (&[sha 'a', sha 'b', sha 'c']) \-> None
+  -- A PR whose head is main's commit (merged by fast-forward) is already built.
+  merged = Target { sha = sha 'a', ...target (Some 10) 'a' }
+  assert_eq! \-> next_of (&[m.clone (), merged]) (&[sha 'a']) \-> None
+
+test "fetch refspecs, root names, and the roots no ref wants any more"
+  m = target None 'a'
+  p = target (Some 12) 'b'
+  both = .to_vec ([m.clone (), p.clone ()]) : Vec<Target>
+  assert_eq! \-> refspecs (&both) "main" \-> .to_vec ([.to_string "+refs/heads/main:refs/vci/main", .to_string "+refs/pull/12/head:refs/vci/pull/12"])
+  assert_eq! \-> (root_of (&m) "drakkar", root_of (&p) "mimir") \-> (.to_string "main-drakkar", .to_string "pull-12-mimir")
+  existing = .to_vec ([.to_string "main-drakkar", .to_string "pull-12-drakkar", .to_string "pull-11-drakkar", .to_string "main-oldhost"]) : Vec<String>
+  hosts = .to_vec ([.to_string "drakkar"]) : Vec<String>
+  assert_eq! \-> stale_roots (&existing) (&both) (&hosts) \-> .to_vec ([.to_string "pull-11-drakkar", .to_string "main-oldhost"])

@@ -1,0 +1,279 @@
+-- One step, and the daemon that repeats it.
+--
+-- A step lists the open refs (main, and the open same-repository PRs;
+-- retried on a bounded Schedule), fetches their heads into vci's own clone,
+-- drops the result roots of refs that are gone, and builds the next commit
+-- (refs.vlt `next_of`: main first, then PRs newest first) for every host, one
+-- after another: evaluate, build into the host's out-link, summarise a PR's
+-- generation against main's, record, post the status. One host failing is
+-- its own result, never the commit's: the other hosts are still built.
+--
+-- The daemon repeats the step on a spaced Schedule. A step builds one commit
+-- to its end, so a build in flight is never cancelled because a ref moved;
+-- the next step lists again and takes the newest heads then (latest-wins).
+-- A commit is built once, whichever ref names it. No loops, threads, sleeps
+-- or timers of vci's own.
+
+import std::time::Duration
+import id_effect::{Effect, HNil, Never, Schedule, succeed}
+import vdeploy::common::{now_secs, tail_lines}
+import crate::caps::Caps
+import crate::common::VciError
+import crate::refs::{Target, next_of, root_of, short, stale_roots}
+import crate::report::{Built, Summary, line_of, status_of}
+
+export data Settings { export hosts Vec<String>, export interval u64 }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Listing and fetching get two more attempts, 10 s and 20 s later: the
+-- network is the step that flakes.
+export transient : Schedule<(Duration, u64), VciError>
+transient = Schedule::exponential (Duration::from_secs 10) |> .intersect (Schedule::recurs 2)
+
+joined : Option<Target> -> Vec<Target> -> Vec<Target>
+joined main pulls =
+  mut all = main |> .into_iter |> .collect : Vec<Target>
+  all.extend pulls
+  all
+
+-- The open refs.
+export listed : Caps -> Effect<Vec<Target>, VciError, HNil>
+listed caps =
+  f1 = caps.forge.clone ()
+  f2 = caps.forge.clone ()
+  Effect::retry (move \-> f1.0.main ()) transient |> .flat_map (move \m -> Effect::retry (move \-> f2.0.pulls ()) transient |> .map (move \ps -> joined m ps))
+
+-- Distinct head commits not built yet.
+export pending_of : &[Target] -> &[String] -> u64
+pending_of targets done =
+  mut shas = targets.iter () |> .map (\t -> t.sha.clone ()) |> .filter (\s -> !(done.contains s)) |> .collect : Vec<String>
+  shas.sort ()
+  shas.dedup ()
+  u64::try_from (shas.len ()) |> .unwrap_or u64::MAX
+
+#[allow(clippy::type_complexity)]
+settled : Effect<(String, u64), (String, u64), HNil> -> Effect<Result<(String, u64), (String, u64)>, Never, HNil>
+settled eff = eff |> .map (\p -> Ok p) |> .catch (\e -> succeed (Err e))
+
+blank : &Target -> &str -> Built
+blank t host = Built { sha = t.sha.clone (), target = t.name.clone (), host = host.to_string (), result = String::new (), drv = None, out = None, eval_secs = 0, build_secs = 0, error = String::new (), diff = None, at = now_secs () }
+
+-- Record one host's result and post its status.
+concluded : Caps -> Built -> Effect<(), VciError, HNil>
+concluded caps b =
+  eprintln! \-> "#{line_of (&b)}"
+  (state, description) = status_of (&b)
+  status = caps.status.clone ()
+  sha = b.sha.clone ()
+  host = b.host.clone ()
+  caps.ledger.0.record b |> .flat_map (move \_ -> status.0.post sha host (state.to_string ()) description |> .widen)
+
+-- A PR's generation against main's for the same host, when main has one.
+compared : Caps -> Target -> String -> String -> Effect<Option<Summary>, Never, HNil>
+compared caps t host out =
+  if t.number.is_none ()
+    succeed None
+  else
+    store = caps.store.clone ()
+    caps.store.0.root_target (root_of (&Target { name = .to_string "main", sha = String::new (), number = None }) (&host)) |> .flat_map (move \main -> against store main out)
+
+against : crate::caps::StoreTool -> Option<String> -> String -> Effect<Option<Summary>, Never, HNil>
+against store main out =
+  case main of
+    None -> succeed None
+    Some m -> store.0.summary m out
+
+built_out : Caps -> Target -> String -> Built -> Result<(String, u64), (String, u64)> -> Effect<(), VciError, HNil>
+built_out caps t host b r =
+  case r of
+    Err (e, secs) -> concluded caps (Built { result = .to_string "build-failed", build_secs = secs, error = tail_lines (&e) 20, ...b })
+    Ok (out, secs) ->
+      c = caps.clone ()
+      done = Built { result = .to_string "built", out = Some (out.clone ()), build_secs = secs, ...b }
+      compared caps t host out |> .widen |> .flat_map (move \d -> concluded c (Built { diff = d, ...done }))
+
+evaluated : Caps -> Target -> String -> Result<(String, u64), (String, u64)> -> Effect<(), VciError, HNil>
+evaluated caps t host r =
+  b = blank (&t) (&host)
+  case r of
+    Err (e, secs) -> concluded caps (Built { result = .to_string "eval-failed", eval_secs = secs, error = tail_lines (&e) 20, ...b })
+    Ok (drv, secs) ->
+      c = caps.clone ()
+      link = root_of (&t) (&host)
+      next = Built { drv = Some (drv.clone ()), eval_secs = secs, ...b }
+      settled (caps.nix.0.build drv link) |> .widen |> .flat_map (move \r2 -> built_out c t host next r2)
+
+-- One host for one commit.
+export one_host : Caps -> Target -> String -> Effect<(), VciError, HNil>
+one_host caps t host =
+  c = caps.clone ()
+  t2 = t.clone ()
+  h2 = host.clone ()
+  sha = t.sha.clone ()
+  caps.status.0.post sha (host.clone ()) (.to_string "pending") ("building #{t.name}") |> .widen |> .flat_map (move \_ -> settled (c.nix.0.eval (t2.sha.clone ()) (h2.clone ())) |> .widen |> .flat_map (move \r -> evaluated c t2 h2 r))
+
+-- Every host for one commit, one after another.
+export hosts_from : Caps -> Target -> Vec<String> -> Effect<(), VciError, HNil>
+hosts_from caps t rest =
+  case rest.split_first () of
+    None -> succeed (())
+    Some (h, tail) ->
+      c = caps.clone ()
+      t2 = t.clone ()
+      more = tail.to_vec ()
+      one_host caps t (h.clone ()) |> .flat_map (move \_ -> hosts_from c t2 more)
+
+-- Build `t` for every host, then mark it built.
+export commit : Caps -> Settings -> Target -> u64 -> Effect<(), VciError, HNil>
+commit caps s t pending =
+  eprintln! \-> "vci: building #{t.name} at #{short (&t.sha)} for #{s.hosts.join ", "}"
+  ledger = caps.ledger.clone ()
+  sha = t.sha.clone ()
+  hosts_from caps t (s.hosts.clone ()) |> .flat_map (move \_ -> ledger.0.finish sha (pending.saturating_sub 1))
+
+chosen : Caps -> Settings -> Vec<Target> -> Vec<String> -> Effect<(), VciError, HNil>
+chosen caps s targets done =
+  pending = pending_of (&targets) (&done)
+  case next_of (&targets) (&done) of
+    None -> caps.ledger.0.publish pending
+    Some t -> commit caps s t pending
+
+-- The roots of refs that are gone, dropped one after another.
+dropped_all : Caps -> Vec<String> -> Effect<(), Never, HNil>
+dropped_all caps names =
+  case names.split_first () of
+    None -> succeed (())
+    Some (n, tail) ->
+      c = caps.clone ()
+      more = tail.to_vec ()
+      caps.store.0.drop_root (n.clone ()) |> .flat_map (move \_ -> dropped_all c more)
+
+pruned : Caps -> Settings -> Vec<Target> -> Effect<(), VciError, HNil>
+pruned caps s targets =
+  c = caps.clone ()
+  hosts = s.hosts.clone ()
+  t2 = targets.clone ()
+  caps.store.0.roots () |> .flat_map (move \existing -> dropped_all c (stale_roots (&existing) (&t2) (&hosts))) |> .widen |> .flat_map (move \_ -> done_then caps s targets)
+
+done_then : Caps -> Settings -> Vec<Target> -> Effect<(), VciError, HNil>
+done_then caps s targets =
+  c = caps.clone ()
+  caps.ledger.0.done () |> .widen |> .flat_map (move \done -> chosen c s targets done)
+
+fetched : Caps -> Settings -> Vec<Target> -> Effect<(), VciError, HNil>
+fetched caps s targets =
+  f = caps.forge.clone ()
+  ts = targets.clone ()
+  c = caps.clone ()
+  Effect::retry (move \-> f.0.fetch (ts.clone ())) transient |> .flat_map (move \_ -> pruned c s targets)
+
+warned : VciError -> Effect<(), Never, HNil>
+warned e =
+  eprintln! \-> "vci: step: #{e}"
+  succeed (())
+
+-- One step; its failure is logged and the next step tries again.
+export step : Caps -> Settings -> Effect<(), Never, HNil>
+step caps s =
+  c = caps.clone ()
+  listed caps |> .flat_map (move \ts -> fetched c s ts) |> .catch warned
+
+-- The daemon: the step on a spaced Schedule.
+export daemon : Caps -> Settings -> Effect<(), Never, HNil>
+daemon caps s =
+  eprintln! \-> "vci: building #{s.hosts.join ", "} for main and open PRs, listing every #{s.interval}s"
+  every = Schedule::spaced (Duration::from_secs s.interval)
+  Effect::repeat (move \-> step (caps.clone ()) (s.clone ())) every |> .map (\_ -> ())
+
+#[cfg(test)]
+import crate::caps::{Scripted, scripted_caps, snapshot}
+
+#[cfg(test)]
+sha : char -> String
+sha c = std::iter::repeat_n c 40 |> .collect
+
+#[cfg(test)]
+main_at : char -> Option<Target>
+main_at c = Some (Target { name = .to_string "main", sha = sha c, number = None })
+
+#[cfg(test)]
+pull : u64 -> char -> Target
+pull n c = Target { name = "pull/#{n}", sha = sha c, number = Some n }
+
+#[cfg(test)]
+settings : Settings
+settings = Settings { hosts = .to_vec ([.to_string "drakkar", .to_string "mimir"]), interval = 1 }
+
+#[cfg(test)]
+stepped : &Scripted -> ()
+stepped w =
+  id_effect::testing::run_test (step (scripted_caps (w.clone ())) (settings ())) |> .into_result |> .ok
+  ()
+
+#[cfg(test)]
+results : &Scripted -> Vec<(String, String, String)>
+results w = snapshot (&w.records) |> .into_iter |> .map (\b -> (b.target, b.host, b.result)) |> .collect
+
+#[cfg(test)]
+logged : &Scripted -> Vec<String>
+logged w = snapshot (&w.log)
+
+test "main is built first, for every host, rooted, and marked built once"
+  w = Scripted { main = main_at 'a', pulls = .to_vec ([pull 7 'b']), ...Scripted::default () }
+  stepped (&w)
+  assert_eq! \-> results (&w) \-> .to_vec ([(.to_string "main", .to_string "drakkar", .to_string "built"), (.to_string "main", .to_string "mimir", .to_string "built")])
+  assert_eq! \-> snapshot (&w.done) \-> .to_vec ([sha 'a'])
+  roots = snapshot (&w.roots) |> .into_iter |> .map (\r -> r.0) |> .collect : Vec<String>
+  assert_eq! \-> roots \-> .to_vec ([.to_string "main-drakkar", .to_string "main-mimir"])
+  -- The next step takes the PR, and diffs it against main's generation.
+  stepped (&w)
+  both_built = .to_vec ([sha 'a', sha 'b']) : Vec<String>
+  assert_eq! \-> snapshot (&w.done) \-> both_built
+  pr = snapshot (&w.records) |> .into_iter |> .filter (\b -> b.target == "pull/7") |> .collect : Vec<Built>
+  assert_eq! \-> pr.len () \-> 2
+  assert! \-> pr.iter () |> .all (\b -> b.diff.is_some ())
+  assert! \-> logged (&w) |> .iter |> .any (\l -> l.starts_with "diff /nix/store/aaaaaaaaa-drakkar /nix/store/bbbbbbbbb-drakkar")
+  -- Nothing left: the step only refreshes the metrics.
+  stepped (&w)
+  assert_eq! \-> snapshot (&w.records) |> .len \-> 4
+  assert! \-> logged (&w) |> .last |> .map (\l -> l == "publish pending 0") |> .unwrap_or false
+
+test "one host's failure is its own result: the others are built, and the commit is done"
+  w = Scripted { main = main_at 'a', eval_broken = .to_vec ([.to_string "drakkar"]), ...Scripted::default () }
+  stepped (&w)
+  assert_eq! \-> results (&w) \-> .to_vec ([(.to_string "main", .to_string "drakkar", .to_string "eval-failed"), (.to_string "main", .to_string "mimir", .to_string "built")])
+  assert_eq! \-> snapshot (&w.done) \-> .to_vec ([sha 'a'])
+  b = Scripted { main = main_at 'c', build_broken = .to_vec ([.to_string "mimir"]), ...Scripted::default () }
+  stepped (&b)
+  assert_eq! \-> results (&b) \-> .to_vec ([(.to_string "main", .to_string "drakkar", .to_string "built"), (.to_string "main", .to_string "mimir", .to_string "build-failed")])
+  failed = snapshot (&b.records) |> .into_iter |> .find (\r -> r.result == "build-failed") |> .expect "failed"
+  assert! \-> failed.error.contains "scripted build failure" && failed.drv.is_some () && failed.out.is_none ()
+
+test "every host gets a pending status, then its result"
+  w = Scripted { main = main_at 'a', eval_broken = .to_vec ([.to_string "mimir"]), ...Scripted::default () }
+  stepped (&w)
+  statuses = logged (&w) |> .into_iter |> .filter (\l -> l.starts_with "status ") |> .collect : Vec<String>
+  assert_eq! \-> statuses.len () \-> 4
+  assert! \-> statuses[0].contains "drakkar pending" && statuses[1].contains "drakkar success: built in 7s (eval 3s)"
+  assert! \-> statuses[2].contains "mimir pending" && statuses[3].contains "mimir failure: evaluation failed after 2s"
+
+test "a forge that is down builds nothing and the step does not fail"
+  w = Scripted { forge_down = true, ...Scripted::default () }
+  stepped (&w)
+  assert! \-> snapshot (&w.records) |> .is_empty
+  assert! \-> snapshot (&w.done) |> .is_empty
+
+test "a closed PR's roots are dropped; main's stay"
+  w = Scripted { main = main_at 'a', pulls = .to_vec ([pull 7 'b']), ...Scripted::default () }
+  stepped (&w)
+  stepped (&w)
+  closed = Scripted { pulls = Vec::new (), ...w.clone () }
+  stepped (&closed)
+  roots = snapshot (&w.roots) |> .into_iter |> .map (\r -> r.0) |> .collect : Vec<String>
+  assert_eq! \-> roots \-> .to_vec ([.to_string "main-drakkar", .to_string "main-mimir"])
+  assert! \-> logged (&w) |> .iter |> .any (\l -> l == "drop pull-7-drakkar")
+
+test "pending counts distinct commits not built"
+  ts = .to_vec ([(main_at 'a' |> .expect "main"), pull 3 'a', pull 4 'b']) : Vec<Target>
+  assert_eq! \-> pending_of (&ts) (&[]) \-> 2
+  assert_eq! \-> pending_of (&ts) (&[sha 'a']) \-> 1

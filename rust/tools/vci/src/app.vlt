@@ -1,0 +1,60 @@
+-- The program: wire the live capabilities from the options and run the
+-- daemon, or `--once` (one step). `main` runs it under id_effect_cli's
+-- `run_main`: exit 0, 1 on a usage error, 101 on a bug, 130 on Ctrl-C
+-- (systemd's stop is SIGINT; a build in flight is a child that is killed with
+-- its fiber).
+
+import id_effect::{Effect, HNil, effect, fail}
+import crate::agent::{Settings, daemon, step}
+import crate::caps::{Caps, Wiring, live}
+import crate::cli::{Options, USAGE, parse_args}
+import crate::common::VciError
+import crate::common::VciError::Usage
+
+export wiring_of : &Options -> Wiring
+wiring_of o = Wiring { git = o.git.clone (), curl = o.curl.clone (), nix = o.nix.clone (), repo = o.repo.clone (), url = o.url.clone (), branch = o.branch.clone (), pulls_url = o.pulls_url.clone (), repo_slug = o.repo_slug.clone (), state = o.state_dir.clone (), textfile_dir = o.textfile_dir.clone (), db = o.db.clone (), api = o.api.clone (), token_file = o.token_file.clone () }
+
+export settings_of : &Options -> Settings
+settings_of o = Settings { hosts = o.hosts.clone (), interval = o.interval }
+
+-- The program for parsed options (or the usage error).
+export program : Result<Options, String> -> Effect<(), VciError, HNil>
+program parsed =
+  case parsed of
+    Err why -> fail (Usage ("#{why}\n#{USAGE}"))
+    Ok o ->
+      caps = live (wiring_of (&o)) : Caps
+      if o.once
+        step caps (settings_of (&o)) |> .widen
+      else
+        daemon caps (settings_of (&o)) |> .widen
+
+-- On a fiber of the runtime's executor (as rust/tools/vdeploy's app.vlt):
+-- `run_main` polls its root outside the executor's context.
+supervised : Effect<(), VciError, HNil> -> Effect<(), VciError, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  parsed = parse_args (&args)
+  if parsed |> .as_ref |> .map (\o -> o.help) |> .unwrap_or false
+    println! \-> "#{USAGE}"
+    std::process::ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (supervised (program parsed)) HNil (id_effect_cli::RunMainConfig::default ())
+
+test "a usage error carries the usage line"
+  exit = id_effect::testing::run_test (program (Err (.to_string "unknown argument: -x")))
+  err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
+  assert! \-> err |> .map (\e -> e.contains USAGE && e.contains "-x") |> .unwrap_or false
+
+test "the options become the live wiring and the settings"
+  o = parse_args (&[.to_string "--host", .to_string "a", .to_string "--host", .to_string "b", .to_string "--state-dir", .to_string "/s", .to_string "--interval", .to_string "30"]) |> .expect "options"
+  w = wiring_of (&o)
+  assert_eq! \-> (w.state.as_str (), w.token_file.clone (), crate::caps::roots_dir (&w.state)) \-> ("/s", None, .to_string "/s/roots")
+  assert_eq! \-> settings_of (&o) \-> Settings { hosts = .to_vec ([.to_string "a", .to_string "b"]), interval = 30 }

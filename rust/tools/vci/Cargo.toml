@@ -1,0 +1,40 @@
+[package]
+name = "vci"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Fleet CI on the cache host: build every host's toplevel for main and every open same-repository PR, keep the results in the cache's store, record eval and build times (GH-242)"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly, like
+# vdeploy and every other consumer.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# vdeploy's command runner (tokio child processes, so an hour-long build holds
+# no executor thread), its nix flags and its atomic file writer, linked as a
+# library and not copied. vdeploy itself is unchanged.
+vdeploy = { path = "../vdeploy" }
+# The closure diff of a PR's generation against main's, per host.
+vdiff = { path = "../vdiff" }
+# The open-PR list (GitHub's REST API, read without a token) and the ledger.
+serde_json = "1"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly (never 0.2.0: it miscompiles).
+[build-dependencies]
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
+
+[lib]
+name = "vci"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vci"
+path = "src/main.rs"
