@@ -1,0 +1,50 @@
+name: shell-budget proof (GH-217, temporary)
+# TEMPORARY, removed before #217's PR merges: the acceptance runs. 20 runs of the gate on a
+# tree whose startup path is unchanged (all must pass), and one with one more completer
+# injected at the completer table's cost (must fail on the differential).
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  unchanged:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: ./.github/actions/setup-nix
+      - uses: ./.github/actions/shell-budget
+  inject:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: ./.github/actions/setup-nix
+      - name: one more completer (cargo) must fail the differential
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHELL_BUDGET_BASE=none ./bin/ci/shell-budget | tee /tmp/plain.log
+          autoload=$(grep -E '^  autoload ' /tmp/plain.log | grep -oE '/nix/store/[a-z0-9]{32}-nushell-vendor-autoload')
+          scripts=$(nix eval --raw --impure --expr "(builtins.getFlake \"$PWD\").inputs.nu-scripts.outPath")
+          mkdir -p /tmp/inject
+          cp "$autoload"/*.nu /tmp/inject/
+          chmod u+w /tmp/inject/*.nu
+          cp "$scripts/custom-completions/cargo/cargo-completions.nu" /tmp/inject/50-cargo-completions.nu
+          if SHELL_BUDGET_AUTOLOAD=/tmp/inject SHELL_BUDGET_BASE=HEAD^1 ./bin/ci/shell-budget 2>&1 | tee /tmp/inject.log; then
+            echo "the gate passed one more completer" >&2
+            exit 1
+          fi
+          grep -q 'FAIL — this change adds' /tmp/inject.log
