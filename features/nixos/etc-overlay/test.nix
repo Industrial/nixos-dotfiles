@@ -93,12 +93,6 @@ in
       # VM-only adjustments, the minimum for drakkar's config to coexist with qemu-vm.
       services.timesyncd.enable = lib.mkForce false;
       systemd.settings.Manager.DefaultTimeoutStartSec = lib.mkForce 300;
-      # vverify and vdiff 0.1.0 (main at fd9eb137, the same drvs as drakkar's toplevel) do
-      # not build: their vendored deps lack `socket2` (tokio via id_effect 0.13.0); vgc's
-      # Cargo.lock lacks it too. None writes to /etc, so they are left out here.
-      features.nix.vverify.enable = lib.mkForce false;
-      features.cli.vdiff.enable = lib.mkForce false;
-      features.nixos.vgc.enable = lib.mkForce false;
 
       system.etc.overlay.enable = overlay;
 
