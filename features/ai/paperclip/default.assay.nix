@@ -46,9 +46,11 @@ in
     nixLdIsSet = assay.eq (svc.environment.NIX_LD != "") true;
 
     # `paperclipai service install` leaves a unit in ~/.config that would shadow ours.
-    # Read from the generated per-user activation script, which is what actually runs.
+    # tmpfiles removes it (GH-219); the per-user activation script that did is gone.
     removesImperativeUnit =
-      assay.eq
-      (contains "rm -f \"$HOME/.config/systemd/user/paperclipai.service\"" cfg.systemd.user.services.nixos-activation.script)
-      true;
+      assay.eq (builtins.elem "r ${userdir}/.config/systemd/user/paperclipai.service" cfg.systemd.tmpfiles.rules) true;
+    noUserActivationScript = assay.eq (cfg.system.userActivationScripts ? paperclipRemoveImperativeUnit) false;
+    # systemd-tmpfiles-resetup, which re-runs the rules on a switch, removes as well as creates.
+    tmpfilesRemovesOnSwitch =
+      assay.eq (lib.hasInfix "--remove" cfg.systemd.services.systemd-tmpfiles-resetup.serviceConfig.ExecStart) true;
   }

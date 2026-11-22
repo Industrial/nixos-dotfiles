@@ -30,6 +30,12 @@ let
   byPath = lib.listToAttrs (map (f: lib.nameValuePair f.path f) spec.files);
   x = byPath."/home/alice/.config/x/x.toml";
   script = on.system.activationScripts.vfiles;
+
+  # GH-205: under userborn the users are written by a unit that runs after the activation.
+  userborn = nixos.eval {modules = [standIn ./default.nix {services.userborn.enable = true;}];};
+  ubScript = builtins.unsafeDiscardStringContext userborn.system.activationScripts.vfiles.text;
+  ubUnit = userborn.systemd.services.vfiles;
+  runCmd = c: builtins.unsafeDiscardStringContext "/bin/vfiles --spec ${c.vfiles.spec} --state-dir /var/lib/vfiles";
 in
   assay.suite "vfiles-feature" {
     takesOver = assay.eq [(on.system.activationScripts ? vfiles) (on.system.activationScripts ? linkX)] [true false];
@@ -48,5 +54,16 @@ in
     specDefaults = assay.eq [x.mode x.group x.perms x.immutable x.force x.fallback] ["link" "users" "0644" false false null];
     specSourceIsAStorePath = assay.eq (lib.hasPrefix "/nix/store/" x.source && lib.hasSuffix "-x.toml" x.source) true;
     absentHasNoSource = assay.eq byPath."/home/alice/.config/gone.toml".source null;
+    # GH-205 (fresh userborn install): the activation step waits for the owners, and a unit
+    # after userborn.service runs the same command. Without userborn, neither.
+    userbornActivationChecksTheOwners =
+      assay.eq [(lib.hasInfix "for u in alice;" ubScript) (lib.hasInfix "for g in users;" ubScript) (lib.hasInfix "/etc/passwd" ubScript)] [true true true];
+    userbornActivationStillRuns = assay.eq (lib.hasInfix (runCmd userborn) ubScript) true;
+    userbornUnitFollowsUserborn = assay.eq [ubUnit.after ubUnit.requires ubUnit.wantedBy] [["userborn.service"] ["userborn.service"] ["multi-user.target"]];
+    userbornUnitRunsTheSpec = assay.eq (lib.hasInfix (runCmd userborn) (builtins.unsafeDiscardStringContext ubUnit.script)) true;
+    userbornUnitRerunsOnSpecChange = assay.eq (map builtins.unsafeDiscardStringContext ubUnit.restartTriggers) [(builtins.unsafeDiscardStringContext "${userborn.vfiles.spec}")];
+    userbornUnitIsOneshot = assay.eq [ubUnit.serviceConfig.Type ubUnit.serviceConfig.RemainAfterExit] ["oneshot" true];
+    noUnitWithoutUserborn = assay.eq [(on.systemd.services ? vfiles) (lib.hasInfix "/etc/passwd" script.text)] [false false];
+
     specSortedByPath = assay.eq (map (f: f.path) spec.files) (lib.sort lib.lessThan (map (f: f.path) spec.files));
   }

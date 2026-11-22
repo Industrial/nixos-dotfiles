@@ -180,8 +180,11 @@ Two conventions worth copying rather than rediscovering:
 - **Generate, do not commit, anything a tool can print.** `features/cli/shell-init` runs
   `starship init nu` and friends at build time, against the exact store path the host
   installs. A committed copy drifts from the binary it came from the moment either moves.
-- **Name activation scripts after what they do.** `system.activationScripts.linkZellijConfig`,
-  not `linkFile` — see the defect table below for what the generic name cost.
+- **Declare a user file, do not script it.** A feature that places a file in a home declares
+  it in `vfiles.files` (`lib/vfiles.nix`, GH-188) and keeps its old activation script only as
+  `vfiles.legacy.<name>`, the rollback. Name that script after what it does
+  (`linkZellijConfig`, not `linkFile`) — see the defect table below for what the generic name
+  cost.
 
 ## Escape hatches
 
@@ -208,7 +211,7 @@ novel. Each one is a separate change with its own blast radius.
 | `bin/generations/rollback:7` | `PREVIOUS_GENERATION="$@"` expands unquoted into a scalar, and the line that computed a default is commented out directly above it. The script is broken for its documented no-argument use. |
 | `features/cli/nushell/config.nu:89` | `def p` lacks `--env`, so it cannot move the caller's directory — and it `cd`s to `~/projects`, which does not exist on drakkar. Outside the REPL `p` is a different command entirely: `/run/current-system/sw/bin/p` runs pnpm. |
 | `features/cli/nushell/QUICKREF.md` | stale: documents `Ctrl-R` as fzf (atuin owns history now), `p`/`~/projects`, and none of the autoload chain above. |
-| `features/window-manager/alacritty/default.nix:10` | claims the generic activation-script name `linkFile`. Four features have had to work around the collision. |
+| `features/window-manager/alacritty/default.nix:10` | its rollback script (`vfiles.legacy`, active only with vfiles off) still claims the generic activation-script name `linkFile`. Four features have had to work around the collision. |
 | `features/cli/zellij` | **inside zellij no terminal gets kitty graphics or sixel.** yazi's probe resolves at most `kitty-graphics-old` and then drops even that on detecting a multiplexer, so image previews do not work in a pane — under Ghostty too. Not a layout bug. |
 | repo-wide | ~60 feature directories are reachable from no profile, ~30 of them commented out in a profile; 55 are baselined in `common/ci/feature-reachability-baseline.txt`. |
 | `features/cli/zellij/etc/zellij/config.kdl` | the `system` dashboard has **20 content panes, not 17**. Its own comment, the assay comments and the mission plan all say seventeen. Count: txt 2 + sys 3 + net 4 + dsk 4 + mda 4 + cfg 3. |

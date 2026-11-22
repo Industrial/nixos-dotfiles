@@ -30,15 +30,13 @@ in {
 
   # The module BindPaths-includes download/incomplete dirs into its root
   # namespace BEFORE ExecStartPre runs -- a missing dir aborts the unit at
-  # step NAMESPACE (status 226). Create them at activation time instead.
-  system.activationScripts.transmissionDirs = {
-    text = ''
-      ${pkgs.coreutils}/bin/mkdir -p ${directoryPath}/downloads ${directoryPath}/downloads/incomplete
-      ${pkgs.coreutils}/bin/chown transmission:data ${directoryPath} ${directoryPath}/downloads ${directoryPath}/downloads/incomplete
-      ${pkgs.coreutils}/bin/chmod 0770 ${directoryPath} ${directoryPath}/downloads ${directoryPath}/downloads/incomplete
-    '';
-  };
-
+  # step NAMESPACE (status 226). These tmpfiles rules create them first: at
+  # boot systemd-tmpfiles-setup runs before sysinit.target, and on a switch
+  # that changes the rules (enabling this feature does),
+  # systemd-tmpfiles-resetup (Before=sysinit-reactivation.target) runs before
+  # switch-to-configuration starts or restarts any unit. They replace the
+  # old transmissionDirs activation script, which made the same three dirs
+  # with the same owner and mode (GH-219).
   systemd.tmpfiles.rules = [
     "d ${directoryPath} 0770 transmission data - -"
     "d ${directoryPath}/downloads 0770 transmission data - -"

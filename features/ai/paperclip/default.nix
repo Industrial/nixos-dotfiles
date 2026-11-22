@@ -37,12 +37,14 @@ in {
   # Start at boot / survive logout (user systemd).
   users.users.${settings.username}.linger = true;
 
-  # Drop imperative onboard unit so /etc/systemd/user wins cleanly.
-  system.userActivationScripts.paperclipRemoveImperativeUnit = {
-    text = ''
-      rm -f "$HOME/.config/systemd/user/paperclipai.service"
-    '';
-  };
+  # `paperclipai service install` leaves a unit in ~/.config/systemd/user that would shadow
+  # ours in /etc/systemd/user. tmpfiles removes it at boot, and on a switch that changes
+  # the tmpfiles rules (systemd-tmpfiles-resetup runs `--remove`). It was a per-user
+  # userActivationScripts entry before (GH-219); vfiles' `absent` would only report a real
+  # file, not remove it.
+  systemd.tmpfiles.rules = [
+    "r ${home}/.config/systemd/user/paperclipai.service"
+  ];
 
   systemd.user.services.paperclipai = {
     description = "Paperclip AI control plane";

@@ -37,31 +37,17 @@ in {
       rules = [
         "d ${directoryPath} 0770 ${name} data - -"
         "d ${directoryPath}/data 0770 ${name} data - -"
+        # The declarative config, linked from the checkout (GH-219, was the activation
+        # script prowlarrConfig). `L`, not `L+`: a real config.xml already there is left
+        # alone rather than deleted, so a live config is never lost; remove it by hand
+        # to let the link take over. Unlike the script, a missing checkout is not skipped:
+        # the link dangles until /data/dotfiles is cloned, and the service cannot save.
+        "L ${directoryPath}/config.xml - - - - ${configSource}"
+        # The service rewrites config.xml on UI changes, through the link: the repo file
+        # is group-writable for the data group, its owner (git access) unchanged.
+        "z ${configSource} 0664 - data - -"
       ];
     };
-  };
-
-  # Link the declarative config into the service data dir (idempotent).
-  # A pre-existing real file is backed up once before the first link takes
-  # over; a missing repo checkout degrades gracefully to the live file.
-  system.activationScripts.prowlarrConfig = {
-    text = ''
-      source="${configSource}"
-      target="${directoryPath}/config.xml"
-      if [ ! -f "$source" ]; then
-        echo "prowlarr: $source missing (is ${dotfilesRepo} cloned?); keeping existing config" >&2
-      else
-        mkdir -p "$(dirname "$target")"
-        if [ -f "$target" ] && [ ! -L "$target" ]; then
-          if ! ${pkgs.diffutils}/bin/cmp -s "$target" "$source"; then
-            cp -a "$target" "$target.bak.$(date +%Y%m%d%H%M%S)"
-          fi
-        fi
-        ln -sfn "$source" "$target"
-        chgrp data "$source" 2>/dev/null || true
-        chmod 0664 "$source"
-      fi
-    '';
   };
 
   users = {
