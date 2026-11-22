@@ -23,11 +23,16 @@
   # profiles.gaming.enable = true;
 
   features.fleet.comin.enable = true;
-  # vdeploy (Voltaic), OBSERVE mode next to comin (GH-221): plans the switch to main and
-  # never makes it, and fast-forwards ~/.dotfiles (the nushell login fix). It waits for
-  # main to go quiet first (deployDebounce in common/fleet.nix). comin still deploys here.
-  # Rollback: lib.mkForce false.
+  # vdeploy (Voltaic) deploys mimir (GH-160): the `vdeploy` role in common/fleet.nix
+  # puts it in deploy mode; every switch is health-checked with vhealth and rolled back
+  # when unhealthy, and comin is retired (forced off, its unit a tombstone). It waits for
+  # main to go quiet first (deployDebounce in common/fleet.nix), and fast-forwards
+  # ~/.dotfiles. Rollback to comin: drop the role, or
+  # features.nix.vdeploy.mode = lib.mkForce "observe".
   features.nix.vdeploy.enable = true;
+  # vhealth (GH-180): the probes vdeploy decides on (nix-daemon as the vhealth user, sshd,
+  # node_exporter, and whatever mimir's features declare).
+  features.nix.vhealth.enable = true;
   features.fleet.nix-remote-builder-client.enable = true;
   features.fleet.remote-access.enable = true;
   features.fleet.remote-desktop-relay.enable = true;

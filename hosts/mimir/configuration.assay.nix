@@ -32,10 +32,11 @@ in
     # The desktop profile brings GNOME and Hyprland; mimir keeps GNOME only.
     gnomeWithoutHyprland = assay.eq [(has "window-manager.gnome") (has "window-manager.hyprland")] [true false];
 
-    # vdeploy observes next to comin, which still deploys (GH-221). mimir has no vdeploy
-    # role in common/fleet.nix, so the mode stays observe. One option removes it.
-    observesWithVdeploy = assay.eq [(has "nix.vdeploy") (has "fleet.comin")] [true true];
-    notADeployHost = assay.eq ((import ../../common/fleet.nix).hasRole "vdeploy" "mimir") false;
+    # vdeploy deploys mimir (GH-160): the vdeploy role in common/fleet.nix, with vhealth
+    # for its health checks. comin stays the host's own choice, which deploy mode forces
+    # off (hosts/fleet.assay.nix checks the evaluated services).
+    deploysWithVdeploy = assay.eq [(has "nix.vdeploy") (has "nix.vhealth") (has "fleet.comin")] [true true true];
+    aDeployHost = assay.eq ((import ../../common/fleet.nix).hasRole "vdeploy" "mimir") true;
     vdeployRollsBack = let
       off = features.evalSelection {
         modules = [
