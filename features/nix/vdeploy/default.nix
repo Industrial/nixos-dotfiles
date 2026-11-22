@@ -43,9 +43,11 @@
 # directory and the checkout. Nix runs through the daemon (NIX_REMOTE=daemon), so the
 # daemon does the builds and the store stays read-only here.
 #
-# node_exporter: the textfile directory is the one features/nix/vverify sets up. Where
-# vverify is off, this feature sets it up the same way. The exporter flag is added only
-# once, because node_exporter refuses a repeated --collector.textfile.directory.
+# node_exporter: the textfile directory is features/monitoring/textfile-collector.nix's,
+# imported here as vverify and vhealth import it, so the directory and the exporter flag
+# exist once however many writers a host runs (node_exporter refuses a repeated
+# --collector.textfile.directory). The earlier "unless vverify is on" test missed vhealth,
+# which also adds the flag (GH-221).
 #
 # Observe-mode rollback: `features.nix.vdeploy.enable = lib.mkForce false;` removes the unit.
 #
@@ -111,10 +113,7 @@
   '';
   vdeploy = pkgs.callPackage ../../../rust/tools/vdeploy/default.nix {};
   textfileDir = "/var/lib/prometheus-node-exporter-text";
-  group = "prometheus-textfile";
   settings = args.settings or {};
-  # vverify (on drakkar already) declares the textfile directory and the exporter flag.
-  vverifyOn = lib.attrByPath ["features" "nix" "vverify" "enable"] false config;
   inherit (cfg.dotfiles) user;
   userGroup = let
     g = config.users.users.${user}.group or "";
@@ -124,6 +123,8 @@
     else g;
   userHome = config.users.users.${user}.home or "/home/${user}";
 in {
+  imports = [../../monitoring/textfile-collector.nix];
+
   options.features.nix.vdeploy = {
     mode = lib.mkOption {
       type = lib.types.enum ["observe" "deploy"];
@@ -169,7 +170,9 @@ in {
     };
     debounce = lib.mkOption {
       type = lib.types.str;
-      default = "0";
+      # A host fact: common/fleet.nix's `deployDebounce` (mimir, the slow host), else none.
+      default = fleet.hosts.${cfg.host}.deployDebounce or "0";
+      defaultText = lib.literalExpression ''(import common/fleet.nix).hosts.''${host}.deployDebounce or "0"'';
       example = "10m";
       description = ''
         How long main must stay on one commit before a plan starts (0: no wait). Give slow
@@ -198,12 +201,6 @@ in {
   config = lib.mkMerge [
     {
       environment.systemPackages = [vdeploy];
-
-      users.groups.${group} = {};
-      systemd.tmpfiles.rules = lib.mkIf (!vverifyOn) ["d ${textfileDir} 2775 root ${group} - -"];
-      services.prometheus.exporters.node.extraFlags =
-        lib.mkIf (config.services.prometheus.exporters.node.enable && !vverifyOn)
-        ["--collector.textfile.directory=${textfileDir}"];
 
       systemd.services.vdeploy = {
         description =

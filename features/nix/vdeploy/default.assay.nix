@@ -16,16 +16,21 @@ let
     features.nix.vdeploy.dotfiles.user = "alice";
   };
   cfg = nixos.eval {modules = [./default.nix base];};
-  # vverify already declares the textfile directory and the exporter's flag.
-  withVverify = nixos.eval {
+  # vverify and vhealth write textfile metrics too: all three import the one
+  # textfile-collector module, so the exporter's flag and the directory are there once.
+  withOtherWriters = nixos.eval {
     modules = [
       ./default.nix
+      ../vverify/default.nix
+      ../vhealth/default.nix
       base
-      {
-        options.features.nix.vverify.enable = lib.mkOption {default = true;};
-        config.services.prometheus.exporters.node.enable = true;
-      }
+      {services.prometheus.exporters.node.enable = true;}
     ];
+  };
+  # mimir (GH-221): its debounce is a host fact in common/fleet.nix.
+  mimir = nixos.eval {
+    modules = [./default.nix base];
+    settings.hostname = "mimir";
   };
   withExporter = nixos.eval {
     modules = [
@@ -101,6 +106,9 @@ in
     everyMinute = assay.eq (argAfter "--interval") "1m";
     noDebounceByDefault = assay.eq (argAfter "--debounce") "0";
     debouncePerHost = assay.eq (argAfterIn slow "--debounce") "15m";
+    # The slow host waits for main to go quiet, from common/fleet.nix, in observe mode.
+    mimirDebouncesFromFleet =
+      assay.eq [(argAfterIn mimir "--host") (argAfterIn mimir "--debounce") mimir.features.nix.vdeploy.mode] ["mimir" "2m" "observe"];
     ownCloneNotTheUsers = assay.eq (argAfter "--repo") "/var/lib/vdeploy/repo";
     nixThroughTheDaemon = assay.eq service.environment.NIX_REMOTE "daemon";
     homeInTheStateDir = assay.eq [service.environment.HOME sc.StateDirectory] ["/var/lib/vdeploy" "vdeploy"];
@@ -122,8 +130,11 @@ in
     exporterReadsTheDir =
       assay.eq (builtins.elem "--collector.textfile.directory=${dir}" withExporter.services.prometheus.exporters.node.extraFlags) true;
     # node_exporter refuses the flag twice: with vverify on, it is vverify's alone.
-    noSecondFlagBesideVverify =
-      assay.eq [withVverify.services.prometheus.exporters.node.extraFlags (builtins.elem "d ${dir} 2775 root prometheus-textfile - -" withVverify.systemd.tmpfiles.rules)] [[] false];
+    flagOnceBesideOtherWriters = let
+      flags = builtins.filter (f: f == "--collector.textfile.directory=${dir}") withOtherWriters.services.prometheus.exporters.node.extraFlags;
+      rules = builtins.filter (r: r == "d ${dir} 2775 root prometheus-textfile - -") withOtherWriters.systemd.tmpfiles.rules;
+    in
+      assay.eq [(builtins.length flags) (builtins.length rules)] [1 1];
 
     # Deploy mode (#160): the take-over.
     observeByDefault = assay.eq [cfg.features.nix.vdeploy.mode (builtins.elem "--mode" args)] ["observe" false];

@@ -23,6 +23,11 @@
   # profiles.gaming.enable = true;
 
   features.fleet.comin.enable = true;
+  # vdeploy (Voltaic), OBSERVE mode next to comin (GH-221): plans the switch to main and
+  # never makes it, and fast-forwards ~/.dotfiles (the nushell login fix). It waits for
+  # main to go quiet first (deployDebounce in common/fleet.nix). comin still deploys here.
+  # Rollback: lib.mkForce false.
+  features.nix.vdeploy.enable = true;
   features.fleet.nix-remote-builder-client.enable = true;
   features.fleet.remote-access.enable = true;
   features.fleet.remote-desktop-relay.enable = true;
