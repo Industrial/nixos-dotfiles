@@ -9,8 +9,28 @@ pub struct NotificationPayload {
 
 #[derive(Debug, Error)]
 pub enum NotifyError {
+    /// No notification server answered (a headless host): not a failure of the run.
+    #[error("no notification server reachable: {0}")]
+    NoServer(String),
     #[error("failed to send notification: {0}")]
     Send(String),
+}
+
+/// What zbus reports when nothing owns org.freedesktop.Notifications, or there is no
+/// session bus to ask (bad or missing address, nothing listening on the socket).
+const NO_SERVER_MARKERS: [&str; 3] = [
+    "org.freedesktop.DBus.Error.ServiceUnknown",
+    "Failed to connect to address",
+    "address error:",
+];
+
+/// Sort a send failure: no reachable server, or a real error.
+pub fn classify_send_error(message: String) -> NotifyError {
+    if NO_SERVER_MARKERS.iter().any(|m| message.contains(m)) {
+        NotifyError::NoServer(message)
+    } else {
+        NotifyError::Send(message)
+    }
 }
 
 pub trait Notifier {
@@ -28,7 +48,7 @@ impl Notifier for SystemNotifier {
             .appname("nixos-update-notifier")
             .timeout(0) // stay in notification center until dismissed
             .show()
-            .map_err(|e| NotifyError::Send(e.to_string()))?;
+            .map_err(|e| classify_send_error(e.to_string()))?;
         Ok(())
     }
 }
@@ -59,6 +79,32 @@ pub fn payloads_for_updates(total_packages: usize, bodies: &[String]) -> Vec<Not
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // GH-277: mimir's unit failed with exactly this zbus error.
+    #[test]
+    fn service_unknown_means_no_server() {
+        let e = classify_send_error(
+            "org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.Notifications \
+             was not provided by any .service files"
+                .into(),
+        );
+        assert!(matches!(e, NotifyError::NoServer(_)));
+    }
+
+    #[test]
+    fn no_session_bus_means_no_server() {
+        let e = classify_send_error(
+            "Failed to connect to address `unix:path=/run/user/1000/bus`: No such file or directory"
+                .into(),
+        );
+        assert!(matches!(e, NotifyError::NoServer(_)));
+    }
+
+    #[test]
+    fn other_send_errors_stay_errors() {
+        let e = classify_send_error("org.freedesktop.DBus.Error.AccessDenied: no".into());
+        assert!(matches!(e, NotifyError::Send(_)));
+    }
 
     #[test]
     fn single_body_summary_includes_count() {
