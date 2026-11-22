@@ -32,7 +32,7 @@ sha2 = "0.10"
 # The NAR chunks nix_store_core::nar::stream yields (native NarFromPath).
 bytes = "1"
 # sync: the client's write half, shared by the relay and native answers.
-tokio = { version = "1", features = ["io-util", "net", "sync"] }
+tokio = { version = "1", features = ["io-util", "net", "sync", "signal"] }
 
 # Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
 # exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
