@@ -41,6 +41,11 @@
 
     config = {
       system.switch.enable = true;
+      # The test VM's disk is ext2 without room for GRUB's core image, so a real
+      # `switch-to-configuration boot` cannot install GRUB there and fails (as it should;
+      # vswitch reports it). The boot default is the system profile, which is what these
+      # subtests check; the boot entries are not the point, so no boot loader is installed.
+      boot.loader.grub.enable = false;
 
       # drakkar's and mimir's restriction (features/nixos/users/default.nix). That feature is
       # detected by vhealth; here it is set by hand, so vhealth is told.
