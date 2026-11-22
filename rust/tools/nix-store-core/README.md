@@ -168,6 +168,9 @@ them.
 | `Member = (i64, String, u64)`, `Edge = (i64, i64)`, `ClosureGraph = (Vec<Member>, Vec<Edge>)` | a closure member (ValidPaths id, path, narSize) and a reference (referrer id, reference id) |
 | `closure_members`, `closure_edges : &Connection -> &str -> rusqlite::Result<Vec<_>>` | a closure's members, and the `Refs` rows out of them, one recursive query each, in no particular order; empty when the root is not valid. Independent, so they can run on two connections at once (vwhy) |
 | `closure_graph : &Connection -> &str -> rusqlite::Result<ClosureGraph>` | both, on one connection. `EDGES` is the query: its CROSS JOIN keeps SQLite walking `Refs` by its key (3 ms on drakkar where a plain JOIN scans all of `Refs`, 150 ms); a test pins the plan |
+| `Registration { id, path, hash, registration_time: i64, deriver, nar_size: Option<i64>, ultimate: Option<i64>, sigs, ca, references }`, `registration : &Connection -> &str -> rusqlite::Result<Option<Registration>>` | a valid path's whole ValidPaths row as stored (nothing normalised), with its sorted references |
+| `to_path_info : Registration -> Option<worker::PathInfo>` | the row as libstore reads it: sigs split on spaces, sorted, deduplicated; empty `ca`/deriver as none; `ultimate` is 1; negative numbers 0. None when the hash is not SHA-256. vdaemon-proxy declines an empty-string deriver before calling it |
+| `full_path_info : &Connection -> &str -> rusqlite::Result<Option<worker::PathInfo>>` | the two together: what the daemon's QueryPathInfo answers, registration time and `ultimate` included |
 
 None means "not a valid path". GC roots and the `DerivationOutputs` walk stay in vgc.
 

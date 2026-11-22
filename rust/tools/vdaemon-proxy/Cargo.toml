@@ -34,6 +34,11 @@ bytes = "1"
 # sync: the client's write half, shared by the relay and native answers.
 tokio = { version = "1", features = ["io-util", "net", "sync", "signal"] }
 
+[dev-dependencies]
+# Test store databases with Nix's schema (nix-store-core's `testdb`), for the
+# tests only: the build keeps core's plain API.
+nix-store-core = { path = "../nix-store-core", features = ["test-support"] }
+
 # Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
 # exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
 [build-dependencies]

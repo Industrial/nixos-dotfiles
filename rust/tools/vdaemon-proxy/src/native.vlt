@@ -23,7 +23,8 @@
 
 import std::collections::BTreeSet
 import rusqlite::Connection
-import nix_store_core::worker::{Op, PathInfo, Short, minor, op_of_code, put_bool, put_path_info, put_str, put_strings, take_bool, take_string, take_strings, take_u64}
+import nix_store_core::db::{Registration, registration, to_path_info}
+import nix_store_core::worker::{Op, Short, minor, op_of_code, put_bool, put_path_info, put_str, put_strings, take_bool, take_string, take_strings, take_u64}
 import nix_store_core::storepath::{STORE_DIR, STORE_PREFIX, HASH_LEN, valid_base}
 
 -- A read-only op, decoded whole.
@@ -196,10 +197,6 @@ bytes_of_strings v =
 
 const ID_OF : &str = "SELECT id FROM ValidPaths WHERE path = ?1"
 
-const INFO : &str = "SELECT id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca FROM ValidPaths WHERE path = ?1"
-
-const REFERENCES : &str = "SELECT path FROM Refs JOIN ValidPaths ON reference = id WHERE referrer = ?1 ORDER BY path"
-
 const REFERRERS : &str = "SELECT path FROM Refs JOIN ValidPaths ON referrer = id WHERE reference = (SELECT id FROM ValidPaths WHERE path = ?1) ORDER BY path"
 
 const FROM_HASH : &str = "SELECT path FROM ValidPaths WHERE path >= ?1 ORDER BY path LIMIT 1"
@@ -240,47 +237,33 @@ from_hash_part conn hash =
         Ok None
 
 -- QueryPathInfo's reply: 0, or 1 and the info (UnkeyedValidPathInfo, 1.16+).
+-- The row and its sorted references are nix-store-core's `db::registration`
+-- (the same SELECTs as LocalStore's), unnormalised.
 info_reply : &Connection -> &str -> rusqlite::Result<Native>
 info_reply conn path =
-  mut stmt = (conn.prepare_cached INFO)?
-  mut rows = (stmt.query ([path]))?
-  first = (rows.next ())?
-  case first of
+  found = (registration conn path)?
+  case found of
     None -> Ok (Reply (bytes_of_bool false))
-    Some row ->
-      id = (row.get 0 : rusqlite::Result<i64>)?
-      db_hash = (row.get 1 : rusqlite::Result<String>)?
-      registered = (row.get 2 : rusqlite::Result<i64>)?
-      deriver = (row.get 3 : rusqlite::Result<Option<String>>)?
-      nar_size = (row.get 4 : rusqlite::Result<Option<i64>>)?
-      ultimate = (row.get 5 : rusqlite::Result<Option<i64>>)?
-      sigs = (row.get 6 : rusqlite::Result<Option<String>>)?
-      ca = (row.get 7 : rusqlite::Result<Option<String>>)?
-      refs = (paths_of conn REFERENCES (rusqlite::types::Value::Integer id))?
-      Ok (info_of path (InfoRow { db_hash, registered, deriver, nar_size, ultimate, sigs, ca }) refs)
+    Some r -> Ok (info_of r)
 
--- A ValidPaths row, as read.
-data InfoRow { db_hash String, registered i64, deriver Option<String>, nar_size Option<i64>, ultimate Option<i64>, sigs Option<String>, ca Option<String> }
-
--- The row as the daemon renders it; declined where the row is one it would
--- not render plainly.
-info_of : &str -> InfoRow -> Vec<String> -> Native
-info_of path row refs =
-  InfoRow { db_hash, registered, deriver, nar_size, ultimate, sigs, ca } = row
-  parsed = nix_store_core::hash::parse (&db_hash)
-  if parsed.is_none ()
-    return declined ("a hash that is not SHA-256: #{db_hash}")
-  hash = parsed.unwrap_or_else (\-> nix_store_core::hash::digest (&[]))
-  if deriver == Some (String::new ())
+-- The row as the daemon renders it (`db::to_path_info`: signatures as
+-- tokenizeString<StringSet>(sigs, " "), an empty content address as none);
+-- declined where the row is one it would not render plainly. Both checks
+-- come before the conversion, which would otherwise read an empty-string
+-- deriver as none.
+info_of : Registration -> Native
+info_of r =
+  if nix_store_core::hash::parse (&r.hash) |> .is_none
+    return declined ("a hash that is not SHA-256: #{r.hash}")
+  if r.deriver == Some (String::new ())
     return declined "an empty-string deriver"
-  -- tokenizeString<StringSet>(sigs, " "): split on spaces, empties dropped,
-  -- sorted and deduplicated.
-  sig_set = sigs |> .unwrap_or_default |> .split ' ' |> .filter (\s -> !s.is_empty ()) |> .map (\s -> s.to_string ()) |> .collect : BTreeSet<String>
-  info = PathInfo { path = path.to_string (), deriver, nar_hash = hash, references = refs, registration_time = u64::try_from registered |> .unwrap_or 0, nar_size = nar_size |> .and_then (\n -> u64::try_from n |> .ok) |> .unwrap_or 0, ultimate = ultimate == Some 1, sigs = sig_set |> .into_iter |> .collect, ca = ca |> .filter (\c -> !c.is_empty ()) }
-  mut out = Vec::new () : Vec<u8>
-  put_bool (&mut out) true
-  put_path_info (&mut out) (&info)
-  Reply out
+  case to_path_info r of
+    None -> declined "a hash that is not SHA-256"
+    Some info ->
+      mut out = Vec::new () : Vec<u8>
+      put_bool (&mut out) true
+      put_path_info (&mut out) (&info)
+      Reply out
 
 ------------------------------------------------------------------------
 -- Tests: an in-memory database with Nix's schema for the two tables read.
@@ -307,8 +290,7 @@ const D : &str = "/nix/store/dddddddddddddddddddddddddddddddd-d"
 #[cfg(test)]
 export test_db : Connection
 test_db =
-  conn = Connection::open_in_memory () |> .expect "an in-memory database"
-  conn.execute_batch "CREATE TABLE ValidPaths (id integer primary key autoincrement not null, path text unique not null, hash text not null, registrationTime integer not null, deriver text, narSize integer, ultimate integer, sigs text, ca text); CREATE TABLE Refs (referrer integer not null, reference integer not null, primary key (referrer, reference));" |> .expect "the schema"
+  conn = nix_store_core::testdb::schema_db ":memory:"
   rows = "INSERT INTO ValidPaths (path, hash, registrationTime, narSize, ultimate) VALUES ('#{A}', '#{H}', 7, 120, 1); INSERT INTO ValidPaths (path, hash, registrationTime, deriver, narSize, sigs, ca) VALUES ('#{B}', '#{H}', 9, '#{D}.drv', 8, 'k2:y  k1:x k2:y', 'fixed:r:sha256:1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s'); INSERT INTO ValidPaths (path, hash, registrationTime) VALUES ('#{C}', '#{H}', 1); INSERT INTO Refs SELECT a.id, b.id FROM ValidPaths a, ValidPaths b WHERE (a.path = '#{A}' AND b.path IN ('#{A}', '#{B}')) OR (a.path = '#{B}' AND b.path = '#{C}');"
   conn.execute_batch (&rows) |> .expect "the rows"
   conn
@@ -391,3 +373,26 @@ test "odd paths are declined, never guessed at"
     assert! \-> answer (&conn) (&Valid (p.to_string ())) |> is_declined
   assert_eq! \-> answer (&conn) (&Nar (A.to_string ())) \-> NarOf (A.to_string ())
   assert! \-> answer (&conn) (&Nar (D.to_string ())) |> is_declined
+
+#[cfg(test)]
+const F : &str = "/nix/store/ffffffffffffffffffffffffffffffff-f"
+
+#[cfg(test)]
+const G : &str = "/nix/store/gggggggggggggggggggggggggggggggg-g"
+
+test "a row the daemon would not render plainly is declined, never normalised"
+  conn = test_db ()
+  rows = "INSERT INTO ValidPaths (path, hash, registrationTime) VALUES ('#{F}', 'md5:abc', 1); INSERT INTO ValidPaths (path, hash, registrationTime, deriver) VALUES ('#{G}', '#{H}', 1, '');"
+  conn.execute_batch (&rows) |> .expect "the rows"
+  assert! \-> answer (&conn) (&Info (F.to_string ())) |> is_declined
+  assert! \-> answer (&conn) (&Info (G.to_string ())) |> is_declined
+  assert_eq! \-> reply_of (answer (&conn) (&Valid (G.to_string ()))) \-> bytes_of_bool true
+
+test "an info reply is core's full path info, as put_path_info writes it"
+  conn = test_db ()
+  for p in [A, B, C]
+    want = nix_store_core::db::full_path_info (&conn) p |> .expect "a read" |> .expect "valid"
+    mut bytes = Vec::new () : Vec<u8>
+    put_bool (&mut bytes) true
+    put_path_info (&mut bytes) (&want)
+    assert_eq! \-> reply_of (answer (&conn) (&Info (p.to_string ()))) \-> bytes

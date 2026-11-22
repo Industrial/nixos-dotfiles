@@ -13,6 +13,7 @@ import rusqlite::Connection
 import rusqlite::OpenFlags
 import crate::narinfo::NarInfo
 import crate::nixbase32::narinfo_hash
+import crate::worker::PathInfo
 
 export const DEFAULT_DB : &str = "/nix/var/nix/db/db.sqlite"
 
@@ -207,6 +208,70 @@ closure_graph conn root =
   edges = (closure_edges conn root)?
   Ok ((members, edges))
 
+------------------------------------------------------------------------
+-- The whole ValidPaths row (vdaemon-proxy's QueryPathInfo read, GH-179)
+
+-- A valid path's row exactly as the database holds it, with its references
+-- (sorted). Nothing is normalised: what a NULL, an empty string or a hash
+-- that is not SHA-256 means is the reader's decision.
+export data Registration
+  { export id i64
+  , export path String
+  , export hash String
+  , export registration_time i64
+  , export deriver Option<String>
+  , export nar_size Option<i64>
+  , export ultimate Option<i64>
+  , export sigs Option<String>
+  , export ca Option<String>
+  , export references Vec<String>
+  }
+  deriving (Clone, Debug, PartialEq, Eq)
+
+const REGISTRATION : &str = "SELECT id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca FROM ValidPaths WHERE path = ?1"
+
+-- A valid path's registration by full path; None when it is not valid.
+export registration : &Connection -> &str -> rusqlite::Result<Option<Registration>>
+registration conn path =
+  mut stmt = (conn.prepare_cached REGISTRATION)?
+  mut rows = (stmt.query ([path]))?
+  first = (rows.next ())?
+  case first of
+    None -> Ok None
+    Some row ->
+      id = (row.get 0 : rusqlite::Result<i64>)?
+      hash = (row.get 1 : rusqlite::Result<String>)?
+      registration_time = (row.get 2 : rusqlite::Result<i64>)?
+      deriver = (row.get 3 : rusqlite::Result<Option<String>>)?
+      nar_size = (row.get 4 : rusqlite::Result<Option<i64>>)?
+      ultimate = (row.get 5 : rusqlite::Result<Option<i64>>)?
+      sigs = (row.get 6 : rusqlite::Result<Option<String>>)?
+      ca = (row.get 7 : rusqlite::Result<Option<String>>)?
+      references = (references_of_id conn id)?
+      Ok (Some (Registration { id, path = path.to_string (), hash, registration_time, deriver, nar_size, ultimate, sigs, ca, references }))
+
+-- A registration as libstore's LocalStore reads it into a ValidPathInfo (what
+-- the daemon's QueryPathInfo sends): signatures split on spaces, empties
+-- dropped, sorted and deduplicated (`tokenizeString<StringSet>`); an empty
+-- content address is none; `ultimate` is the value 1; a negative time or size
+-- is 0. None when the hash is not SHA-256. An empty-string deriver, which
+-- libstore refuses to parse, reads as none here: a reader that must answer
+-- exactly as the daemon does (vdaemon-proxy) checks for it first.
+export to_path_info : Registration -> Option<PathInfo>
+to_path_info r =
+  sig_set = r.sigs.clone () |> .unwrap_or_default |> .split ' ' |> .filter (\s -> !s.is_empty ()) |> .map (\s -> s.to_string ()) |> .collect : BTreeSet<String>
+  case crate::hash::parse (&r.hash) of
+    None -> None
+    Some nar_hash -> Some (PathInfo { path = r.path, deriver = present r.deriver, nar_hash, references = r.references, registration_time = u64::try_from r.registration_time |> .unwrap_or 0, nar_size = r.nar_size |> .and_then (\n -> u64::try_from n |> .ok) |> .unwrap_or 0, ultimate = r.ultimate == Some 1, sigs = sig_set |> .into_iter |> .collect, ca = present r.ca })
+
+-- A valid path's full info (registration time and `ultimate` included, which
+-- `NarInfo` has no room for); None when it is not valid, or its hash is not
+-- SHA-256.
+export full_path_info : &Connection -> &str -> rusqlite::Result<Option<PathInfo>>
+full_path_info conn path =
+  found = (registration conn path)?
+  Ok (found |> .and_then to_path_info)
+
 #[cfg(test)]
 import crate::testdb::{memory_db, schema_db}
 
@@ -302,3 +367,46 @@ test "the reference query walks Refs by its key, never scanning it"
   assert! \-> !plan.is_empty ()
   assert! \-> !(plan.iter () |> .any (\step -> step.starts_with "SCAN r"))
 
+-- A -> {A, B}, B -> {C}; B has a deriver, signatures (one twice, a double
+-- space) and a content address; A is ultimate. vdaemon-proxy's fixture.
+#[cfg(test)]
+info_db : Connection
+info_db =
+  conn = schema_db ":memory:"
+  rows = "INSERT INTO ValidPaths (path, hash, registrationTime, narSize, ultimate) VALUES ('#{A}', '#{H}', 7, 120, 1); INSERT INTO ValidPaths (path, hash, registrationTime, deriver, narSize, sigs, ca) VALUES ('#{B}', '#{H}', 9, '#{D}.drv', 8, 'k2:y  k1:x k2:y', 'fixed:r:sha256:1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s'); INSERT INTO ValidPaths (path, hash, registrationTime, deriver, ca) VALUES ('#{C}', 'md5:abc', 1, '', ''); INSERT INTO Refs SELECT a.id, b.id FROM ValidPaths a, ValidPaths b WHERE (a.path = '#{A}' AND b.path IN ('#{A}', '#{B}')) OR (a.path = '#{B}' AND b.path = '#{C}');"
+  conn.execute_batch (&rows) |> .expect "the rows"
+  conn
+
+test "a registration is the row as stored, with its sorted references"
+  conn = info_db ()
+  b = registration (&conn) B |> .expect "a read" |> .expect "valid"
+  assert_eq! \-> (b.path.as_str (), b.hash.as_str (), b.registration_time) \-> (B, H, 9)
+  assert_eq! \-> b.sigs \-> Some (.to_string "k2:y  k1:x k2:y")
+  assert_eq! \-> (b.nar_size, b.ultimate) \-> (Some 8, None)
+  assert_eq! \-> b.references \-> .to_vec ([C.to_string ()])
+  c = registration (&conn) C |> .expect "a read" |> .expect "valid"
+  assert_eq! \-> (c.deriver, c.ca, c.nar_size) \-> (Some (String::new ()), Some (String::new ()), None)
+  assert_eq! \-> registration (&conn) D |> .expect "a read" \-> None
+
+test "the full path info is the daemon's ValidPathInfo"
+  conn = info_db ()
+  b = full_path_info (&conn) B |> .expect "a read" |> .expect "valid"
+  assert_eq! \-> b.deriver \-> Some ("#{D}.drv")
+  assert_eq! \-> b.nar_hash \-> crate::hash::parse H |> .expect "a hash"
+  assert_eq! \-> (b.registration_time, b.nar_size, b.ultimate) \-> (9, 8, false)
+  assert_eq! \-> b.sigs \-> .to_vec ([.to_string "k1:x", .to_string "k2:y"])
+  assert_eq! \-> b.ca \-> Some (.to_string "fixed:r:sha256:1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s")
+  a = full_path_info (&conn) A |> .expect "a read" |> .expect "valid"
+  assert! \-> a.ultimate
+  assert_eq! \-> (a.registration_time, a.nar_size, a.deriver, a.ca) \-> (7, 120, None, None)
+  assert_eq! \-> a.references \-> .to_vec ([A.to_string (), B.to_string ()])
+  assert! \-> a.sigs.is_empty ()
+  assert_eq! \-> full_path_info (&conn) C |> .expect "a read" \-> None
+  assert_eq! \-> full_path_info (&conn) D |> .expect "a read" \-> None
+
+test "empty text and negative numbers normalise as libstore reads them"
+  r = Registration { id = 1, path = A.to_string (), hash = H.to_string (), registration_time = -1, deriver = Some (String::new ()), nar_size = Some (-5), ultimate = Some 2, sigs = Some (.to_string " "), ca = Some (String::new ()), references = Vec::new () }
+  i = to_path_info r |> .expect "a SHA-256 hash"
+  assert_eq! \-> (i.registration_time, i.nar_size, i.ultimate) \-> (0, 0, false)
+  assert_eq! \-> (i.deriver, i.ca) \-> (None, None)
+  assert! \-> i.sigs.is_empty ()
