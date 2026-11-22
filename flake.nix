@@ -101,11 +101,6 @@
       flake = false;
     };
 
-    nixos-update-notifier-src = {
-      url = "path:./rust/tools/nixos-update-notifier";
-      flake = false;
-    };
-
     # Deliberately does NOT follow nixpkgs, for now. Built against the root pin, the
     # locked assay (fd6b48ca) fails to link: `ld: cannot find -lsqlite3`. Its
     # buildRustPackage declares only pkg-config, and rusqlite's libsqlite3-sys (not

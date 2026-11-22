@@ -7,7 +7,7 @@
 # package set is the honest cheap proxy: it names every package in
 # environment.systemPackages with its version, plus the kernel and NixOS release -- the
 # lines an operator actually reviews. The exact built closure diff is produced on the
-# host itself, after merge, by nixos-update-notifier (`nix store diff-closures`).
+# host itself, after merge, by nixos-update-notifier (`vdiff --json`).
 #
 # Kept free of `pkgs` and of any IO so the colocated assay suite can call every function
 # on literal data.

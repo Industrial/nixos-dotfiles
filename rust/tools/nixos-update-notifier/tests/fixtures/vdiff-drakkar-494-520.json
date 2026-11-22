@@ -1,0 +1,90 @@
+{
+  "added": [
+    {
+      "kind": "added",
+      "name": "etc-overlay-carry-out",
+      "new": [""],
+      "old": [],
+      "selection": "."
+    },
+    {
+      "kind": "added",
+      "name": "unit-vci.service",
+      "new": [""],
+      "old": [],
+      "selection": "."
+    },
+    {
+      "kind": "added",
+      "name": "unit-vexporter.service",
+      "new": [""],
+      "old": [],
+      "selection": "."
+    },
+    {
+      "kind": "added",
+      "name": "vci",
+      "new": ["0.1.0"],
+      "old": [],
+      "selection": "+"
+    },
+    {
+      "kind": "added",
+      "name": "vexporter",
+      "new": ["0.1.0"],
+      "old": [],
+      "selection": "+"
+    },
+    {
+      "kind": "added",
+      "name": "vlocate",
+      "new": ["0.1.0"],
+      "old": [],
+      "selection": "+"
+    },
+    {
+      "kind": "added",
+      "name": "vswitch",
+      "new": ["", "0.1.0"],
+      "old": [],
+      "selection": "+"
+    }
+  ],
+  "changed": [
+    {
+      "kind": "upgraded",
+      "name": "voltaic",
+      "new": ["0.3.0"],
+      "old": ["0.2.1"],
+      "selection": "*"
+    }
+  ],
+  "closure": {
+    "narSizeDelta": 19053528,
+    "pathsAdded": 87,
+    "pathsRemoved": 80
+  },
+  "new": {
+    "label": "/nix/var/nix/profiles/system-520-link",
+    "narSize": 37379309952,
+    "path": "/nix/store/5dazswvd1glx1wn78z32j2y8nmpcb20f-nixos-system-drakkar-26.11.20261120.9996594",
+    "paths": 3696
+  },
+  "old": {
+    "label": "/nix/var/nix/profiles/system-494-link",
+    "narSize": 37360256424,
+    "path": "/nix/store/l113s5jqrm2zn09bj3a3cpzlphzf8517-nixos-system-drakkar-26.11.20261120.9996594",
+    "paths": 3689
+  },
+  "removed": [
+    {
+      "kind": "removed",
+      "name": "command-not-found",
+      "new": [],
+      "old": [""],
+      "selection": "."
+    }
+  ],
+  "schema": 1,
+  "selectionChanged": []
+}

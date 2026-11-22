@@ -7,7 +7,7 @@
 let
   assay = import ./common/assay/default.nix;
   nixos = import ./common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
 
   flake = import ./flake.nix;
   inherit (flake) inputs;
@@ -35,17 +35,16 @@ in
       flake = false;
     };
     nuScriptsLockMatchesPin = assay.eq lock.nodes.nu-scripts.locked.rev "19c49e09e1970a11db235fd38477dd5fa44e56bc";
-    # The fleet's own Rust tools come from the checkout, as plain sources.
-    rustToolsAreLocalSources = assay.eq [inputs.oomkiller-src inputs.nixos-update-notifier-src] [
+    # The fleet's own Rust tools come from the checkout, as plain sources. oomkiller is the
+    # last one still on a path: input; the rest (nixos-update-notifier since GH-207) are
+    # callPackage'd with a lib.fileset source.
+    rustToolsAreLocalSources = assay.eq [inputs.oomkiller-src] [
       {
         url = "path:./rust/tools/oomkiller";
         flake = false;
       }
-      {
-        url = "path:./rust/tools/nixos-update-notifier";
-        flake = false;
-      }
     ];
+    notifierIsNotAFlakeInput = assay.eq [(inputs ? nixos-update-notifier-src) (lock.nodes ? nixos-update-notifier-src)] [false false];
     # Deliberately NOT following nixpkgs: its FOD hash and interpreter pin are fixed against
     # its own nixpkgs (see the comment in flake.nix).
     # Its lib-only inputs (systems, flake-parts, treefmt-nix) do follow the root; nixpkgs not.

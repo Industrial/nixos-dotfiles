@@ -6,7 +6,7 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
   pkgs = nixos.flakeInputs.nixpkgs.legacyPackages.x86_64-linux;
 
   pkg = pkgs.callPackage ./default.nix {};
@@ -26,6 +26,14 @@ in
     wrapsTheBinaryWithItsTools = assay.eq (builtins.all (p: lib.hasInfix (builtins.unsafeDiscardStringContext "${lib.getBin p}/bin") pkg.postInstall)
       [pkgs.nix pkgs.git pkgs.coreutils pkgs.util-linux pkgs.curl])
     true;
+    # vdiff lists the package changes (GH-207), from its absolute store path: the fleet's own
+    # rust/tools/vdiff, not whatever `vdiff` is on the caller's PATH.
+    pointsAtVdiffsStorePath =
+      assay.eq (lib.hasInfix (builtins.unsafeDiscardStringContext "--set-default NIXOS_UPDATE_VDIFF ${lib.getExe pkg.passthru.vdiff}") pkg.postInstall) true;
+    vdiffIsTheCrate = assay.eq [pkg.passthru.vdiff.pname pkg.passthru.vdiff.meta.mainProgram] ["vdiff" "vdiff"];
+    # A lib.fileset source: only the crate's own files (no target/), with the vdiff fixtures.
+    sourceIsTheCrateOnly =
+      assay.eq (builtins.attrNames (builtins.readDir pkg.src)) ["Cargo.lock" "Cargo.toml" "src" "tests"];
     wrapsTheInstalledBinary =
       assay.eq (lib.hasInfix "wrapProgram $out/bin/nixos-update-notifier" pkg.postInstall) true;
 

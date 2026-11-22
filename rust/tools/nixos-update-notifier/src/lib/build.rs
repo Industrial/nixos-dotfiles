@@ -4,7 +4,8 @@ use std::process::Command;
 
 use thiserror::Error;
 
-use crate::diff::{DiffError, PackageChange, parse_diff_closures};
+use crate::config::Differ;
+use crate::diff::{DiffError, PackageChange, parse_diff_closures, parse_vdiff_json};
 
 #[derive(Debug, Error)]
 pub enum BuildError {
@@ -12,8 +13,11 @@ pub enum BuildError {
     Io(#[from] std::io::Error),
     #[error("nix build failed: {0}")]
     BuildFailed(String),
-    #[error("nix store diff-closures failed: {0}")]
-    DiffFailed(String),
+    #[error("{differ} failed: {stderr}")]
+    DiffFailed {
+        differ: &'static str,
+        stderr: String,
+    },
     #[error("{0}")]
     DiffParse(#[from] DiffError),
     #[error("could not read MemAvailable from /proc/meminfo")]
@@ -80,32 +84,92 @@ pub fn build_toplevel(
     Ok(PathBuf::from(path))
 }
 
-/// Diff two closures with `nix store diff-closures`.
-pub fn diff_closures(before: &Path, after: &Path) -> Result<Vec<PackageChange>, BuildError> {
-    let output = Command::new("nix")
-        .args([
-            "--extra-experimental-features",
-            "nix-command flakes",
-            "store",
-            "diff-closures",
-        ])
-        .arg(before)
-        .arg(after)
-        .output()?;
+/// Diff two closures with the configured differ: `vdiff --json` by default, or
+/// `nix store diff-closures` (the rollback, `--differ nix`).
+pub fn diff_closures(
+    differ: Differ,
+    vdiff: &Path,
+    before: &Path,
+    after: &Path,
+) -> Result<Vec<PackageChange>, BuildError> {
+    let (name, mut command) = match differ {
+        Differ::Vdiff => {
+            let mut c = Command::new(vdiff);
+            c.arg("--json");
+            ("vdiff --json", c)
+        }
+        Differ::Nix => {
+            let mut c = Command::new("nix");
+            c.args([
+                "--extra-experimental-features",
+                "nix-command flakes",
+                "store",
+                "diff-closures",
+            ]);
+            ("nix store diff-closures", c)
+        }
+    };
+    let output = command.arg(before).arg(after).output()?;
 
     if !output.status.success() {
-        return Err(BuildError::DiffFailed(
-            String::from_utf8_lossy(&output.stderr).trim().to_string(),
-        ));
+        return Err(BuildError::DiffFailed {
+            differ: name,
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        });
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(parse_diff_closures(&stdout)?)
+    Ok(match differ {
+        Differ::Vdiff => parse_vdiff_json(&stdout)?,
+        Differ::Nix => parse_diff_closures(&stdout)?,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::os::unix::fs::PermissionsExt;
+
+    /// A stand-in vdiff: refuses anything but `--json <old> <new>`, then prints `json`.
+    fn fake_vdiff(dir: &Path, json: &str) -> PathBuf {
+        fs::write(dir.join("out.json"), json).unwrap();
+        let bin = dir.join("vdiff");
+        fs::write(
+            &bin,
+            format!(
+                "#!/bin/sh\n[ \"$1\" = --json ] && [ $# -eq 3 ] || exit 2\nexec cat '{}'\n",
+                dir.join("out.json").display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&bin, fs::Permissions::from_mode(0o755)).unwrap();
+        bin
+    }
+
+    #[test]
+    fn vdiff_differ_runs_vdiff_json_and_parses_it() {
+        let t = tempfile::tempdir().unwrap();
+        let bin = fake_vdiff(
+            t.path(),
+            include_str!("../../tests/fixtures/vdiff-drakkar-494-520.json"),
+        );
+        let changes =
+            diff_closures(Differ::Vdiff, &bin, Path::new("/old"), Path::new("/new")).unwrap();
+        assert_eq!(changes.len(), 9);
+        assert_eq!(changes[0].to_string(), "voltaic: 0.2.1 → 0.3.0");
+    }
+
+    #[test]
+    fn a_failing_vdiff_names_the_differ() {
+        let t = tempfile::tempdir().unwrap();
+        let bin = t.path().join("vdiff");
+        fs::write(&bin, "#!/bin/sh\necho 'no such path' >&2\nexit 1\n").unwrap();
+        fs::set_permissions(&bin, fs::Permissions::from_mode(0o755)).unwrap();
+        let err =
+            diff_closures(Differ::Vdiff, &bin, Path::new("/old"), Path::new("/new")).unwrap_err();
+        assert_eq!(err.to_string(), "vdiff --json failed: no such path");
+    }
 
     #[test]
     fn available_memory_mib_reads_proc() {

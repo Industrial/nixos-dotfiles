@@ -307,7 +307,7 @@ jobs:
           {
             echo '## What this bump changes'
             echo
-            echo "Base: \`${GITHUB_SHA:0:12}\` (main). Package versions are **evaluated, not built**: \`environment.systemPackages\`, kernel and NixOS release per host. The exact built closure diff appears on each host after merge (\`nixos-update-notifier\`, \`nix store diff-closures\`)."
+            echo "Base: \`${GITHUB_SHA:0:12}\` (main). Package versions are **evaluated, not built**: \`environment.systemPackages\`, kernel and NixOS release per host. The exact built closure diff appears on each host after merge (\`nixos-update-notifier\`, \`vdiff --json\`)."
             echo
             echo '### Flake inputs'
             echo

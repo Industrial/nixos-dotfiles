@@ -1,0 +1,24 @@
+{
+  "added": [],
+  "changed": [],
+  "closure": {
+    "narSizeDelta": 32,
+    "pathsAdded": 26,
+    "pathsRemoved": 26
+  },
+  "new": {
+    "label": "/nix/var/nix/profiles/system-520-link",
+    "narSize": 37379309952,
+    "path": "/nix/store/5dazswvd1glx1wn78z32j2y8nmpcb20f-nixos-system-drakkar-26.11.20261120.9996594",
+    "paths": 3696
+  },
+  "old": {
+    "label": "/nix/var/nix/profiles/system-519-link",
+    "narSize": 37379309920,
+    "path": "/nix/store/palzjvsnxdp3pc2zkhgwvc120921jac2-nixos-system-drakkar-26.11.20261120.9996594",
+    "paths": 3696
+  },
+  "removed": [],
+  "schema": 1,
+  "selectionChanged": []
+}
