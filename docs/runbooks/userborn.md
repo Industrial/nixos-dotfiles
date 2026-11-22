@@ -23,6 +23,9 @@ tested three ways:
 | console (tty) password login | ok | ok | ok |
 | switch that adds a user and a group, then rollback | ok | ok | ok |
 | `pwck -r`, `grpck -r` after boot, switch and rollback | clean | clean | clean |
+| exactly the configured login-capable users, unlocked users and groups (GH-206) | ok | ok | ok |
+| after the rollback: the dropped user and group | deleted | user locked (`!*`), group kept, empty | user **active**, group kept with its members |
+| the "Rollback" step 3 cleanup below, then a re-activation: back to exactly the configured set | n/a | ok | ok |
 
 Run one with
 `bin/with-devenv bash .tmp/vnla/vmtest.sh <worktree> '.#checks.x86_64-linux.users-vm-userborn'`.
@@ -42,8 +45,10 @@ CI does not build the VM tests.
   - userborn keeps the entry, sets its password to `!*` (locked), and removes it from its
     groups. The group itself stays.
   - **userborn → Perl rollback:** Perl never saw that user, so it leaves it **active**, with
-    its password and group memberships. After rolling back to Perl, remove by hand any user
-    that was added while userborn was on (see below).
+    its password and group memberships. The group is imperative to Perl as well, so it keeps
+    **all** its members: the operator stays in it even though the configuration no longer
+    puts them there. After rolling back, remove by hand any user and group that was added
+    while userborn was on (see below).
 - userborn logs `uses an insecure password hashing scheme` for `$6$` (sha512crypt) hashes.
   It is only a warning. Running `passwd` writes a new hash in the system's default scheme.
 
@@ -56,7 +61,9 @@ CI does not build the VM tests.
    numbers.
 3. Check:
    - `systemctl is-active userborn.service lock-root-password.service`
-   - `sudo pwck -r` and `sudo grpck -r`
+   - `sudo pwck -r` and `sudo grpck -r`. On a GNOME host `pwck -r` exits 2 with "no
+     changes": GDM's dynamic `gdm-greeter*` users have homes under `/run/gdm/home/` only
+     while a greeter runs (seen on drakkar, 2026-11-22). Expect that, and nothing else.
    - `sudo getent shadow root`: the hash field starts with `!`
    - `id tom`
    - `ssh tom@<host> sudo -n true` from another fleet host
@@ -70,9 +77,19 @@ CI does not build the VM tests.
    generation from before the switch. Or pick that generation in the systemd-boot menu.
 2. The Perl script takes over again. It keeps every entry userborn wrote, so the operator
    and root are unchanged.
-3. Look for users created while userborn was on: `awk -F: '$3 >= 1000 && $3 < 60000' /etc/passwd`.
-   `sudo userdel <name>` any that are no longer declared.
-4. `sudo rm -rf /var/lib/userborn` only if you want the next switch-over to import the Perl
+3. Look for users created while userborn was on:
+   `awk -F: '$3 >= 1000 && $3 < 30000 {print $1}' /etc/passwd` (normal users get uids
+   1000-29999; an upper bound of 60000 would also list `nixbld1`…`nixbld32`, which start at
+   30001 and must stay). `sudo userdel <name>` any that are no longer declared. `userdel`
+   leaves the home directory: add `-r` only if nothing in it is worth keeping.
+   This also applies after a userborn → userborn rollback, where the dropped users are
+   locked (`!*`) rather than active.
+4. `userdel` removes only a user's own primary group, so a group added while userborn was
+   on stays, and after a rollback to Perl the operator is still a member of it. Compare
+   `cut -d: -f1 /etc/group` with the configuration's groups and `sudo groupdel <name>` any
+   that are no longer declared. Then check `id tom` and `awk -F: '$7 !~ /nologin|false/'
+   /etc/passwd`: only the configured login users should be left.
+5. `sudo rm -rf /var/lib/userborn` only if you want the next switch-over to import the Perl
    state again.
 
 If login is broken anyway, use ADR-0007's "Recovery (locked root)": an older generation
