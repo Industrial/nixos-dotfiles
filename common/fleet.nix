@@ -54,7 +54,9 @@ let
     };
     mimir = {
       description = "always-on file server";
-      roles = ["server" "monitoring" "nfs-server" "remote-desktop-relay"];
+      # vdeploy: vdeploy deploys this host instead of comin (GH-160), after drakkar's 5
+      # clean deploys on 2026-11-22.
+      roles = ["server" "monitoring" "nfs-server" "remote-desktop-relay" "vdeploy"];
       # vdeploy waits for main to sit still this long before it starts a plan (GH-221).
       # vdeploy never cancels a plan, so a plan started on a commit that is superseded
       # a minute later is a whole plan of lag. Measured 2026-11-21/22 over 48 h: 20 of

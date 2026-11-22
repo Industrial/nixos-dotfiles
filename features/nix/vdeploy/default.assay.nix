@@ -106,9 +106,10 @@ in
     everyMinute = assay.eq (argAfter "--interval") "1m";
     noDebounceByDefault = assay.eq (argAfter "--debounce") "0";
     debouncePerHost = assay.eq (argAfterIn slow "--debounce") "15m";
-    # The slow host waits for main to go quiet, from common/fleet.nix, in observe mode.
+    # The slow host waits for main to go quiet, from common/fleet.nix; it deploys (the
+    # vdeploy role, GH-160), and keeps the debounce.
     mimirDebouncesFromFleet =
-      assay.eq [(argAfterIn mimir "--host") (argAfterIn mimir "--debounce") mimir.features.nix.vdeploy.mode] ["mimir" "2m" "observe"];
+      assay.eq [(argAfterIn mimir "--host") (argAfterIn mimir "--debounce") mimir.features.nix.vdeploy.mode] ["mimir" "2m" "deploy"];
     ownCloneNotTheUsers = assay.eq (argAfter "--repo") "/var/lib/vdeploy/repo";
     nixThroughTheDaemon = assay.eq service.environment.NIX_REMOTE "daemon";
     homeInTheStateDir = assay.eq [service.environment.HOME sc.StateDirectory] ["/var/lib/vdeploy" "vdeploy"];
