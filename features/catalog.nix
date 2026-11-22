@@ -160,6 +160,7 @@
   ./nix/vpush
   ./nix/vdeploy
   ./nix/vhealth
+  ./nix/vci
 
   # nixos
   ./nixos
