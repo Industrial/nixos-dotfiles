@@ -250,7 +250,7 @@ allocated). Encoders `put_* : &mut Vec<u8> -> .. -> ()` write into a buffer.
 | `process_stderr : &mut Conn -> Result<(), WorkerError>` | up to `Last`; `Failed` becomes `WorkerError::Remote` |
 | `relay_stderr : &mut Conn -> &mut Conn -> Result<StderrEnd, WorkerError>` | relay one op's stderr stream from the daemon side to the client side, answering `DataRead` from the client; `StderrEnd = Done \| Errored DaemonFailure` |
 | `copy_nar : &mut Conn -> FnMut(&[u8]) -> ..` | pass the NAR after NarFromPath's `Last` to a sink, exactly as sent |
-| `is_valid_path_on`, `query_valid_paths_on`, `query_path_info_on`, `query_path_from_hash_part_on`, `nar_from_path_on`, `nar_hash_from_path_on`, `add_to_store_nar_on`, `add_to_store_nar_from_on`, `add_temp_root_on`, `add_signatures_on` | the ops below, on a `&mut Conn` |
+| `is_valid_path_on`, `query_valid_paths_on`, `query_path_info_on`, `query_path_from_hash_part_on`, `nar_from_path_on`, `nar_hash_from_path_on`, `add_to_store_nar_on`, `add_to_store_nar_from_on`, `add_to_store_nar_reader_on`, `add_temp_root_on`, `add_signatures_on` | the ops below, on a `&mut Conn` |
 
 A proxy forwards an op by sending what it read (`take_request` names it,
 `pending` and the raw bytes carry the rest) and relaying the stderr stream
@@ -281,6 +281,7 @@ op is an `Effect<_, WorkerError, HNil>`.
 | `nar_hash_from_path : &Daemon -> String -> Effect<NarDigest, ..>` | NarFromPath, hashed as it streams (one buffer) |
 | `add_to_store_nar : &Daemon -> PathInfo -> Vec<u8> -> bool -> bool -> Effect<(), ..>` | AddToStoreNar from a NAR in memory, framed; the flags are `repair`, `dont_check_sigs` |
 | `add_to_store_nar_from : &Daemon -> PathInfo -> PathBuf -> bool -> bool -> Effect<(), ..>` | AddToStoreNar from the NAR of a local path, archived and framed chunk by chunk |
+| `add_to_store_nar_reader : &Daemon -> PathInfo -> Reader -> bool -> bool -> Effect<(), ..>` | AddToStoreNar from a NAR read as it comes (a staged file, a download), a frame of at most 256 KiB per read; a read error breaks the connection |
 | `add_temp_root : &Daemon -> String -> Effect<(), ..>` | AddTempRoot: the path lives while the connection does |
 | `add_signatures : &Daemon -> String -> Vec<String> -> Effect<(), ..>` | AddSignatures |
 
@@ -315,7 +316,8 @@ the runtime (such as `tokio::process` pipes) work either way.
   scanning, the NAR scanner fed in 7-byte pieces, and the client against a
   scripted fake daemon over an in-memory pipe: both handshakes (1.37 and
   1.38's features), log traffic, a `Remote` error that leaves the connection
-  usable, AddToStoreNar's frames and NarFromPath's NAR.
+  usable, AddToStoreNar's frames and NarFromPath's NAR, and AddToStoreNar from
+  a reader (the flags, a frame per read, the NAR intact).
 - `worker_live`: the client against this machine's daemon. IsValidPath and
   QueryValidPaths, QueryPathInfo against `nix path-info --json` for ten paths
   (the current system's references), QueryPathFromHashPart, NarFromPath
