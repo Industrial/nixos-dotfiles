@@ -18,6 +18,26 @@
 #
 # Rollback: `features.nix.vdaemon-proxy.native = lib.mkForce [];`.
 #
+# Ops kept forwarded, and why (#244; the analysis is on that issue). Every write, build and GC
+# stays nix-daemon's, because a native version would have to own side effects that cannot be
+# shown equal, for no win worth the risk:
+#   AddTempRoot, AddIndirectRoot, AddPermRoot    temp-roots files kept alive by each daemon
+#                                                worker's lock (the GC's liveness test), and
+#                                                gcroots links; the win is one round trip
+#   AddToStore, AddToStoreNar, AddMultipleToStore, AddTextToStore
+#                                                SQLite writes racing nix-daemon's writers and
+#                                                the GC lock; one bad row spreads fleet-wide
+#                                                through vcache
+#   BuildPaths, BuildDerivation, BuildPathsWithResults
+#                                                already delegated: vbuild is the daemon's build
+#                                                hook (#156)
+#   CollectGarbage                               the GC lock and every root; vgc is the policy
+#                                                layer, as a client
+#   QueryMissing                                 substituter network queries
+#   RegisterDrvOutput, QueryRealisation          content-addressed; no traffic in the fleet
+# Pure database reads outside the six (QueryValidDerivers, QueryDerivationOutputMap) could
+# join conformance mode first if they ever see traffic.
+#
 # Probe, as a user: the journal's op lines carry "answered":"native" or "daemon".
 #   journalctl -u vdaemon-proxy --since -1min -o cat | grep -c '"answered":"native"'
 {

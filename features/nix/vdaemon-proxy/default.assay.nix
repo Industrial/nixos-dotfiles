@@ -83,4 +83,8 @@ in
     # feature wrapped and OFF, the oneshot is still there, guarding the public path.
     rebindIsUngated = assay.eq (offCfg.systemd.services.nix-daemon-listen.environment.NIX_DAEMON_LISTEN or null) public;
     offAddsNoProxy = assay.eq (offCfg.systemd.sockets ? vdaemon-proxy) false;
+
+    # #224: a stop drains (25 s in the proxy) and then runs the finalizers; systemd waits
+    # longer than both before it kills, and the stop signal is the one the proxy handles.
+    stopWaitsLongerThanTheDrain = assay.eq [cfg.systemd.services.vdaemon-proxy.serviceConfig.TimeoutStopSec (cfg.systemd.services.vdaemon-proxy.serviceConfig.KillSignal or "SIGTERM")] ["40s" "SIGTERM"];
   }
