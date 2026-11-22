@@ -10,6 +10,7 @@ local addonName, AM = ...
 --   "SELL_FILTER_CHANGED"  an item was ignored or no longer ignored in the Sell tab, or the filter for them changed (SellSettings)
 --   "SCAN_CHANGED"    the full scan of the auction house started or ended (Scan)
 --   "SELL_SCAN_CHANGED" the scan of the items to sell started, advanced or ended (SellScan)
+--   "SELL_FORM_CHANGED" our sell form got another item ("item") or another price or quantity ("price") (SellForm)
 --   "OWN_AUCTIONS_CHANGED"  the player's own auctions changed, or a search told what is ahead of them (OwnAuctions)
 --   "CRAFTERS_CHANGED"  who crafts what changed (ProfessionScanner: a scan, a dropped profession, a character or
 --                     profession ignored, a character deleted)

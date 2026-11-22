@@ -27,7 +27,7 @@ local meta = {
     ['minLevel'] = 4,
     -- Maximum NPC level.
     ['maxLevel'] = 5,
-    -- NPC rank; see https://github.com/cmangos/issues/wiki/creature_template#rank
+    -- NPC rank, named by Enum.npcRanks; see https://github.com/cmangos/issues/wiki/creature_template#rank
     ['rank'] = 6,
     -- Spawn coordinates grouped by zone: {[zoneId] = {{x, y, phase?}, ...}}.
     ['spawns'] = 7,

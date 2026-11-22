@@ -23,6 +23,16 @@ local function OtherBusy(self)
   return false
 end
 
+-- True while any queue searches.
+function SearchQueue.IsAnyRunning()
+  for _, queue in ipairs(queues) do
+    if queue.running then
+      return true
+    end
+  end
+  return false
+end
+
 -- A new queue. options: log (debug log category), portrait (key of the portrait animation), event (fired when the
 -- queue started, advanced or ended), onNothingListed(itemId, started) (optional: a search without any auction, or
 -- without an answer; started is the time() the query was sent), onComplete(started) (optional: every item was

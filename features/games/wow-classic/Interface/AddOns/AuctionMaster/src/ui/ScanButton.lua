@@ -39,15 +39,25 @@ local function FormatAge(timestamp)
 end
 
 local function CanStart()
-  return not AM.Scan.IsRunning() and AM.Scan.GetWaitSeconds() <= 0
+  return not AM.Scan.IsRunning() and AM.Scan.GetWaitSeconds() <= 0 and not AM.Scan.IsSystemBusy()
+    and not AM.AuctionHouse.IsNeutral()
 end
 
 local function UpdateTooltip()
   GameTooltip:SetOwner(button, "ANCHOR_TOP")
   GameTooltip:SetText(L["SCAN_BUTTON"], 1, 1, 1)
   GameTooltip:AddLine(L["SCAN_BUTTON_TOOLTIP"], nil, nil, nil, true)
+  if AM.AuctionHouse.IsNeutral() then
+    GameTooltip:AddLine(L["SCAN_BUTTON_NEUTRAL_TOOLTIP"], 1, 0.33, 0.33, true)
+  end
   if AM.Scan.HasTimedOut() then
     GameTooltip:AddLine(L["SCAN_BUTTON_NO_ANSWER_TOOLTIP"], 1, 0.33, 0.33, true)
+  end
+  if AM.Scan.IsSystemBusy() then
+    GameTooltip:AddLine(L["SCAN_BUTTON_BUSY_TOOLTIP"], 1, 0.82, 0, true)
+  end
+  if AM.Scan.IsBlockedByOtherAddon() then
+    GameTooltip:AddLine(L["SCAN_BUTTON_OTHER_ADDON_TOOLTIP"], 1, 0.33, 0.33, true)
   end
   local wait = AM.Scan.GetWaitSeconds()
   if not AM.Scan.IsRunning() and wait > 0 then
@@ -75,10 +85,18 @@ function ScanButton.Update()
   if message and GetTime() >= messageUntil then
     message = nil
   end
-  if percent then
+  if AM.Scan.IsWaitingForSystem() then
+    status:SetText(Widgets.Color(UI.gold, L["SCAN_BUTTON_BUSY"]))
+  elseif percent then
     status:SetText(Widgets.Color(UI.gold, ("%d%%"):format(percent)))
   elseif message then
     status:SetText(message)
+  elseif AM.AuctionHouse.IsNeutral() then
+    status:SetText(Widgets.Color(UI.muted, L["SCAN_BUTTON_NEUTRAL"]))
+  elseif AM.Scan.IsSystemBusy() then
+    status:SetText(Widgets.Color(UI.gold, L["SCAN_BUTTON_BUSY"]))
+  elseif AM.Scan.IsBlockedByOtherAddon() then
+    status:SetText(Widgets.Color(UI.loss, L["SCAN_BUTTON_OTHER_ADDON"]))
   elseif last then
     status:SetText(Widgets.Color(UI.text, FormatAge(last)))
   else

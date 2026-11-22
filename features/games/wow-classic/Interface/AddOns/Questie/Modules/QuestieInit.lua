@@ -57,8 +57,8 @@ local DailyQuestComms = QuestieLoader:ImportModule("DailyQuestComms")
 local CommsVisibility = QuestieLoader:ImportModule("CommsVisibility")
 ---@type QuestieComms
 local QuestieComms = QuestieLoader:ImportModule("QuestieComms");
----@type QuestieOptions
-local QuestieOptions = QuestieLoader:ImportModule("QuestieOptions");
+---@type QuestieOptionsEngine
+local QuestieOptionsEngine = QuestieLoader:ImportModule("QuestieOptionsEngine")
 ---@type QuestieCoords
 local QuestieCoords = QuestieLoader:ImportModule("QuestieCoords");
 ---@type QuestieTooltips
@@ -320,7 +320,7 @@ QuestieInit.Stages[3] = function() -- run as a coroutine
     CommsEncoding.Init()
     CommsVisibility:Initialize()
     DailyQuestComms.Initialize()
-    if (not Questie.IsClassic) then
+    if (Expansions.Current ~= Expansions.Era) then
         -- There are no random daily quests on Era, HC or SoD so we skip this
         DailyQuestComms.RequestUnavailableDailyQuests(true)
     end
@@ -440,7 +440,7 @@ function QuestieInit.OnAddonLoaded()
         QuestieSlash.RegisterSlashCommands()
 
         IsleOfQuelDanas.Initialize() -- This has to happen before option init
-        QuestieOptions.Initialize()
+        QuestieOptionsEngine:Initialize()
     end, 0, "Error during AddonLoaded initialization!", nil, function(err)
         _StopStartup("startup.addon-loaded", err, "Reload the UI. If the problem persists, report this error.")
     end)

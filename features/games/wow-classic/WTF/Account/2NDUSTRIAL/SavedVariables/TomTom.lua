@@ -76,6 +76,31 @@ TomTomWaypointsM = {
 ["world"] = true,
 },
 },
+[1441] = {
+["1441:478000000:237000000:Razorfen Downs"] = {
+1441,
+0.478,
+0.237,
+["arrivaldistance"] = 15,
+["crazy"] = true,
+["persistent"] = true,
+["desc"] = "Razorfen Downs",
+["silent"] = true,
+["cleardistance"] = 10,
+["title"] = "Razorfen Downs",
+["from"] = "?",
+["callbacks"] = {
+["distance"] = {
+},
+["minimap"] = {
+},
+["world"] = {
+},
+},
+["minimap"] = true,
+["world"] = true,
+},
+},
 [1420] = {
 ["1420:851000000:314000000:Scarlet Monastery - Library"] = {
 1420,
@@ -157,31 +182,6 @@ TomTomWaypointsM = {
 ["silent"] = true,
 ["cleardistance"] = 10,
 ["title"] = "Scarlet Monastery - Graveyard",
-["from"] = "?",
-["callbacks"] = {
-["distance"] = {
-},
-["minimap"] = {
-},
-["world"] = {
-},
-},
-["minimap"] = true,
-["world"] = true,
-},
-},
-[1441] = {
-["1441:478000000:237000000:Razorfen Downs"] = {
-1441,
-0.478,
-0.237,
-["arrivaldistance"] = 15,
-["crazy"] = true,
-["persistent"] = true,
-["desc"] = "Razorfen Downs",
-["silent"] = true,
-["cleardistance"] = 10,
-["title"] = "Razorfen Downs",
 ["from"] = "?",
 ["callbacks"] = {
 ["distance"] = {

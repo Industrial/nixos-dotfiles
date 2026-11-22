@@ -74,17 +74,9 @@ function SellHistory.GetSellRate(itemDbKey)
   return totals and totals.sellRate
 end
 
--- The buyout per item in the game's sell form (both forms ask for it per item), nil without an item or a price.
+-- The buyout per item in our sell form, nil without an item or a price.
 local function GetFormPrice()
-  local house = AuctionHouseFrame
-  for _, name in ipairs({ "ItemSellFrame", "CommoditiesSellFrame" }) do
-    local frame = house and house[name]
-    local item = frame and frame:IsShown() and frame.GetItem and frame:GetItem()
-    if item and item:IsValid() and frame.PriceInput then
-      local amount = frame.PriceInput:GetAmount()
-      return amount and amount > 0 and amount or nil
-    end
-  end
+  return AM.SellForm.GetPrice()
 end
 
 -- The text of a tab with nothing to show, placed as the auction house's own "no results" text of its item lists:
@@ -489,8 +481,8 @@ function SellHistory.Refresh()
   end
 end
 
--- The price in the sell form changed: only the Summary's line for it depends on it. The game calls this once per
--- box of gold, silver and copper, so it is redrawn once for all of them.
+-- The price in the sell form changed: only the Summary's line for it depends on it. It changes once per box of gold,
+-- silver and copper and per key typed, so it is redrawn once for all of them.
 local pricePending = false
 local function PriceChanged()
   if pricePending or not (ui and ui.panel:IsVisible() and tab == TAB_SUMMARY) then
@@ -503,16 +495,12 @@ local function PriceChanged()
   end)
 end
 
--- Hooks the sell forms of the auction house (load on demand: called once it exists).
-function SellHistory.Install()
-  for _, name in ipairs({ "ItemSellFrame", "CommoditiesSellFrame" }) do
-    local frame = AuctionHouseFrame[name]
-    -- runs on every change of the price, typed or set by the game (the item frame has its own, so per frame)
-    if frame and frame.UpdatePostState then
-      hooksecurefunc(frame, "UpdatePostState", PriceChanged)
-    end
+-- The price or quantity in our sell form changed.
+AM.Events.Register("SELL_FORM_CHANGED", function(what)
+  if what == "price" then
+    PriceChanged()
   end
-end
+end)
 
 -- The ledger changed: the totals are worked out again when next needed.
 AM.Events.Register("LEDGER_CHANGED", function()

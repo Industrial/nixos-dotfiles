@@ -103,6 +103,9 @@ end
 local function GetUnitNameParts(token)
   if type(UnitName) ~= "function" then return {} end
   local first, second = UnitName(token)
+  if issecretvalue and (issecretvalue(first) or issecretvalue(second)) then
+    return {}
+  end
   local parts = {}
   if type(first) == "string" and first ~= "" then
     parts[#parts + 1] = first
@@ -317,4 +320,102 @@ function Core.IsAllowedSystemMessage(text)
     end
   end
   return false
+end
+
+---------------------------------------------------------------------------
+-- CHAT_MSG_TRADESKILLS allowlist
+---------------------------------------------------------------------------
+-- Crafting messages from nearby players ("%s creates %s.") embed the
+-- crafter's name in the text without passing it as a playerName arg, so the
+-- shared chat sanitizer cannot redact it. Messages are matched against the
+-- client's own (locale-correct) global format strings: the crafter
+-- placeholder of third-person templates is replaced with "<name>", the
+-- first-person templates are kept, and anything else is discarded.
+
+---@type string[] Templates without any player name.
+local TRADESKILL_SELF_TAGS = {
+  "TRADESKILL_LOG_FIRSTPERSON",      -- "You create %s."
+  "LOOT_ITEM_CREATED_SELF",          -- "You create: %s."
+  "LOOT_ITEM_CREATED_SELF_MULTIPLE", -- "You create: %sx%d."
+}
+
+---@type string[] Templates whose first format argument is the crafter's name.
+local TRADESKILL_OTHER_TAGS = {
+  "TRADESKILL_LOG_THIRDPERSON", -- "%s creates %s."
+  "CREATED_ITEM",               -- "%s creates: %s."
+  "CREATED_ITEM_MULTIPLE",      -- "%s creates: %sx%d."
+}
+
+--- Like GlobalStringToPattern, but wraps the placeholder of format argument
+--- 1 (`%1$s` or the first unnumbered placeholder) in position captures.
+---@param template string
+---@return string? pattern nil if the template has no argument 1
+local function GlobalStringToNameCapturePattern(template)
+  local argIndex = 0
+  local found = false
+  local withSentinel = template:gsub("%%(%d?)%$?[sd]", function(position)
+    argIndex = argIndex + 1
+    local index = position ~= "" and tonumber(position) or argIndex
+    if index == 1 then
+      found = true
+      return "\2"
+    end
+    return "\1"
+  end)
+  if not found then return nil end
+  local escaped = EscapePattern(withSentinel)
+  return "^" .. escaped:gsub("\1", ".-"):gsub("\2", "().-()") .. "$"
+end
+
+---@type {self: string[], other: string[]}?
+local tradeskillPatterns
+
+local function GetTradeskillPatterns()
+  if not tradeskillPatterns then
+    tradeskillPatterns = { self = {}, other = {} }
+    for i = 1, #TRADESKILL_SELF_TAGS do
+      local template = _G[TRADESKILL_SELF_TAGS[i]]
+      if type(template) == "string" and template ~= "" then
+        tradeskillPatterns.self[#tradeskillPatterns.self + 1] = GlobalStringToPattern(template)
+      end
+    end
+    for i = 1, #TRADESKILL_OTHER_TAGS do
+      local template = _G[TRADESKILL_OTHER_TAGS[i]]
+      local pattern = type(template) == "string" and GlobalStringToNameCapturePattern(template)
+      if pattern then
+        tradeskillPatterns.other[#tradeskillPatterns.other + 1] = pattern
+      end
+    end
+  end
+  return tradeskillPatterns
+end
+
+--- Sanitize `CHAT_MSG_TRADESKILLS` args: applies Core.SanitizeChatMsgArgs,
+--- then redacts the crafter's name using the client's global format
+--- strings. Text matching no known template is discarded.
+---@param args PackedArgs
+---@return PackedArgs sanitized
+function Core.SanitizeTradeskillChatMsgArgs(args)
+  local out = Core.SanitizeChatMsgArgs(args)
+  local text = out[1]
+  if type(text) ~= "string" or text == "" then
+    return out
+  end
+
+  local patterns = GetTradeskillPatterns()
+  for i = 1, #patterns.other do
+    local nameStart, nameEnd = text:match(patterns.other[i])
+    if nameStart then
+      out[1] = text:sub(1, nameStart - 1) .. "<name>" .. text:sub(nameEnd)
+      return out
+    end
+  end
+  for i = 1, #patterns.self do
+    if text:match(patterns.self[i]) then
+      return out
+    end
+  end
+
+  out[1] = nil
+  return out
 end

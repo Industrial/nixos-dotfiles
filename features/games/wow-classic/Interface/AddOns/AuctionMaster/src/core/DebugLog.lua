@@ -162,6 +162,11 @@ local function ListenToGame()
     listener = CreateFrame("Frame")
     listener:SetScript("OnEvent", function(_, event, ...)
       DebugLog.Log("game", "%s %s", event, DescribeAll(...))
+      if event == "AUCTION_HOUSE_SHOW" then
+        -- Which auction house this is: its auctioneer's faction tells a neutral one (AM.AuctionHouse).
+        DebugLog.Log("game", "auctioneer %s, faction %s, zone %s / %s", tostring(UnitGUID("npc")),
+          tostring(UnitFactionGroup("npc")), tostring(GetZoneText()), tostring(GetSubZoneText()))
+      end
     end)
   end
   for _, name in ipairs(GAME_EVENTS) do

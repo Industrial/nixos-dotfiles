@@ -3,7 +3,14 @@ local addonName, AM = ...
 AM.name = addonName
 AM.version = C_AddOns.GetAddOnMetadata(addonName, "Version")
 
-local Print = AM.Print
+-- The answer to a slash command, its words joined by spaces (AM.Print takes one text and a level).
+local function Print(...)
+  local parts = {}
+  for i = 1, select("#", ...) do
+    parts[i] = tostring((select(i, ...)))
+  end
+  AM.Print(table.concat(parts, " "), "quiet")
+end
 
 AM.Locale.Apply(GetLocale())
 
@@ -115,6 +122,11 @@ SlashCmdList["AUCTIONMASTER"] = function(msg)
   elseif cmd == "softreset" then
     -- Hidden developer command: resets the state of the windows only, after asking.
     StaticPopup_Show("AUCTIONMASTER_SOFT_RESET")
+  elseif cmd == "demo on" then
+    -- Hidden developer command: shows a made-up ledger for recordings, "/am demo off" puts the real one back.
+    AM.LedgerDemo.Start()
+  elseif cmd == "demo off" then
+    AM.LedgerDemo.Stop()
   elseif cmd == "recipes" then
     AM.MainWindow.Toggle("recipes")
   elseif cmd == "announce" then

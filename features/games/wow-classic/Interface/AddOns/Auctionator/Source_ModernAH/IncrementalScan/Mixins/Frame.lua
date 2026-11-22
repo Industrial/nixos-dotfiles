@@ -38,12 +38,14 @@ function AuctionatorIncrementalScanFrameMixin:OnEvent(event, ...)
     -- will fire when doing other specific items searches (to update the price
     -- and quantity) on any size search results.
     if #browseResults <= Auctionator.Constants.SummaryBatchSize then
-      self:AddPrices(browseResults)
-      self:NextStep()
+      self:AddPrices(browseResults, function()
+        self:NextStep()
+      end)
     end
   elseif event == "AUCTION_HOUSE_BROWSE_RESULTS_ADDED" then
-    self:AddPrices(...)
-    self:NextStep()
+    self:AddPrices(..., function()
+      self:NextStep()
+    end)
 
   elseif event == "AUCTION_HOUSE_CLOSED" and self.doingFullScan then
     self.doingFullScan = false
@@ -65,6 +67,8 @@ function AuctionatorIncrementalScanFrameMixin:InitiateScan()
     Auctionator.AH.SendBrowseQuery({searchString = "", sorts = {}, filters = {}, itemClassFilters = {}})
     self.previousDatabaseCount = Auctionator.Database:GetItemCount()
     self.doingFullScan = true
+
+    self.queued = 0
 
     Auctionator.EventBus:Fire(self, Auctionator.IncrementalScan.Events.ScanStart)
     self:FireProgressEvent()
@@ -101,26 +105,37 @@ function AuctionatorIncrementalScanFrameMixin:FireProgressEvent()
   Auctionator.EventBus:Fire(self, Auctionator.IncrementalScan.Events.ScanProgress, progress)
 end
 
-function AuctionatorIncrementalScanFrameMixin:AddPrices(results)
+function AuctionatorIncrementalScanFrameMixin:AddPrices(results, callback)
   Auctionator.Debug.Message("AuctionatorIncrementalScanFrameMixin:AddPrices()", results)
 
+  local queued, loopComplete = 0, false
   for _, resultInfo in ipairs(results) do
     if resultInfo.totalQuantity ~= 0 then
-      local allDBKeys = Auctionator.Utilities.DBKeyFromBrowseResult(resultInfo)
+      queued = queued + 1
+      Auctionator.Utilities.DBKeyFromItemKey(resultInfo.itemKey, function(allDBKeys)
+        for index, dbKey in ipairs(allDBKeys) do
+          if self.info[dbKey] == nil then
+            self.info[dbKey] = {}
+          end
 
-      for index, dbKey in ipairs(allDBKeys) do
-        if self.info[dbKey] == nil then
-          self.info[dbKey] = {}
+          table.insert(self.info[dbKey],
+            { price = resultInfo.minPrice, available = resultInfo.totalQuantity }
+          )
+        end
+        if self.doingFullScan then
+          table.insert(self.rawScan, resultInfo)
         end
 
-        table.insert(self.info[dbKey],
-          { price = resultInfo.minPrice, available = resultInfo.totalQuantity }
-        )
-      end
-      if self.doingFullScan then
-        table.insert(self.rawScan, resultInfo)
-      end
+        queued = queued - 1
+        if loopComplete and queued == 0 then
+          callback()
+        end
+      end)
     end
+  end
+  loopComplete = true
+  if queued == 0 then
+    callback()
   end
 
   if self.doingFullScan then

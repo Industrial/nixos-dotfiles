@@ -1,0 +1,8 @@
+<Bindings>
+    <Binding name="FOREVERDUNGEONJOURNAL_TOGGLE" category="Dungeon Journal">
+        ForeverDungeonJournal_Toggle()
+    </Binding>
+    <Binding name="FOREVERDUNGEONJOURNAL_OPENITEM" category="Dungeon Journal">
+        ForeverDungeonJournal_OpenHoveredItem()
+    </Binding>
+</Bindings>

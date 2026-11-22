@@ -236,7 +236,9 @@ local function SampleSubName(_, tooltipData)
   -- Unit tooltips are hover-driven (world and unit frames), so only mouseover is tracked.
   local token = "mouseover"
   if not UnitExists(token) or UnitIsPlayer(token) or UnitPlayerControlled(token) then return end
-  if UnitGUID(token) ~= guid then return end
+  local tokenGuid = UnitGUID(token)
+  if issecretvalue and issecretvalue(tokenGuid) then return end
+  if tokenGuid ~= guid then return end
 
   local subName = ExtractSubName(tooltipData)
   if subName == nil then return end

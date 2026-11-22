@@ -30,6 +30,8 @@ local QuestieLib = QuestieLoader:ImportModule("QuestieLib")
 local DailyQuestComms = QuestieLoader:ImportModule("DailyQuestComms")
 ---@type DailyQuestCommsBlacklist
 local DailyQuestCommsBlacklist = QuestieLoader:ImportModule("DailyQuestCommsBlacklist")
+---@type Expansions
+local Expansions = QuestieLoader:ImportModule("Expansions")
 
 local GetQuestGreenRange = QuestieCompat.GetQuestGreenRange
 local yield = coroutine.yield
@@ -100,7 +102,7 @@ function AvailableQuests.Initialize()
     unavailableDailyQuestsByNpc = Questie.db.global.unavailableDailyQuestsByNpc[realmName]
     AvailableQuests.__unavailableDailyQuestsByNpc = unavailableDailyQuestsByNpc
 
-    if (not Questie.IsClassic) then
+    if (Expansions.Current ~= Expansions.Era) then
         _ScheduleDailyResetTimer()
     end
 end
@@ -586,12 +588,12 @@ _CalculateAndDrawAvailableQuests = function()
     local hidden = Questie.db.char.hidden
 
     local activeQuests = ActiveQuests.GetAll()
-    local currentIsleOfQuelDanasQuests = IsleOfQuelDanas.quests[Questie.db.profile.isleOfQuelDanasPhase] or {}
+    local currentIsleOfQuelDanasQuests = IsleOfQuelDanas.quests[Questie.db.global.isleOfQuelDanasPhase or 1] or {}
     local aqWarEffortQuests = QuestieQuestBlacklist.AQWarEffortQuests
 
     QuestieDB.activeChildQuests = {} -- Reset here so we don't need to keep track in the quest event system
 
-    local IsClassic = Questie.IsClassic
+    local isEraContent = Expansions.Current == Expansions.Era
     local IsSoD = Questie.IsSoD
 
     -- We create a local function here to improve readability but use the localized variables above.
@@ -613,7 +615,7 @@ _CalculateAndDrawAvailableQuests = function()
                 ((not showDungeonQuests) and QuestieDB.IsDungeonQuest(questId)) or -- Don't show dungeon quests if option is disabled
                 ((not showRaidQuests) and QuestieDB.IsRaidQuest(questId)) or -- Don't show raid quests if option is disabled
                 ((not showAQWarEffortQuests) and aqWarEffortQuests[questId]) or -- Don't show AQ War Effort quests if the option disabled
-                (IsClassic and currentIsleOfQuelDanasQuests[questId]) or -- Don't show Isle of Quel'Danas quests for Era/HC/SoX
+                (isEraContent and currentIsleOfQuelDanasQuests[questId]) or -- Don't show Isle of Quel'Danas quests for Era/HC/SoX
                 (IsSoD and QuestieDB.IsRuneAndShouldBeHidden(questId)) -- Don't show SoD Rune quests with the option disabled
             ) then
             if availableQuests[questId] then

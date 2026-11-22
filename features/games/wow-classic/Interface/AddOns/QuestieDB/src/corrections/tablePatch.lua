@@ -23,6 +23,29 @@ local function contains(list, value)
   return false
 end
 
+-- Scalar membership without a scan per member. Trace data puts about a thousand IDs in one list,
+-- where `contains` per member is quadratic. Scalars compare by `==`, which a set answers
+-- identically; tuples compare by deep equality and still scan.
+
+---@param list table Dense list of validated members.
+---@return table<number|string, true> scalars The list's scalar members; tuples are left out.
+local function scalarMembers(list)
+  local scalars = {}
+  for _, member in ipairs(list) do
+    if type(member) ~= "table" then scalars[member] = true end
+  end
+  return scalars
+end
+
+---@param list table Dense list of validated members.
+---@param scalars table<number|string, true> `scalarMembers(list)`, kept current by the caller.
+---@param value any
+---@return boolean
+local function holds(list, scalars, value)
+  if type(value) ~= "table" then return scalars[value] == true end
+  return contains(list, value)
+end
+
 local function integer(value)
   return type(value) == "number" and value > -math.huge and value < math.huge and value % 1 == 0
 end
@@ -137,14 +160,16 @@ function patch.Resolve(fields, meta, context, id, base, fallback, noOverwrites, 
     local removals = grouped[shape] and removed or { removed }
     for group, values in pairs(groups) do
       local other = removals[group]
-      if other then
+      -- An add-only row pairs with an empty removal, which cannot conflict.
+      if other and next(other) then
         if atomic[shape] or (shape == "objectives" and group == 4) then
           if next(values) and equal(values, other) then
             fail(meta, context, id, field, operation, "same value requested for add and remove")
           end
         else
+          local otherScalars = scalarMembers(other)
           for _, value in ipairs(values) do
-            if contains(other, value) then fail(meta, context, id, field, operation, "same value requested for add and remove") end
+            if holds(other, otherScalars, value) then fail(meta, context, id, field, operation, "same value requested for add and remove") end
           end
         end
       end
@@ -178,9 +203,21 @@ function patch.Resolve(fields, meta, context, id, base, fallback, noOverwrites, 
               current = copy(add)
             end
           else
-            local kept = {}
-            for _, value in ipairs(current) do if not contains(remove, value) then kept[#kept + 1] = value end end
-            for _, value in ipairs(add) do if not contains(kept, value) then kept[#kept + 1] = copy(value) end end
+            -- Existing members keep their order and any repeats; only additions are deduplicated.
+            local kept, keptScalars = {}, {}
+            local removeScalars = scalarMembers(remove)
+            for _, value in ipairs(current) do
+              if not holds(remove, removeScalars, value) then
+                kept[#kept + 1] = value
+                if type(value) ~= "table" then keptScalars[value] = true end
+              end
+            end
+            for _, value in ipairs(add) do
+              if not holds(kept, keptScalars, value) then
+                kept[#kept + 1] = copy(value)
+                if type(value) ~= "table" then keptScalars[value] = true end
+              end
+            end
             current = kept
           end
           targets[group] = next(current) and current or nil

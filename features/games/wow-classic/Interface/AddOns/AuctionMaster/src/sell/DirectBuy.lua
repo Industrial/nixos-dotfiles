@@ -51,7 +51,9 @@ searchEvents:SetScript("OnEvent", function(self, _, itemID)
   end)
 end)
 
-local function Open(rowData)
+-- Opens the buy tab for a row of a sell list: rowData is the game's search result of that row
+-- (C_AuctionHouse.GetCommoditySearchResultInfo / GetItemSearchResultInfo), also used by AM.SellForm.
+function DirectBuy.Open(rowData)
   local itemKey = rowData.itemKey or (rowData.itemID and C_AuctionHouse.MakeItemKey(rowData.itemID))
   if not itemKey then
     return
@@ -84,7 +86,7 @@ local function HookSellList(list)
       line.amDoubleClickHooked = true
       line:HookScript("OnDoubleClick", function(self)
         if self.amRowData then
-          Open(self.amRowData)
+          DirectBuy.Open(self.amRowData)
         end
       end)
     end

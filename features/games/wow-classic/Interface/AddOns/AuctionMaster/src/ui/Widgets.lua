@@ -166,7 +166,9 @@ function Widgets.CreateButton(parent, text, _, onClick, template)
   button:SetHeight(22)
   function button:SetLabel(label, padding)
     self:SetText(label)
-    self:SetWidth(self:GetFontString():GetStringWidth() + 2 * (padding or 12))
+    -- a button has no font string while its text is empty
+    local fontString = self:GetFontString()
+    self:SetWidth((fontString and fontString:GetStringWidth() or 0) + 2 * (padding or 12))
   end
   button:SetLabel(text or "")
   if onClick then

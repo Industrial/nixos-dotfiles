@@ -1,0 +1,93 @@
+## Interface: 16001
+## Title: DungeonJournal
+## Notes: Boss, loot and quest journal for WoW Classic dungeons.
+## Author: Exehn
+## Version: 2.1.3
+## IconTexture: Interface\Icons\INV_Misc_Book_09
+## AddonCompartmentFunc: ForeverDungeonJournal_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: ForeverDungeonJournal_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: ForeverDungeonJournal_OnAddonCompartmentLeave
+## SavedVariables: ForeverDungeonJournalDB
+## SavedVariablesPerCharacter: ForeverDungeonJournalCharacterDB
+
+
+Core\Bootstrap.lua
+Core\Fonts.lua
+Localization\Localization.lua
+Localization\Locale_frFR.lua
+Localization\Locale_esES.lua
+Localization\Locale_ruRU.lua
+Localization\Locale_itIT.lua
+Localization\Locale_ptBR.lua
+Localization\Locale_koKR.lua
+Localization\Locale_zhCN.lua
+Localization\Locale_zhTW.lua
+Localization\Content_deDE.lua
+Localization\Content_frFR.lua
+Localization\Content_esES.lua
+Localization\Content_ruRU.lua
+Localization\Content_itIT.lua
+Localization\Content_ptBR.lua
+Localization\Content_koKR.lua
+Localization\Content_zhCN.lua
+Localization\Content_zhTW.lua
+Localization\Content_NewDungeons.lua
+Data\Dungeons.lua
+Data\SharedLoot.lua
+Data\DungeonEntrances.lua
+Data\DungeonRoutes.lua
+Data\Bosses.lua
+Data\QuestMaps.lua
+Data\ArrowNpcIds.lua
+Data\QuestChains.lua
+Data\QuestRewards.lua
+Data\QuestShareability.lua
+Data\QuestUpdates.lua
+Data\WalkNet.lua
+Localization\Content_Verified.lua
+UI\ThemeData.lua
+UI\ItemComparisonData.lua
+Systems\MapMarkers.lua
+Systems\WalkNet.lua
+Systems\VersionCheck.lua
+Systems\LootFilter.lua
+Systems\Favourites.lua
+Data\DungeonAliases.lua
+Data\RunLogWings.lua
+Data\RunLogEncounters.lua
+Systems\RunLog.lua
+Systems\RunLogUI.lua
+Systems\ClientNames.lua
+Systems\BugReport.lua
+Systems\PortraitPool.lua
+Systems\BakedPortraits.lua
+Core\Journal.lua
+Systems\ScarletWing.lua
+Systems\ItemSource.lua
+Systems\SettingsPanel.lua
+Systems\RPGMode.lua
+Systems\ForeverFilter.lua
+Systems\BossFactionTag.lua
+Systems\MapArtFinder.lua
+Systems\WingFromText.lua
+Systems\ItemIdLearner.lua
+Systems\BossSummon.lua
+Systems\ItemCharges.lua
+Systems\MapNote.lua
+Systems\TooltipBacking.lua
+Systems\DoneTickTooltip.lua
+Systems\HomeBottomBand.lua
+Systems\LFGButton.lua
+Systems\QuestText.lua
+Systems\SpotLearn.lua
+Systems\OnyxiaAttunement.lua
+Systems\TierSets.lua
+Systems\MapBossSize.lua
+Systems\WorldMapOverlay.lua
+Systems\Resize.lua
+Systems\GamePad.lua
+Systems\OptionsPanel.lua
+Libs\LibDeflate\LibDeflate.lua
+Systems\CharacterSnapshot.lua
+Systems\CharacterExport.lua
+Systems\ProgressTransfer.lua

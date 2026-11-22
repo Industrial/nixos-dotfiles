@@ -156,6 +156,7 @@ config.enumFiles = {
   "src/corrections/enum/constants.lua",
   "src/corrections/enum/items.lua",
   "src/corrections/enum/quests.lua",
+  "src/corrections/enum/npcs.lua",
   "src/corrections/enum/professions.lua",
   "src/corrections/enum/factions.lua",
   "src/corrections/enum/zones.lua",
@@ -440,6 +441,7 @@ function config.sourceFileEntries()
   for _, name in ipairs({ "TBC", "Wrath", "Cata", "Mists" }) do
     add("l10n/lookupOverrides.lua", config.flavorByName[name])
   end
+  add("l10n/Forever/lookupOverrides.lua", config.flavorByName.Forever)
   add("src/l10n/source/_end.lua")
   for _, path in ipairs(config.runtimeFiles.tail) do add(path) end
   for _, path in ipairs(config.runtimeFiles.wrathTail) do add(path, config.flavorByName.Wrath) end

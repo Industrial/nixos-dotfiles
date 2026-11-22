@@ -6,9 +6,9 @@ HandyNotesDB = {
 ["Völundr Industrial"] = "Skelf Onyourshelf",
 },
 ["profiles"] = {
-["Skelf Onyourshelf"] = {
-},
 ["Banknspank Saladfingers"] = {
+},
+["Skelf Onyourshelf"] = {
 },
 },
 }
@@ -19,9 +19,9 @@ HandyNotes_HandyNotesDB = {
 ["Völundr Industrial"] = "Skelf Onyourshelf",
 },
 ["profiles"] = {
-["Skelf Onyourshelf"] = {
-},
 ["Banknspank Saladfingers"] = {
+},
+["Skelf Onyourshelf"] = {
 },
 },
 }
