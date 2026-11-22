@@ -404,7 +404,9 @@
       // {vdeploy-rollback-vm = import ./features/nix/vdeploy/test-rollback.nix {inherit pkgs;};}
       // {vdeploy-takeover-vm = import ./features/nix/vdeploy/test-takeover.nix {inherit pkgs;};}
       # GH-185: drakkar's /etc under setup-etc.pl vs system.etc.overlay (measurement).
-      // lib.listToAttrs (map (variant: lib.nameValuePair "etc-overlay-${variant}" (import ./features/nixos/etc-overlay/test.nix {inherit pkgs inputs variant;})) ["stock" "on" "live-switch"])
+      // lib.listToAttrs (map (variant: lib.nameValuePair "etc-overlay-${variant}" (import ./features/nixos/etc-overlay/test.nix {inherit pkgs inputs variant;})) ["stock" "on"])
+      # features/nixos/etc-overlay: switched into and out of, live and cold, state kept.
+      // {etc-overlay-live-switch = import ./features/nixos/etc-overlay/test-live-switch.nix {inherit pkgs inputs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;
