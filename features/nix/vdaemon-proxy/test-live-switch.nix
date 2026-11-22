@@ -20,6 +20,17 @@
       args = ["-c" "''${bb}/bin/sleep 25 && echo survived-the-switches > $out"];
     }
   '';
+  # A build that connects THROUGH the proxy and outlasts its restart (12 s, inside the 25 s
+  # drain): the restart must not cut it.
+  through = pkgs.writeText "through.nix" ''
+    let bb = builtins.storePath ${busybox}; in
+    derivation {
+      name = "vdaemon-proxy-through";
+      system = builtins.currentSystem;
+      builder = "''${bb}/bin/sh";
+      args = ["-c" "''${bb}/bin/sleep 12 && echo drained-not-dropped > $out"];
+    }
+  '';
 in
   pkgs.testers.runNixOSTest {
     name = "vdaemon-proxy-live-switch";
@@ -59,6 +70,24 @@ in
           machine.succeed("test -S /nix/var/nix/daemon-socket-upstream/socket")
           alice("nix-store -q --hash /run/current-system")
           machine.wait_until_succeeds("journalctl -u vdaemon-proxy.service -o cat | grep -F '\"uid\":1000'", timeout=30)
+
+      with subtest("a proxy restart drains: a build connected through it finishes, a new client is queued, the exit is 0"):
+          # #224: a vdeploy switch restarts the proxy while builds are connected through it.
+          machine.succeed("su - alice -c 'nohup nix-build --no-out-link ${through} > /tmp/through.out 2>&1 &'")
+          # [b]: the pattern must not match the waiting shell's own command line.
+          machine.wait_until_succeeds("pgrep -f '[b]in/sleep 12'", timeout=30)
+          machine.succeed("systemctl restart --no-block vdaemon-proxy.service")
+          machine.wait_until_succeeds("journalctl -u vdaemon-proxy.service -o cat | grep -q 'no longer accepting; draining 1 connection'", timeout=30)
+          # #211's failure mode: a client that connects while the old proxy drains is queued
+          # by the socket and served by the next proxy, not refused.
+          alice("nix-store -q --hash /run/current-system")
+          machine.wait_until_succeeds("grep -q '^/nix/store/.*-vdaemon-proxy-through$' /tmp/through.out", timeout=120)
+          out = machine.succeed("tail -n 1 /tmp/through.out").strip()
+          assert machine.succeed(f"cat {out}").strip() == "drained-not-dropped"
+          machine.wait_for_unit("vdaemon-proxy.socket")
+          # The old proxy ended by its own return, not by the signal: exit 0, no status=143.
+          machine.fail("journalctl -u vdaemon-proxy.service -o cat | grep -E 'status=143|code=killed'")
+          alice("nix-store -q --hash /run/current-system")
 
       with subtest("a live switch back out returns the socket to nix-daemon"):
           machine.succeed("${base}/bin/switch-to-configuration test")

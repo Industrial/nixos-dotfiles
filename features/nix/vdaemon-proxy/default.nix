@@ -113,6 +113,12 @@ in {
       ExecStart = lib.getExe proxy;
       Restart = "always";
       RestartSec = "100ms";
+      # A stop (a switch restarting the proxy) drains (#224): SIGTERM stops the accepting,
+      # open connections get DRAIN_SECS = 25 s (rust/tools/vdaemon-proxy/src/proxy.vlt) to
+      # finish, then the finalizers write the totals and the exit is 0. 40 s leaves 15 s
+      # above the drain for the finalizers, so systemd's SIGKILL never cuts either short.
+      # Clients that connect meanwhile wait in the socket's backlog for the next start.
+      TimeoutStopSec = "40s";
       # Root, for the per-connection setresuid/setresgid; nothing else.
       CapabilityBoundingSet = "CAP_SETUID CAP_SETGID";
       NoNewPrivileges = true;

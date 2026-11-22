@@ -10,14 +10,15 @@
 -- scope, so a shutdown interrupts and awaits all of them.
 
 import std::sync::{Arc, Mutex}
-import std::sync::atomic::{AtomicBool, Ordering}
+import std::sync::atomic::{AtomicBool, AtomicU64, Ordering}
+import std::time::Duration
 import std::time::Instant
 import nix_store_core::worker::Op
 import crate::answer::{Answer, NativeMode, decide, last_of}
 import tokio::io::{AsyncReadExt, AsyncWriteExt}
 import tokio::net::{UnixListener, UnixStream}
 import tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf}
-import id_effect::{Effect, HNil, Never, Scope, Stream, fail, from_async, succeed, suspend, zip_par}
+import id_effect::{Effect, HNil, Never, Schedule, Scope, Stream, fail, from_async, succeed, suspend, zip_par}
 import crate::tap::Event::{OpEnded, OpStarted, TapLost}
 import crate::tap::{Event, Tap, client_bytes, daemon_bytes, in_reply, new_tap, version}
 import crate::record::{Peer, conformance_line, connect_line, disconnect_line, emit, error_line, lost_line, op_line}
@@ -292,14 +293,82 @@ accept_next state =
 accept_step : (Arc<UnixListener>, u64) -> Effect<Option<((UnixStream, u64), (Arc<UnixListener>, u64))>, ProxyError, HNil>
 accept_step state = from_async (move \-> accept_next state)
 
-spawn : &Scope -> (UnixStream, u64) -> Settings -> Effect<(), ProxyError, HNil>
-spawn scope accepted settings =
-  (stream, id) = accepted
-  scope.fork_in (serve_client stream id settings) |> .map (\_ -> ()) |> .widen
+-- A client served, counted while it is open (#224: the drain waits on the count).
+left : Arc<AtomicU64> -> Effect<(), Never, HNil>
+left active =
+  active.fetch_sub 1 Ordering::SeqCst
+  succeed (())
 
--- Accept clients until interrupted (or until accept fails, which ends the
--- program for systemd to restart; the listening socket stays systemd's).
+spawn : &Scope -> (UnixStream, u64) -> Settings -> Arc<AtomicU64> -> Effect<(), ProxyError, HNil>
+spawn scope accepted settings active =
+  (stream, id) = accepted
+  active.fetch_add 1 Ordering::SeqCst
+  done = Arc::clone (&active)
+  scope.fork_in (serve_client stream id settings |> .ensuring (suspend (move \-> left done))) |> .map (\_ -> ()) |> .widen
+
+-- How long a stop waits for open connections (#224). A vdeploy switch restarts
+-- the proxy while builds (vci's, a user's) may be connected: each gets this
+-- long to finish before it is closed. The unit's TimeoutStopSec is longer.
+export const DRAIN_SECS : u64 = 25
+
+rust """
+  /// Resolves at the first SIGTERM (systemd's stop). Installed when the server
+  /// starts accepting; before that, SIGTERM keeps its default action (nothing is
+  /// in flight yet).
+  pub fn terminated() -> Effect<(), ProxyError, HNil> {
+      id_effect::from_async(move || async move {
+          let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+          term.recv().await;
+          Ok(())
+      })
+  }
+"""
+
+idle_check : Arc<AtomicU64> -> Effect<(), u64, HNil>
+idle_check active =
+  suspend (move \-> idle_now (active.load Ordering::SeqCst))
+
+idle_now : u64 -> Effect<(), u64, HNil>
+idle_now n =
+  if n == 0
+    succeed (())
+  else
+    fail n
+
+cut_off : u64 -> Effect<(), Never, HNil>
+cut_off n =
+  eprintln! \-> "vdaemon-proxy: stop: #{n} connection(s) still open after #{DRAIN_SECS}s; closing them"
+  succeed (())
+
+-- The drain: no new client is accepted (systemd keeps the socket listening,
+-- so new clients queue for the next start), and the open ones get DRAIN_SECS
+-- to finish, looked at every 200 ms. What is still open then is closed.
+export drained : Arc<AtomicU64> -> Effect<(), Never, HNil>
+drained active =
+  n = active.load Ordering::SeqCst
+  eprintln! \-> "vdaemon-proxy: stop: no longer accepting; draining #{n} connection(s), up to #{DRAIN_SECS}s"
+  looks = Schedule::spaced (Duration::from_millis 200) |> .intersect (Schedule::recurs (DRAIN_SECS * 5))
+  Effect::retry (move \-> idle_check (active.clone ())) looks |> .catch cut_off
+
+-- Accept clients until SIGTERM (then drain, and return, so run_main's
+-- finalizers run and the exit is 0) or an interrupt, or until accept fails,
+-- which ends the program for systemd to restart (the socket stays systemd's).
 export serve : UnixListener -> Settings -> Effect<(), ProxyError, HNil>
 serve listener settings =
   l = Arc::new listener
-  Effect::scoped (move \scope -> Stream::unfold_effect (l, 1) accept_step |> .run_for_each_effect (move \accepted -> spawn (&scope) accepted (settings.clone ())))
+  active = Arc::new (AtomicU64::new 0)
+  a2 = Arc::clone (&active)
+  Effect::scoped (move \scope -> Stream::unfold_effect (l, 1) accept_step |> .run_for_each_effect (move \accepted -> spawn (&scope) accepted (settings.clone ()) (Arc::clone (&active))) |> .race_first (terminated ()) |> .flat_map (move \_ -> drained a2 |> .widen))
+
+test "the drain: no open connection is no wait; a connection left open is closed at the deadline"
+  idle = Arc::new (AtomicU64::new 0)
+  assert! \-> id_effect::testing::run_test (drained idle) |> .into_result |> .is_ok
+  -- One that never ends: the drain gives up after DRAIN_SECS (on the test clock), it does not hang.
+  stuck = Arc::new (AtomicU64::new 1)
+  assert! \-> id_effect::testing::run_test (drained (Arc::clone (&stuck))) |> .into_result |> .is_ok
+  assert_eq! \-> stuck.load Ordering::SeqCst \-> 1
+
+test "a connection is counted while it is served, whatever way it ends"
+  active = Arc::new (AtomicU64::new 2)
+  assert! \-> id_effect::testing::run_test (left (Arc::clone (&active))) |> .into_result |> .is_ok
+  assert_eq! \-> active.load Ordering::SeqCst \-> 1
