@@ -16,7 +16,9 @@ import crate::daemon::worker
 import crate::fault::VfetchError
 import crate::fetch::{Report, Request, program}
 import crate::importer::nix_copy
-import crate::remote::{http, lifted}
+import crate::remote::{RemoteService, http, lifted}
+import crate::narcache::{Clock, cached, conf_ttl, serve_root, user_root}
+import id_effect_platform::fs::{FileSystemService, LiveFileSystem}
 import crate::stage::Staging
 import crate::target::open
 
@@ -55,6 +57,24 @@ request_of o =
   dir = staging_dir (o.staging.clone ()) (std::env::var "XDG_CACHE_HOME" |> .ok) (std::env::var "HOME" |> .ok)
   Ok (Request { paths = o.paths.clone (), caches = o.caches.clone (), keys, staging = Staging { dir }, jobs = o.jobs })
 
+env_of : &str -> Option<String>
+env_of name = std::env::var name |> .ok
+
+-- The live caches behind the narinfo disk cache at `root`, kept for
+-- nix.conf's TTLs (nix's defaults when it sets none).
+narinfo_cached : &str -> PathBuf -> RemoteService
+narinfo_cached nix_conf root =
+  conf = std::fs::read_to_string nix_conf |> .unwrap_or_default
+  cached (http ()) (FileSystemService::new (LiveFileSystem::new ())) root (conf_ttl (&conf)) Clock::SystemClock
+
+-- The CLI's caches: the user's narinfo cache.
+cli_remote : &str -> RemoteService
+cli_remote nix_conf = narinfo_cached nix_conf (user_root (env_of "XDG_CACHE_HOME") (env_of "HOME"))
+
+-- serve's caches: the narinfo cache in its state directory.
+serve_remote : &str -> RemoteService
+serve_remote nix_conf = narinfo_cached nix_conf (serve_root (env_of "STATE_DIRECTORY") (env_of "XDG_CACHE_HOME") (env_of "HOME"))
+
 report : &Report -> ()
 report r =
   eprintln! \-> "vfetch: #{r.closure} paths: #{r.valid} valid already, #{r.staged} staged by an earlier run, #{r.fetched} fetched (#{r.nar_bytes} NAR bytes), imported"
@@ -70,7 +90,7 @@ live o =
         ImporterKind::Worker => worker(req.staging.clone(), o.to.clone(), req.jobs.min(IMPORT_CONNECTIONS)),
         ImporterKind::NixCopy => nix_copy(req.staging.clone(), o.to.clone(), o.trusted_keys.clone(), ProcessRuntimeService::new(TokioProcessRuntime)),
     };
-    let r = ~program(req).provide_env(hlist![http(), target, importer]);
+    let r = ~program(req).provide_env(hlist![cli_remote(&o.nix_conf), target, importer]);
     report(&r)
 
 -- On a fiber of the runtime's executor: `run_main` polls its root fiber on
@@ -120,7 +140,7 @@ serve_live o =
     let up = ~suspend({ let o = o.clone(); move || lifted(serve_upstreams(&o)) });
     let host = ~suspend({ let l = o.listen.clone(); move || lifted(host_of(&l)) });
     eprintln!("vfetch serve: on http://{} for {}", o.listen, up.caches.join(" "));
-    ~serving(http(), up, host)
+    ~serving(serve_remote(&o.nix_conf), up, host)
 
 serve_supervised : ServeOptions -> Effect<Infallible, VfetchError, HNil>
 serve_supervised o =

@@ -1,0 +1,357 @@
+-- The narinfo disk cache: what each binary cache answered for a hash part,
+-- kept on disk so the next run (or the next `vfetch serve` request) does not
+-- ask again. It plays the part of libstore's narinfo disk cache
+-- (`~/.cache/nix/binary-cache-v*.sqlite`):
+--
+--   * a hit (the narinfo text) is used for `narinfo-cache-positive-ttl`
+--     seconds, a miss (a 404 or 403) for `narinfo-cache-negative-ttl`, with
+--     nix's defaults (30 days, 1 hour) and nix.conf's values when it sets
+--     them. A TTL of 0 never answers from the cache; both 0 turns it off.
+--   * keyed by the cache's URL and the hash part: one file per answer,
+--     `<root>/<cache URL, escaped>/<hash part>`.
+--   * a transient failure is never kept, so it is asked again.
+--   * a cache file that cannot be read, or does not decode, is a miss and is
+--     overwritten, never an error. A failed write costs only a later lookup.
+--     A kept hit is still parsed and signature-checked by its caller, exactly
+--     as an answer straight from the cache would be.
+--
+-- `CachedRemote` puts the cache in front of any `Remote`, so the fetch and
+-- serve use it unchanged. The TTL decisions and the file format are pure;
+-- the files go through id_effect_platform's `FileSystem` capability and the
+-- time through `Clock`.
+
+import std::path::{Path, PathBuf}
+import std::sync::Arc
+import id_effect::{Effect, HNil, UtcDateTime, succeed}
+import id_effect_platform::fs::FileSystemService
+import id_effect_platform::http::HttpBody
+import nix_store_core::narinfo::parse
+import nix_store_core::storepath::is_hash_part
+import crate::fault::VfetchError
+import crate::remote::{Remote, RemoteService}
+
+-- Seconds a kept answer is used for: a hit, a miss.
+export data Ttl { export positive i64, export negative i64 }
+  deriving (Clone, Copy, Debug, PartialEq)
+
+-- libstore's defaults for `narinfo-cache-positive-ttl` / `-negative-ttl`.
+export nix_ttl : Ttl
+nix_ttl = Ttl { positive = 2592000, negative = 3600 }
+
+-- nix.conf's TTLs, nix's defaults for the ones it does not set.
+export conf_ttl : &str -> Ttl
+conf_ttl text =
+  mut t = nix_ttl ()
+  for raw in text.lines ()
+    line = raw.split '#' |> .next |> .unwrap_or "" |> .trim
+    if line.split_once '=' is Some (k, v)
+      key = k.trim ()
+      n = v.trim ().parse () : Result<i64, std::num::ParseIntError>
+      if n is Ok secs
+        if key == "narinfo-cache-positive-ttl"
+          t.positive := secs.max 0
+        else if key == "narinfo-cache-negative-ttl"
+          t.negative := secs.max 0
+  t
+
+-- One kept answer: when it was asked (Unix seconds), and the narinfo text,
+-- or None for "not in this cache".
+export data Entry { export at i64, export text Option<String> }
+  deriving (Clone, Debug, PartialEq)
+
+-- libstore's rule: an answer is used while it is younger than its TTL. A
+-- TTL of 0 never answers.
+export fresh : Ttl -> i64 -> &Entry -> bool
+fresh ttl now e =
+  limit = case &e.text of
+    Some _ -> ttl.positive
+    None -> ttl.negative
+  limit > 0 && now < e.at.saturating_add limit
+
+const MAGIC : &str = "vfetch-narinfo-cache 1"
+
+-- The file: a header line, then the narinfo text for a hit.
+--   vfetch-narinfo-cache 1 <unix seconds> hit <bytes of text>\n<text>
+--   vfetch-narinfo-cache 1 <unix seconds> miss\n
+export encode : &Entry -> Vec<u8>
+encode e =
+  s = case &e.text of
+    Some t -> "#{MAGIC} #{e.at} hit #{t.len ()}\n#{t}"
+    None -> "#{MAGIC} #{e.at} miss\n"
+  s.into_bytes ()
+
+-- A file back into an entry. Anything else (another format, a cut-off or
+-- padded text, a text that is not a narinfo) is None: a miss.
+export decode : &[u8] -> Option<Entry>
+decode bytes =
+  text = (std::str::from_utf8 bytes |> .ok)?
+  (head, body) = (text.split_once '\n')?
+  rest = (head.strip_prefix MAGIC)?
+  words = rest.split_whitespace () |> .collect : Vec<&str>
+  at_word = (words.first ())?
+  at = ((at_word.parse () : Result<i64, std::num::ParseIntError>) |> .ok)?
+  case words.get 1 of
+    Some w | *w == "miss" && words.len () == 2 && body.is_empty () -> Some (Entry { at, text = None })
+    Some w | *w == "hit" && words.len () == 3 -> hit_of at (words[2]) body
+    _ -> None
+
+hit_of : i64 -> &str -> &str -> Option<Entry>
+hit_of at len body =
+  n = ((len.parse () : Result<usize, std::num::ParseIntError>) |> .ok)?
+  readable = parse body |> .is_ok
+  if n == body.len () && readable
+    Some (Entry { at, text = Some (body.to_string ()) })
+  else
+    None
+
+-- A cache URL as one path segment: letters, digits, `.` and `-` stay, every
+-- other character is `_<hex code>_` (so `_` itself is escaped, and two URLs
+-- never share a directory).
+export cache_dir_name : &str -> String
+cache_dir_name url =
+  mut out = String::new ()
+  for c in url.chars ()
+    if c.is_ascii_alphanumeric () || c == '.' || c == '-'
+      out.push c
+    else
+      code = u32::from c
+      out.push_str (&format! \-> "_#{code:X}_")
+  out
+
+-- `<cache>/<hash part>.narinfo` as (cache, hash part); None for any other URL.
+export narinfo_key : &str -> Option<(String, String)>
+narinfo_key url =
+  stem = (url.strip_suffix ".narinfo")?
+  (cache, hash) = (stem.rsplit_once '/')?
+  if is_hash_part hash && !cache.is_empty ()
+    Some ((cache.to_string (), hash.to_string ()))
+  else
+    None
+
+-- Where the answer of `cache` for `hash` is kept.
+export entry_file : &Path -> &str -> &str -> PathBuf
+entry_file root cache hash = root.join (cache_dir_name cache) |> .join hash
+
+-- The time: the system's, or a fixed one for tests.
+export data Clock = SystemClock | FixedClock i64
+  deriving (Clone, Copy, Debug, PartialEq)
+
+export now_of : Clock -> Effect<i64, VfetchError, HNil>
+now_of c =
+  case c of
+    SystemClock -> UtcDateTime::now () |> .map (\t -> t.to_epoch_millis () / 1000) |> .widen
+    FixedClock s -> succeed s
+
+-- A `Remote` with the narinfo disk cache in front of it; NARs pass through.
+export data CachedRemote { export inner RemoteService, export fs FileSystemService, export root PathBuf, export ttl Ttl, export clock Clock }
+  deriving (Clone)
+
+-- `inner` behind a cache in `root`, or `inner` itself when both TTLs are 0.
+export cached : RemoteService -> FileSystemService -> PathBuf -> Ttl -> Clock -> RemoteService
+cached inner fs root ttl clock =
+  if ttl.positive <= 0 && ttl.negative <= 0
+    inner
+  else
+    RemoteService (Arc::new (CachedRemote { inner, fs, root, ttl, clock }))
+
+-- What the file holds, if it decodes; an unreadable or missing file is None.
+kept : FileSystemService -> PathBuf -> Effect<Option<Entry>, VfetchError, HNil>
+kept fs file =
+  (fs.0.read (&file)) |> .map (\b -> decode (&b)) |> .catch (\_ -> succeed None)
+
+-- Keep an answer, best effort.
+keep : FileSystemService -> PathBuf -> Entry -> Effect<(), VfetchError, HNil>
+keep fs file e =
+  dir = file.parent () |> .map (\p -> p.to_path_buf ()) |> .unwrap_or_default
+  bytes = encode (&e)
+  fs2 = fs.clone ()
+  (fs.0.create_dir_all (&dir)) |> .flat_map (move \_ -> fs2.0.write (&file) (&bytes)) |> .catch (\_ -> succeed (()))
+
+-- A fresh kept answer, else the cache's, kept.
+answer : CachedRemote -> String -> PathBuf -> i64 -> Option<Entry> -> Effect<Option<String>, VfetchError, HNil>
+answer c url file now found =
+  case found of
+    Some e | fresh c.ttl now (&e) -> succeed e.text
+    _ ->
+      fs = c.fs.clone ()
+      (c.inner.0.text url) |> .flat_map (move \text -> keep fs file (Entry { at = now, text = text.clone () }) |> .map (move \_ -> text))
+
+looked_up : CachedRemote -> String -> String -> String -> Effect<Option<String>, VfetchError, HNil>
+looked_up c url cache hash =
+  file = entry_file (&c.root) (&cache) (&hash)
+  f2 = file.clone ()
+  fs = c.fs.clone ()
+  (now_of c.clock) |> .flat_map (move \now -> kept fs f2 |> .flat_map (move \found -> answer c url file now found))
+
+instance Remote CachedRemote
+  text : &self -> String -> Effect<Option<String>, VfetchError, HNil>
+  text self url =
+    case narinfo_key (&url) of
+      Some (cache, hash) -> looked_up (self.clone ()) url cache hash
+      None -> self.inner.0.text url
+
+  body : &self -> String -> Effect<HttpBody, VfetchError, HNil>
+  body self url = self.inner.0.body url
+
+-- `vfetch serve`'s cache: systemd's StateDirectory, else the user's.
+export serve_root : Option<String> -> Option<String> -> Option<String> -> PathBuf
+serve_root state xdg home =
+  case state of
+    Some s | !s.is_empty () -> PathBuf::from (s.split ':' |> .next |> .unwrap_or "") |> .join "narinfo-cache"
+    _ -> user_root xdg home
+
+-- The CLI's cache: $XDG_CACHE_HOME/vfetch-narinfo, else ~/.cache/vfetch-narinfo
+-- (beside the staging directory's default, not in it).
+export user_root : Option<String> -> Option<String> -> PathBuf
+user_root xdg home =
+  case (xdg, home) of
+    (Some x, _) | !x.is_empty () -> PathBuf::from x |> .join "vfetch-narinfo"
+    (_, Some h) | !h.is_empty () -> PathBuf::from h |> .join ".cache" |> .join "vfetch-narinfo"
+    _ -> PathBuf::from "/var/tmp/vfetch-narinfo"
+
+------------------------------------------------------------------------
+-- Tests
+
+#[cfg(test)]
+const HASH : &str = "vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq"
+
+#[cfg(test)]
+const UP : &str = "http://up:5000"
+
+#[cfg(test)]
+sample : String
+sample = .to_string "StorePath: /nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh\nURL: nar/1w1f.nar.xz\nCompression: xz\nNarHash: sha256:00m9rmlp4446y79k0s295c61zxdbq9cmnwjgs1f9xn1xrr7qhjq4\nNarSize: 256\nReferences: \nCA: fixed:r:sha256:1w1f\n"
+
+#[cfg(test)]
+url_of : &str -> String
+url_of hash = "#{UP}/#{hash}.narinfo"
+
+-- A fake upstream serving `sample` for HASH, its request log, a test
+-- filesystem, and the cache over both at `now`.
+#[cfg(test)]
+data Rig { up RemoteService, log Arc<std::sync::Mutex<Vec<String>>>, faults Arc<std::sync::Mutex<std::collections::HashMap<String, usize>>>, fs id_effect_platform::fs::TestFileSystem }
+
+#[cfg(test)]
+rig : Rig
+rig =
+  mut files = std::collections::HashMap::new () : std::collections::HashMap<String, Vec<u8>>
+  files.insert (url_of HASH) (sample ().into_bytes ())
+  log = Arc::new (std::sync::Mutex::new (Vec::new ())) : Arc<std::sync::Mutex<Vec<String>>>
+  faults = Arc::new (std::sync::Mutex::new (std::collections::HashMap::new ())) : Arc<std::sync::Mutex<std::collections::HashMap<String, usize>>>
+  remote = crate::remote::MemoryRemote { files, log = Arc::clone (&log), faults = Arc::clone (&faults) }
+  Rig { up = RemoteService (Arc::new remote), log, faults, fs = id_effect_platform::fs::TestFileSystem::new () }
+
+#[cfg(test)]
+logged : &Rig -> Vec<String>
+logged r = r.log.lock () |> .map (\l -> l.clone ()) |> .unwrap_or_default
+
+#[cfg(test)]
+cache_at : &Rig -> i64 -> RemoteService
+cache_at r now =
+  cached (r.up.clone ()) (FileSystemService::new (r.fs.clone ())) (PathBuf::from "/cache") (nix_ttl ()) (FixedClock now)
+
+#[cfg(test)]
+ask : &RemoteService -> &str -> Option<String>
+ask remote hash =
+  id_effect::testing::run_test (remote.0.text (url_of hash)) |> .into_result |> .expect "a lookup never fails on the cache's account"
+
+#[cfg(test)]
+asked : &Rig -> usize
+asked r = logged r |> .len
+
+test "nix.conf's TTLs, else nix's defaults"
+  assert_eq! \-> conf_ttl "" \-> Ttl { positive = 2592000, negative = 3600 }
+  assert_eq! \-> conf_ttl "narinfo-cache-positive-ttl = 0 # off\nnarinfo-cache-negative-ttl=60\nsubstituters = x\n" \-> Ttl { positive = 0, negative = 60 }
+  assert_eq! \-> conf_ttl "narinfo-cache-negative-ttl = soon\n" \-> nix_ttl ()
+
+test "an answer is fresh for its TTL, a hit and a miss each their own, and 0 never"
+  ttl = Ttl { positive = 100, negative = 10 }
+  hit = Entry { at = 1000, text = Some (sample ()) }
+  miss = Entry { at = 1000, text = None }
+  assert! \-> fresh ttl 1099 (&hit)
+  assert! \-> !(fresh ttl 1100 (&hit))
+  assert! \-> fresh ttl 1009 (&miss)
+  assert! \-> !(fresh ttl 1010 (&miss))
+  assert! \-> !(fresh (Ttl { positive = 0, negative = 0 }) 1000 (&hit))
+  assert! \-> !(fresh (Ttl { positive = 0, negative = 0 }) 999 (&miss))
+
+test "entries round-trip, and anything else decodes to nothing"
+  hit = Entry { at = 1795000000, text = Some (sample ()) }
+  miss = Entry { at = 7, text = None }
+  assert_eq! \-> decode (&encode (&hit)) \-> Some (hit.clone ())
+  assert_eq! \-> decode (&encode (&miss)) \-> Some miss
+  whole = encode (&hit)
+  assert_eq! \-> decode (&whole[0 .. whole.len () - 1]) \-> None
+  mut padded = whole.clone ()
+  padded.extend_from_slice (b"x")
+  assert_eq! \-> decode (&padded) \-> None
+  assert_eq! \-> decode (b"") \-> None
+  assert_eq! \-> decode (&[0xff, 0xfe, 0x0a]) \-> None
+  assert_eq! \-> decode (b"vfetch-narinfo-cache 2 7 miss\n") \-> None
+  assert_eq! \-> decode (b"vfetch-narinfo-cache 1 x miss\n") \-> None
+  assert_eq! \-> decode (b"vfetch-narinfo-cache 1 7 miss\ntrailing") \-> None
+  assert_eq! \-> decode (b"vfetch-narinfo-cache 1 7 hit 5\nhello") \-> None
+
+test "keys: the cache URL as one segment, the hash part from the narinfo URL"
+  assert_eq! \-> cache_dir_name "https://cache.nixos.org" \-> "https_3A__2F__2F_cache.nixos.org"
+  assert! \-> cache_dir_name "http://a_b" != cache_dir_name "http://a/b"
+  assert! \-> !(cache_dir_name "http://x/../y" |> .contains '/')
+  assert_eq! \-> narinfo_key (&url_of HASH) \-> Some ((UP.to_string (), HASH.to_string ()))
+  assert_eq! \-> narinfo_key "http://up/nar/x.nar.xz" \-> None
+  assert_eq! \-> narinfo_key "http://up/nix-cache-info" \-> None
+  assert_eq! \-> narinfo_key "/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq.narinfo" \-> None
+
+test "the cache roots: the service's state directory, else the user's cache"
+  assert_eq! \-> serve_root (Some (.to_string "/var/lib/vfetch")) None None \-> PathBuf::from "/var/lib/vfetch/narinfo-cache"
+  assert_eq! \-> serve_root None (Some (.to_string "/x")) None \-> PathBuf::from "/x/vfetch-narinfo"
+  assert_eq! \-> user_root None (Some (.to_string "/h")) \-> PathBuf::from "/h/.cache/vfetch-narinfo"
+  assert_eq! \-> user_root None None \-> PathBuf::from "/var/tmp/vfetch-narinfo"
+
+test "a miss asks the cache once, then the kept answer is used until it expires"
+  r = rig ()
+  assert_eq! \-> ask (&cache_at (&r) 1000) HASH \-> Some (sample ())
+  assert_eq! \-> asked (&r) \-> 1
+  -- Another run, a day later: no request.
+  assert_eq! \-> ask (&cache_at (&r) 87400) HASH \-> Some (sample ())
+  assert_eq! \-> asked (&r) \-> 1
+  -- Thirty days on, it is asked again.
+  assert_eq! \-> ask (&cache_at (&r) (1000 + 2592000)) HASH \-> Some (sample ())
+  assert_eq! \-> asked (&r) \-> 2
+
+test "a 404 is kept for the negative TTL, then asked again"
+  r = rig ()
+  other = "00000000000000000000000000000000"
+  assert_eq! \-> ask (&cache_at (&r) 1000) other \-> None
+  assert_eq! \-> ask (&cache_at (&r) 4599) other \-> None
+  assert_eq! \-> asked (&r) \-> 1
+  assert_eq! \-> ask (&cache_at (&r) 4600) other \-> None
+  assert_eq! \-> asked (&r) \-> 2
+
+test "a corrupt cache file is a miss, never an error, and is rewritten"
+  r = rig ()
+  file = entry_file (&PathBuf::from "/cache") UP HASH
+  for junk in [b"garbage".to_vec (), b"vfetch-narinfo-cache 1 1000 hit 999\nStorePath: x".to_vec (), Vec::new ()]
+    id_effect::testing::run_test ((FileSystemService::new (r.fs.clone ())).0.write (&file) (&junk)) |> .into_result |> .expect "test fs"
+    assert_eq! \-> ask (&cache_at (&r) 1000) HASH \-> Some (sample ())
+  assert_eq! \-> asked (&r) \-> 3
+  assert_eq! \-> ask (&cache_at (&r) 1001) HASH \-> Some (sample ())
+  assert_eq! \-> asked (&r) \-> 3
+
+test "a transient failure is not kept, and NARs pass through"
+  r = rig ()
+  for faults in r.faults.lock ().iter_mut ()
+    faults.insert (url_of HASH) 1
+  failed = id_effect::testing::run_test ((cache_at (&r) 1000).0.text (url_of HASH)) |> .into_result
+  assert! \-> failed.is_err ()
+  assert_eq! \-> ask (&cache_at (&r) 1001) HASH \-> Some (sample ())
+  assert_eq! \-> asked (&r) \-> 2
+  nar = id_effect::testing::run_test ((cache_at (&r) 1002).0.body (.to_string "#{UP}/nar/missing.nar")) |> .into_result
+  assert! \-> nar.is_err ()
+  assert_eq! \-> logged (&r) |> .last |> .cloned \-> Some (.to_string "#{UP}/nar/missing.nar")
+
+test "both TTLs 0 turn the cache off"
+  r = rig ()
+  off = cached (r.up.clone ()) (FileSystemService::new (r.fs.clone ())) (PathBuf::from "/cache") (Ttl { positive = 0, negative = 0 }) (FixedClock 1000)
+  assert_eq! \-> ask (&off) HASH \-> Some (sample ())
+  assert_eq! \-> ask (&off) HASH \-> Some (sample ())
+  assert_eq! \-> asked (&r) \-> 2
