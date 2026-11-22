@@ -16,6 +16,10 @@ pub mod store {
     include!(concat!(env!("OUT_DIR"), "/store.rs"));
 }
 
+pub mod metrics {
+    include!(concat!(env!("OUT_DIR"), "/metrics.rs"));
+}
+
 pub mod http {
     include!(concat!(env!("OUT_DIR"), "/http.rs"));
 }

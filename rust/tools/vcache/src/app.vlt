@@ -5,7 +5,9 @@
 -- with finalizers).
 
 import std::convert::Infallible
-import id_effect::{Effect, HNil, effect, hlist, suspend}
+import id_effect::{Effect, HNil, Never, effect, hlist, succeed, suspend}
+import std::sync::Arc
+import crate::metrics::{Counters, flusher}
 import id_effect_axum::{HostConfig, HostError, serve}
 import id_effect_config::{Config, ConfigEnv, ConfigError}
 import nix_store_core::db
@@ -25,12 +27,20 @@ export errors AppError
 -- signatures). The listener is the host's HOST and PORT.
 export settings_config : Config<Settings>
 settings_config =
-  Config::all ((Config::string "VCACHE_DB" |> .with_default (db::DEFAULT_DB.to_string ()), Config::string "VCACHE_STORE_DIR" |> .with_default (.to_string "/nix/store"), Config::integer "VCACHE_PRIORITY" |> .with_default 30, Config::optional_string "VCACHE_SIGN_KEY_FILE")) |> .map settings_of
+  Config::all ((Config::string "VCACHE_DB" |> .with_default (db::DEFAULT_DB.to_string ()), Config::string "VCACHE_STORE_DIR" |> .with_default (.to_string "/nix/store"), Config::integer "VCACHE_PRIORITY" |> .with_default 30, Config::optional_string "VCACHE_SIGN_KEY_FILE", Config::optional_string "VCACHE_TEXTFILE_DIR")) |> .map settings_of
 
-settings_of : (String, String, i64, Option<String>) -> Settings
+settings_of : (String, String, i64, Option<String>, Option<String>) -> Settings
 settings_of fields =
-  (db, store_dir, priority, sign_key_file) = fields
-  Settings { db, store_dir, priority, sign_key_file }
+  (db, store_dir, priority, sign_key_file, textfile_dir) = fields
+  Settings { db, store_dir, priority, sign_key_file, textfile_dir, meter = Arc::new (Counters::default ()) }
+
+-- The counters' flusher (GH-248), forked beside the server when there is a
+-- textfile directory; without one, nothing is written.
+flushing : &Settings -> Effect<(), Never, HNil>
+flushing s =
+  case &s.textfile_dir of
+    Some dir -> flusher (Arc::clone (&s.meter)) (dir.clone ())
+    None -> succeed (())
 
 read_signer : Option<String> -> Result<Signer, String>
 read_signer file =
@@ -61,6 +71,7 @@ program =
     let signer = ~load_signer(settings.sign_key_file.clone());
     let store = ~live(settings.db.clone(), settings.store_dir.clone(), pool_size()).map_err(AppError::from);
     eprintln!("vcache: serving {} from {} on {}:{}", settings.store_dir, settings.db, host.bind_host, host.bind_port);
+    let _flushing = ~flushing(&settings).fork();
     ~serve(router(hlist![store, settings, signer])).provide(host).map_err(AppError::from)
 
 -- On a fiber of the runtime's executor: `run_main` polls its root fiber on
