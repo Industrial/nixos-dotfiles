@@ -34,8 +34,10 @@ each on its own read-only connection.
   option to run an external one: `--diff` only takes
   `auto|always|never|full`. Use `nh os switch --diff never` and
   `vdiff --generations system` afterwards to get vdiff's report.
-- `nixos-update-notifier` diffs with `nix store diff-closures`, Nix's own
-  differ, not nvd's. It is left as it is.
+- `nixos-update-notifier` lists an update's package changes with
+  `vdiff --json` (GH-207), from vdiff's absolute store path. Its rollback,
+  `features.cli.nixos-update-notifier.differ = "nix";`, goes back to
+  `nix store diff-closures`. Nothing else in the repo calls that.
 - Rollback: `features.cli.nvd.enable = true;` on a host installs nvd again
   (the `nvdIsTheRollback` assay claim in `profiles/cli-core.assay.nix`).
   `bin/dev build` uses nvd only where vdiff is missing, so a host that also

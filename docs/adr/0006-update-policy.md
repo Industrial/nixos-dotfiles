@@ -63,8 +63,8 @@ after comin has already switched kernels.
      public repo. While one is open, it skips its local build, since the PR has the diff;
    - a pending reboot, when `kernel`, `initrd` or `kernel-modules` differ between
      `/run/booted-system` and `/run/current-system`;
-   - otherwise, upstream movement with the exact built `nix store diff-closures` package
-     list, when RAM allows.
+   - otherwise, upstream movement with the exact built package list (`vdiff --json`
+     since GH-207; `nix store diff-closures` before), when RAM allows.
 7. **Rollback is a revert on `main`.** comin reapplies whatever `main` says, so the
    durable rollback is `git revert` of the bump commit (or reverting the PR in the UI).
    An on-host `nixos-rebuild switch --rollback` is the immediate stopgap and lasts only
