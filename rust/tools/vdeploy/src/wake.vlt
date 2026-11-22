@@ -44,12 +44,13 @@ instance Clone Wakes
 export wakes : Wakes
 wakes = Wakes (Queue::sliding 1)
 
--- The poller's wait: `every`, or a wake, whichever comes first.
-export waited : Wakes -> Duration -> Effect<(), Never, HNil>
+-- The poller's wait: `every`, or a wake, whichever comes first; true when a
+-- wake ended it (that poll does not count toward the debounce).
+export waited : Wakes -> Duration -> Effect<bool, Never, HNil>
 waited w every =
-  interval = id_effect::sleep every : Effect<(), Never, HNil>
-  late = id_effect::sleep every : Effect<(), Never, HNil>
-  woke = w.0.take () |> .catch (move \_ -> late)
+  interval = (id_effect::sleep every : Effect<(), Never, HNil>) |> .map (\_ -> false)
+  late = (id_effect::sleep every : Effect<(), Never, HNil>) |> .map (\_ -> false)
+  woke = w.0.take () |> .map (\_ -> true) |> .catch (move \_ -> late)
   interval.race_first woke
 
 rust """
@@ -154,7 +155,7 @@ status_json st quiet_polls deploy now =
   m.insert (.to_string "done") (st.done |> .as_ref |> .map (\d -> Value::from (d.clone ())) |> .unwrap_or Value::Null)
   m.insert (.to_string "polledAt") (Value::from (st.last_poll |> .unwrap_or now))
   m.insert (.to_string "planning") (Value::from (st.started > st.finished))
-  seen = st.watch.polls.saturating_sub st.watch.changed_at
+  seen = crate::watch::quiet_seen (&st.watch)
   m.insert (.to_string "debounceLeft") (Value::from (quiet_polls.saturating_sub seen))
   m.insert (.to_string "mode") (Value::from (if deploy
     "deploy"
@@ -370,7 +371,7 @@ test "the writer's refusals say who may wake, and when to retry"
   assert_eq! \-> woken "/nonexistent/vdeploy/wake" |> .err |> .map (\r -> r.code) \-> Some 69
 
 test "status.json names the head, what was done, and the debounce left"
-  st = Status { watch = crate::watch::Watch { head = Some (crate::watch::Head { sha = .to_string "c3", time = 1, signed = false }), polls = 5, changed_at = 4, changes = 2 }, done = Some (.to_string "c2"), started = 2, finished = 1, last_poll = Some 77, ...Status::default () }
+  st = Status { watch = crate::watch::Watch { head = Some (crate::watch::Head { sha = .to_string "c3", time = 1, signed = false }), polls = 5, changed_at = 4, changes = 2, woken = 0 }, done = Some (.to_string "c2"), started = 2, finished = 1, last_poll = Some 77, ...Status::default () }
   v = json (&status_json (&st) 3 true 99) |> .expect "json"
   assert_eq! \-> (v.get "head" |> .and_then (\x -> x.as_str ()), v.get "done" |> .and_then (\x -> x.as_str ()), v.get "polledAt" |> .and_then (\x -> x.as_u64 ())) \-> (Some "c3", Some "c2", Some 77)
   assert_eq! \-> (v.get "planning" |> .and_then (\x -> x.as_bool ()), v.get "debounceLeft" |> .and_then (\x -> x.as_u64 ()), v.get "mode" |> .and_then (\x -> x.as_str ())) \-> (Some true, Some 2, Some "deploy")
