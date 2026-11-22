@@ -162,9 +162,7 @@ on_path path name =
 -- the run then says which one is missing).
 export absolute : &Tools -> &str -> Tools
 absolute t path =
-  vmon = case &t.vmon of
-    Some v -> Some (abs_of path v)
-    None -> None
+  vmon = t.vmon.as_ref () |> .map (\v -> abs_of path v)
   Tools { nix = abs_of path (&t.nix), vmon, systemd_run = abs_of path (&t.systemd_run), systemctl = abs_of path (&t.systemctl), nix_env = abs_of path (&t.nix_env), nix_store = abs_of path (&t.nix_store), setpriv = abs_of path (&t.setpriv), elevate = abs_of path (&t.elevate) }
 
 abs_of : &str -> &str -> String

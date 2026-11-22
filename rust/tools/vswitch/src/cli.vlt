@@ -18,7 +18,7 @@ export const USAGE : &str = "usage: vswitch switch|boot|test|build|dry [--flake 
 -- What the command line asked for.
 export data Command
   = Help
-  | Run Options
+  | Run (Box<Options>)
   | Apply (Vec<String>)
   | Activate (Vec<String>)
   deriving (Debug, Clone, PartialEq, Eq)
@@ -120,7 +120,7 @@ parse_args args =
     None -> Err (.to_string "a verb is required: switch, boot, test, build or dry")
     Some v ->
       o.verb := v
-      Ok (Command::Run o)
+      Ok (Command::Run (Box::new o))
 
 #[cfg(test)]
 args : &[&str] -> Vec<String>
@@ -130,7 +130,7 @@ args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
 run_of : &[&str] -> Options
 run_of xs =
   case parse_args (&args xs) of
-    Ok (Command::Run o) -> o
+    Ok (Command::Run o) -> *o
     other -> panic! "not a run: #{other:?}"
 
 test "a verb is all it needs; the rest has defaults"

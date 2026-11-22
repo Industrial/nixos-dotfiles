@@ -95,6 +95,11 @@ diff_text db old new =
     Err e -> succeed ("vswitch: no closure diff: #{e}")
     Ok (a, b) -> both db a b |> .map (\pair -> render_text (&diff (&pair.0) (&pair.1))) |> .catch (\e -> succeed ("vswitch: no closure diff: #{e}"))
 
+said : String -> Effect<(), Never, HNil>
+said line =
+  eprintln! \-> "#{line}"
+  succeed (())
+
 asked : String -> bool
 asked question =
   eprint! \-> "#{question} [y/N] "
@@ -128,7 +133,7 @@ instance World Live
     suspend (move \-> succeed (asked question))
   say : &self -> String -> Effect<(), Never, HNil>
   say self line =
-    suspend (move \-> succeed (eprintln! \-> "#{line}"))
+    suspend (move \-> said line)
   busy : &self -> Effect<bool, Never, HNil>
   busy self =
     systemctl = self.systemctl.clone ()

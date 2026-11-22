@@ -204,7 +204,7 @@ program parsed =
       Ok a -> activated_now a
     Ok (Command::Run o) ->
       db = o.db.clone ()
-      r = suspend (move \-> succeed (run_of o))
+      r = suspend (move \-> succeed (run_of (*o)))
       r |> .flat_map (move \run -> switched (WorldTool (Arc::new (live db (run.tools.systemctl.clone ())))) run)
 
 -- On a fiber of the runtime's executor (as rust/tools/vdeploy's app.vlt):
@@ -325,11 +325,11 @@ test "only switch can mark a generation bad: test and boot are not vdeploy's app
     assert! \-> !(line.contains " apply ") && line.contains " activate "
 
 test "the activate subcommand's arguments"
-  a = activate_of (&.to_vec ([.to_string "boot", .to_string "/x", .to_string "--nix-env", .to_string "/n/nix-env"])) |> .expect "activate"
+  a = activate_of (&[.to_string "boot", .to_string "/x", .to_string "--nix-env", .to_string "/n/nix-env"]) |> .expect "activate"
   assert_eq! \-> (a.verb, a.toplevel.as_str (), a.nix_env.as_str (), a.profile.as_str ()) \-> (Verb::Boot, "/x", "/n/nix-env", "/nix/var/nix/profiles/system")
-  assert! \-> activate_of (&.to_vec ([.to_string "switch", .to_string "/x"])) |> .is_err
-  assert! \-> activate_of (&.to_vec ([.to_string "test"])) |> .is_err
-  assert! \-> activate_of (&.to_vec ([.to_string "test", .to_string "/x", .to_string "--frob"])) |> .is_err
+  assert! \-> activate_of (&[.to_string "switch", .to_string "/x"]) |> .is_err
+  assert! \-> activate_of (&[.to_string "test"]) |> .is_err
+  assert! \-> activate_of (&[.to_string "test", .to_string "/x", .to_string "--frob"]) |> .is_err
 
 test "the build's link: ./result for build, the runtime directory otherwise"
   assert_eq! \-> link_of Verb::Build None (Some (.to_string "/run/user/1000")) \-> "result"
