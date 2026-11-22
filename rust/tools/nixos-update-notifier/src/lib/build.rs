@@ -129,21 +129,48 @@ pub fn diff_closures(
 mod tests {
     use super::*;
 
-    use std::os::unix::fs::PermissionsExt;
+    /// Install an executable stand-in at `bin` without this process ever holding a
+    /// writable fd on it (GH-282).
+    ///
+    /// `fs::write` + `set_permissions` + exec is racy under the parallel test
+    /// harness: while one test thread has the script open for writing, another
+    /// thread's `Command::spawn` clones the fd table, and its child keeps a copy of
+    /// that write fd until its own `execve` closes it (O_CLOEXEC only acts at exec).
+    /// If the first thread execs its script inside that window, the kernel sees a
+    /// writer on the inode and fails with ETXTBSY. Closing, syncing or renaming in
+    /// this process does not help: the copy lives in the other child and pins the
+    /// inode, not the name. So the source goes to a data file that is never exec'd,
+    /// and the executable is created by `install`, a separate process whose write
+    /// fd no sibling can inherit. `status()` waits for it to exit, so every writer
+    /// of `bin` is gone before anyone execs it.
+    fn install_stand_in(bin: &Path, script: &str) {
+        let src = bin.with_extension("sh");
+        fs::write(&src, script).unwrap();
+        let status = Command::new("install")
+            .arg("-m")
+            .arg("0755")
+            .arg(&src)
+            .arg(bin)
+            .status()
+            .unwrap();
+        assert!(
+            status.success(),
+            "install {} failed: {status}",
+            bin.display()
+        );
+    }
 
     /// A stand-in vdiff: refuses anything but `--json <old> <new>`, then prints `json`.
     fn fake_vdiff(dir: &Path, json: &str) -> PathBuf {
         fs::write(dir.join("out.json"), json).unwrap();
         let bin = dir.join("vdiff");
-        fs::write(
+        install_stand_in(
             &bin,
-            format!(
+            &format!(
                 "#!/bin/sh\n[ \"$1\" = --json ] && [ $# -eq 3 ] || exit 2\nexec cat '{}'\n",
                 dir.join("out.json").display()
             ),
-        )
-        .unwrap();
-        fs::set_permissions(&bin, fs::Permissions::from_mode(0o755)).unwrap();
+        );
         bin
     }
 
@@ -164,11 +191,34 @@ mod tests {
     fn a_failing_vdiff_names_the_differ() {
         let t = tempfile::tempdir().unwrap();
         let bin = t.path().join("vdiff");
-        fs::write(&bin, "#!/bin/sh\necho 'no such path' >&2\nexit 1\n").unwrap();
-        fs::set_permissions(&bin, fs::Permissions::from_mode(0o755)).unwrap();
+        install_stand_in(&bin, "#!/bin/sh\necho 'no such path' >&2\nexit 1\n");
         let err =
             diff_closures(Differ::Vdiff, &bin, Path::new("/old"), Path::new("/new")).unwrap_err();
         assert_eq!(err.to_string(), "vdiff --json failed: no such path");
+    }
+
+    /// Regression guard for GH-282: threads create and exec stand-ins at once, so
+    /// creations overlap other threads' spawns. The old write-then-exec helper hits
+    /// ETXTBSY here; with `install_stand_in` this process never holds a writer on a
+    /// stand-in, so no spawn can inherit one.
+    #[test]
+    fn stand_ins_survive_concurrent_spawns() {
+        let t = tempfile::tempdir().unwrap();
+        std::thread::scope(|s| {
+            for thread in 0..8 {
+                let root = t.path();
+                s.spawn(move || {
+                    for i in 0..25 {
+                        let dir = root.join(format!("{thread}-{i}"));
+                        fs::create_dir(&dir).unwrap();
+                        let bin = dir.join("stand-in");
+                        install_stand_in(&bin, "#!/bin/sh\nexit 0\n");
+                        let status = Command::new(&bin).status().unwrap();
+                        assert!(status.success());
+                    }
+                });
+            }
+        });
     }
 
     #[test]
