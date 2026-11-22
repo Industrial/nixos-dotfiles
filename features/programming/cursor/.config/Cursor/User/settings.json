@@ -207,13 +207,13 @@
       "formatting": { "command": ["alejandra"] },
       "options": {
         "nixos": {
-          "expr": "(builtins.getFlake \"${workspaceFolder}\").nixosConfigurations.<name>.options"
+          "expr": "(builtins.getFlake \"git+file://${workspaceFolder}\").nixosConfigurations.<name>.options"
         },
         "home-manager": {
-          "expr": "(builtins.getFlake \"${workspaceFolder}\").homeConfigurations.<name>.options"
+          "expr": "(builtins.getFlake \"git+file://${workspaceFolder}\").homeConfigurations.<name>.options"
         },
         "nix-darwin": {
-          "expr": "(builtins.getFlake \"${workspaceFolder}\").darwinConfigurations.<name>.options"
+          "expr": "(builtins.getFlake \"git+file://${workspaceFolder}\").darwinConfigurations.<name>.options"
         }
       }
     }
