@@ -151,11 +151,24 @@ supervised eff =
 cpus : usize
 cpus = std::thread::available_parallelism () |> .map (\n -> n.get ()) |> .unwrap_or 2
 
+-- A failure as run_main prints it (`error: <this>`): run_main renders a
+-- typed failure with Debug, so this Debug is the error's message (vwhy's
+-- form). `--once` with faults says `error: vverify: 2 store path(s) corrupt,
+-- missing or unreadable`, not `error: Faults(2)`.
+export data Failed { message Box<str> }
+
+instance std::fmt::Debug Failed
+  fmt : &self -> &mut std::fmt::Formatter -> std::fmt::Result
+  fmt self f = f.write_str (&self.message)
+
+export failed : VerifyError -> Failed
+failed e = Failed { message = "vverify: #{e}" |> .into_boxed_str }
+
 -- The process.
 export main_code : std::process::ExitCode
 main_code =
   args = std::env::args () |> .skip 1 |> .collect : Vec<String>
-  id_effect_cli::run_main (supervised (program (parse_args (&args) (cpus ())))) HNil (id_effect_cli::RunMainConfig::default ())
+  id_effect_cli::run_main (supervised (program (parse_args (&args) (cpus ()))) |> .map_err failed) HNil (id_effect_cli::RunMainConfig::default ())
 
 test "the first pass waits out the rest of the interval"
   assert_eq! \-> first_delay None 1000 600 \-> 0
@@ -197,3 +210,15 @@ test "a missing database fails the pass with its path"
 test "a fault fails --once, a clean pass does not"
   assert! \-> id_effect::testing::run_test (judged 0) |> .into_result |> .is_ok
   assert! \-> id_effect::testing::run_test (judged 2) |> .into_result |> .is_err
+
+test "a failure prints as its message, not as Debug"
+  faulted = failed (Faults 2)
+  shown = format! \-> "#{faulted:?}"
+  assert_eq! \-> shown \-> "vverify: 2 store path(s) corrupt, missing or unreadable"
+  assert! \-> !shown.contains "Faults("
+  exit = id_effect::testing::run_test (judged 2 |> .map_err failed)
+  err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> format! \-> "#{e:?}")
+  assert_eq! \-> err \-> Some (.to_string "vverify: 2 store path(s) corrupt, missing or unreadable")
+  usage = failed (Usage (.to_string "bad"))
+  usage_shown = format! \-> "#{usage:?}"
+  assert_eq! \-> usage_shown \-> "vverify: bad"
