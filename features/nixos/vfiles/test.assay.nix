@@ -24,5 +24,7 @@ in
     fallbackForTheCheckout = assay.eq machine.vfiles.files."/home/alice/.config/hypr/hyprland.lua".source "/home/alice/checkout/hyprland.lua";
     # The specialisation inherits the three base files and adds two.
     inheritsTheBaseAndAddsTwo = assay.eq (builtins.length (builtins.attrNames extra.vfiles.files)) 5;
+    # GH-205: the second machine boots under userborn, so vfiles also runs from a unit after it.
+    freshBootsUnderUserborn = assay.eq [test.nodes.fresh.services.userborn.enable (test.nodes.fresh.systemd.services ? vfiles)] [true true];
     everyFileIsAlices = assay.eq (builtins.all (f: f.user == "alice") (builtins.attrValues machine.vfiles.files)) true;
   }

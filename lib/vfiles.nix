@@ -18,6 +18,10 @@
 #
 #   vfiles.enable = true  (features.nixos.vfiles.enable): one activation step,
 #     `vfiles --spec <spec> --state-dir /var/lib/vfiles`, places every declared file.
+#     With userborn (services.userborn), whose unit writes /etc/passwd after the activation
+#     on boot, that step skips itself while an owner is missing (a fresh install's first
+#     boot, a switch adding a user) and vfiles.service, ordered after userborn.service,
+#     runs the same command (GH-205).
 #   vfiles.enable = false (the default): the features' legacy scripts run, as before.
 #
 # Rollback on a host: `features.nixos.vfiles.enable = lib.mkForce false;`. The legacy
@@ -133,6 +137,15 @@
     version = 1;
     files = map entry (lib.sortOn (f: f.path) files);
   });
+
+  run = "${cfg.package}/bin/vfiles --spec ${spec} --state-dir /var/lib/vfiles";
+
+  # Under userborn the activation step may have to wait for the owners (GH-205).
+  userborn = config.services.userborn.enable or false;
+  owners = {
+    users = lib.unique (lib.sort lib.lessThan (map (f: f.user) files));
+    groups = lib.unique (lib.sort lib.lessThan (map (f: f.group) files));
+  };
 in {
   options.vfiles = {
     enable = mkOption {
@@ -203,8 +216,45 @@ in {
       # out-of-store path vfiles checks itself.
       system.activationScripts.vfiles = {
         deps = ["users" "groups"];
-        text = ''
-          ${cfg.package}/bin/vfiles --spec ${spec} --state-dir /var/lib/vfiles
+        text =
+          if userborn
+          then ''
+            # userborn (GH-205): on a fresh install's first boot the activation runs before
+            # userborn.service has written /etc/passwd and /etc/group, and so before the
+            # owners exist. Defer to vfiles.service, which runs once userborn has.
+            vfiles_missing=""
+            for u in ${lib.escapeShellArgs owners.users}; do
+              grep -q "^$u:" /etc/passwd 2>/dev/null || vfiles_missing="$vfiles_missing user:$u"
+            done
+            for g in ${lib.escapeShellArgs owners.groups}; do
+              grep -q "^$g:" /etc/group 2>/dev/null || vfiles_missing="$vfiles_missing group:$g"
+            done
+            if [ -n "$vfiles_missing" ]; then
+              echo "vfiles: deferred to vfiles.service, not yet in the user database:$vfiles_missing" >&2
+            else
+              ${run}
+            fi
+          ''
+          else ''
+            ${run}
+          '';
+      };
+
+      # The run after userborn: on boot, and again on a switch that changes the spec (a new
+      # user's files, which the activation step deferred). Where the activation step already
+      # placed everything, this second run finds every file kept, and changes nothing.
+      systemd.services.vfiles = lib.mkIf userborn {
+        description = "Place the declared user files once userborn has written the users (GH-205)";
+        after = ["userborn.service"];
+        requires = ["userborn.service"];
+        wantedBy = ["multi-user.target"];
+        restartTriggers = [spec];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        script = ''
+          ${run}
         '';
       };
     })

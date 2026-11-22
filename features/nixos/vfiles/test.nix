@@ -10,6 +10,10 @@
 #   - a link whose out-of-store source (a checkout) is missing uses its fallback, and
 #     moves to the source once it exists.
 #
+# A second machine, `fresh`, boots under userborn for the first time (GH-205): the
+# activation runs before userborn.service has written alice, so the vfiles step defers,
+# and vfiles.service places her files once userborn has.
+#
 #   nix build .#checks.x86_64-linux.vfiles-vm
 {pkgs}: let
   home = "/home/alice";
@@ -46,6 +50,22 @@ in
         };
       };
       specialisation.extra.configuration = extra;
+
+      virtualisation.memorySize = 1024;
+    };
+
+    nodes.fresh = {...}: {
+      imports = [./default.nix];
+
+      services.userborn.enable = true;
+      users.users.alice = {
+        isNormalUser = true;
+        group = "users";
+      };
+
+      vfiles.files = alice {
+        "${home}/.config/base/linked.conf" = {text = "linked\n";};
+      };
 
       virtualisation.memorySize = 1024;
     };
@@ -114,5 +134,15 @@ in
 
       with subtest("nothing failed along the way"):
           assert report()["failed"] == [], report()
+
+      with subtest("a fresh userborn boot defers to vfiles.service, which places the files (GH-205)"):
+          fresh.wait_for_unit("vfiles.service")
+          fresh.succeed("test -L ${home}/.config/base/linked.conf")
+          fresh.succeed("grep -qx linked ${home}/.config/base/linked.conf")
+          fresh.succeed("test \"$(stat -c %U ${home}/.config/base)\" = alice")
+          # The unit placed the file, so the activation step before it had deferred.
+          journal = fresh.succeed("journalctl -b -u vfiles.service")
+          assert "1 placed" in journal, journal
+          assert json.loads(fresh.succeed("cat /var/lib/vfiles/report.json"))["failed"] == []
     '';
   }
