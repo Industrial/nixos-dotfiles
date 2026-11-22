@@ -617,10 +617,7 @@
   ],
   "refresh": "1m",
   "schemaVersion": 39,
-  "tags": [
-    "nix",
-    "fleet"
-  ],
+  "tags": ["nix", "fleet"],
   "time": {
     "from": "now-24h",
     "to": "now"
