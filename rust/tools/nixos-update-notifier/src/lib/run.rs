@@ -105,7 +105,12 @@ fn check_upstream(config: &Config, notifier: &mut dyn Notifier) -> Result<CheckO
     let new_system =
         build::build_toplevel(config.flake_dir(), &config.hostname, &new_lock, &out_link)?;
 
-    let changes = build::diff_closures(&config.current_system, &new_system)?;
+    let changes = build::diff_closures(
+        config.differ,
+        &config.vdiff,
+        &config.current_system,
+        &new_system,
+    )?;
     if changes.is_empty() {
         return Ok(CheckOutcome::LockChangedNoPackageDiff);
     }

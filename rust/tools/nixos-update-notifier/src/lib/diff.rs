@@ -1,6 +1,7 @@
 use std::fmt;
 
 use regex::Regex;
+use serde::Deserialize;
 use thiserror::Error;
 
 /// A single package-level change between two store closures.
@@ -33,9 +34,73 @@ impl fmt::Display for PackageChange {
 pub enum DiffError {
     #[error("failed to compile diff-closures parser: {0}")]
     Regex(#[from] regex::Error),
+    #[error("vdiff --json output is not valid: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("vdiff --json schema {0} is not supported (expected {VDIFF_SCHEMA})")]
+    Schema(u64),
 }
 
-/// Parse `nix store diff-closures` stdout into package changes.
+/// The `vdiff --json` schema this parser reads (rust/tools/vdiff/README.md).
+pub const VDIFF_SCHEMA: u64 = 1;
+
+/// One package entry of `vdiff --json`. Unknown fields are ignored.
+#[derive(Debug, Deserialize)]
+struct VdiffPackage {
+    name: String,
+    kind: String,
+    old: Vec<String>,
+    new: Vec<String>,
+}
+
+/// The parts of a `vdiff --json` report the notifier uses. `selectionChanged` is left
+/// out on purpose: same versions on both sides is not an update.
+#[derive(Debug, Deserialize)]
+struct VdiffReport {
+    schema: u64,
+    changed: Vec<VdiffPackage>,
+    added: Vec<VdiffPackage>,
+    removed: Vec<VdiffPackage>,
+}
+
+/// One side's versions as `nix store diff-closures` writes them: comma separated,
+/// `ε` for a path with no version, `∅` when the package is not on that side.
+fn versions_text(versions: &[String]) -> String {
+    if versions.is_empty() {
+        return "∅".into();
+    }
+    versions
+        .iter()
+        .map(|v| if v.is_empty() { "ε" } else { v.as_str() })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Parse `vdiff --json` (schema 1) into package changes, in the notifier's
+/// `name: old → new` form. Version changes come first, then added, then removed
+/// packages, each sorted by name as vdiff sorts them. A downgrade says so.
+pub fn parse_vdiff_json(json: &str) -> Result<Vec<PackageChange>, DiffError> {
+    let report: VdiffReport = serde_json::from_str(json)?;
+    if report.schema != VDIFF_SCHEMA {
+        return Err(DiffError::Schema(report.schema));
+    }
+    let changes = report
+        .changed
+        .iter()
+        .chain(&report.added)
+        .chain(&report.removed)
+        .map(|p| {
+            let mut detail = format!("{} → {}", versions_text(&p.old), versions_text(&p.new));
+            if p.kind == "downgraded" {
+                detail.push_str(" (downgrade)");
+            }
+            PackageChange::new(p.name.clone(), detail)
+        })
+        .collect();
+    Ok(changes)
+}
+
+/// Parse `nix store diff-closures` stdout into package changes. Only the rollback
+/// differ (`--differ nix`) uses this; the default is [`parse_vdiff_json`].
 ///
 /// Expected lines look like:
 /// - `firefox: 128.0 → 129.0`
@@ -71,6 +136,111 @@ pub fn parse_diff_closures(output: &str) -> Result<Vec<PackageChange>, DiffError
         }
     }
     Ok(changes)
+}
+
+#[cfg(test)]
+mod vdiff_tests {
+    use super::{DiffError, PackageChange, parse_vdiff_json};
+    use crate::format::format_notification_bodies;
+
+    // Captured with `vdiff --json` on drakkar (read-only), two system generations each.
+    const SMALL: &str = include_str!("../../tests/fixtures/vdiff-drakkar-494-520.json");
+    const NONE: &str = include_str!("../../tests/fixtures/vdiff-drakkar-519-520.json");
+    const LARGE: &str = include_str!("../../tests/fixtures/vdiff-drakkar-493-494.json");
+
+    fn lines(changes: &[PackageChange]) -> Vec<String> {
+        changes.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn real_pair_lists_changed_then_added_then_removed() {
+        let changes = parse_vdiff_json(SMALL).unwrap();
+        assert_eq!(
+            lines(&changes),
+            [
+                "voltaic: 0.2.1 → 0.3.0",
+                "etc-overlay-carry-out: ∅ → ε",
+                "unit-vci.service: ∅ → ε",
+                "unit-vexporter.service: ∅ → ε",
+                "vci: ∅ → 0.1.0",
+                "vexporter: ∅ → 0.1.0",
+                "vlocate: ∅ → 0.1.0",
+                "vswitch: ∅ → ε, 0.1.0",
+                "command-not-found: ε → ∅",
+            ]
+        );
+    }
+
+    #[test]
+    fn identical_closures_have_no_changes() {
+        assert!(parse_vdiff_json(NONE).unwrap().is_empty());
+    }
+
+    #[test]
+    fn large_real_pair_counts_every_entry_but_selection_changes() {
+        let changes = parse_vdiff_json(LARGE).unwrap();
+        // 70 version changes, 84 added, 29 removed; the 1 selection-only change is not an update.
+        assert_eq!(changes.len(), 70 + 84 + 29);
+        assert!(!changes.iter().any(|c| c.name == "keyutils"));
+        let chromium = changes.iter().find(|c| c.name == "chromium").unwrap();
+        assert_eq!(
+            chromium.detail,
+            "157.0.8103.78, 157.0.8103.78_fish-completions, 157.0.8103.78-sandbox → \
+158.0.8127.36, 158.0.8127.36_fish-completions, 158.0.8127.36-sandbox"
+        );
+    }
+
+    #[test]
+    fn downgrades_are_marked() {
+        let changes = parse_vdiff_json(LARGE).unwrap();
+        let downgrades = changes
+            .iter()
+            .filter(|c| c.detail.ends_with(" (downgrade)"))
+            .count();
+        assert_eq!(downgrades, 13);
+    }
+
+    #[test]
+    fn summary_text_is_one_line_per_package() {
+        let changes = parse_vdiff_json(SMALL).unwrap();
+        let bodies = format_notification_bodies(&changes, 900);
+        assert_eq!(
+            bodies,
+            ["voltaic: 0.2.1 → 0.3.0\n\
+etc-overlay-carry-out: ∅ → ε\n\
+unit-vci.service: ∅ → ε\n\
+unit-vexporter.service: ∅ → ε\n\
+vci: ∅ → 0.1.0\n\
+vexporter: ∅ → 0.1.0\n\
+vlocate: ∅ → 0.1.0\n\
+vswitch: ∅ → ε, 0.1.0\n\
+command-not-found: ε → ∅"]
+        );
+    }
+
+    #[test]
+    fn large_summary_splits_without_dropping_packages() {
+        let changes = parse_vdiff_json(LARGE).unwrap();
+        let bodies = format_notification_bodies(&changes, 900);
+        assert!(bodies.len() > 1);
+        assert!(bodies.iter().all(|b| b.len() <= 900));
+        let total: usize = bodies.iter().map(|b| b.lines().count()).sum();
+        assert_eq!(total, changes.len());
+    }
+
+    #[test]
+    fn another_schema_is_refused() {
+        let json = SMALL.replace("\"schema\": 1", "\"schema\": 2");
+        assert!(matches!(parse_vdiff_json(&json), Err(DiffError::Schema(2))));
+    }
+
+    #[test]
+    fn text_output_is_refused() {
+        assert!(matches!(
+            parse_vdiff_json("<<< /run/current-system\n>>> result\n"),
+            Err(DiffError::Json(_))
+        ));
+    }
 }
 
 #[cfg(test)]

@@ -1,6 +1,15 @@
 use std::path::{Path, PathBuf};
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+
+/// The closure differ behind the package list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Differ {
+    /// `vdiff --json` (rust/tools/vdiff): reads the store database directly.
+    Vdiff,
+    /// `nix store diff-closures`: the rollback.
+    Nix,
+}
 
 /// Check for NixOS flake updates and notify with exact package changes.
 #[derive(Debug, Clone, Parser)]
@@ -46,6 +55,15 @@ pub struct Config {
     )]
     pub lock_branch: String,
 
+    /// Which closure differ lists the package changes: `vdiff` (`vdiff --json`, the
+    /// default) or `nix` (`nix store diff-closures`, kept as the rollback).
+    #[arg(long, value_enum, default_value_t = Differ::Vdiff, env = "NIXOS_UPDATE_DIFFER")]
+    pub differ: Differ,
+
+    /// The vdiff binary. The Nix package sets this to vdiff's absolute store path.
+    #[arg(long, default_value = "vdiff", env = "NIXOS_UPDATE_VDIFF")]
+    pub vdiff: PathBuf,
+
     /// Minimum available memory (MiB) required before building the new closure.
     #[arg(long, default_value_t = 4096, env = "NIXOS_UPDATE_MIN_MEM_MIB")]
     pub min_mem_mib: u64,
@@ -68,5 +86,23 @@ impl Config {
     /// callers that build a `Config` by hand.
     pub fn flake_dir(&self) -> &Path {
         self.flake.as_deref().unwrap_or(Path::new("."))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vdiff_is_the_default_differ() {
+        let config = Config::parse_from(["nixos-update-notifier"]);
+        assert_eq!(config.differ, Differ::Vdiff);
+        assert_eq!(config.vdiff, PathBuf::from("vdiff"));
+    }
+
+    #[test]
+    fn nix_differ_is_the_rollback() {
+        let config = Config::parse_from(["nixos-update-notifier", "--differ", "nix"]);
+        assert_eq!(config.differ, Differ::Nix);
     }
 }
