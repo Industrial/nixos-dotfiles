@@ -2,9 +2,12 @@
 
 Tells the operator what an update is waiting on (see `docs/runbooks/updates.md`):
 
-- an **open lock-bump PR** from `.github/workflows/update-flake-lock.yml`, awaiting review
-  (unauthenticated GitHub API, public repo; while one is open the local build below is skipped,
-  since the PR body already carries the per-host diff);
+- an **open lock-bump PR** from `.github/workflows/update-flake-lock.yml`, awaiting review:
+  the legacy single PR on `update/flake-lock`, or any of vbump's per-input PRs on
+  `update/flake-lock-<input>` (unauthenticated GitHub API, public repo: one
+  `GET /repos/{repo}/pulls?state=open&per_page=100`, filtered on `head.ref`, and only PRs whose
+  head is this repository, not a fork). While one is open the local build below is skipped,
+  since the PR body already carries the per-host diff;
 - a **pending reboot**: `kernel`, `initrd` or `kernel-modules` of `/run/current-system` differ
   from `/run/booted-system` (comin switched, but nothing reboots by itself);
 - otherwise, whether upstream inputs moved, with **the exact packages** that would change.
@@ -76,7 +79,7 @@ nixos-update-notifier \
 | `--current-system` | `NIXOS_UPDATE_CURRENT` | `/run/current-system` | Closure to diff against |
 | `--booted-system` | `NIXOS_UPDATE_BOOTED` | `/run/booted-system` | Compared with current to detect a pending reboot |
 | `--github-repo` | `NIXOS_UPDATE_GITHUB_REPO` | empty (off) | `owner/name` whose open lock-bump PRs to report |
-| `--lock-branch` | `NIXOS_UPDATE_LOCK_BRANCH` | `update/flake-lock` | Branch the workflow opens its PR from |
+| `--lock-branch` | `NIXOS_UPDATE_LOCK_BRANCH` | `update/flake-lock` | Lock-bump branch: the workflow's single PR branch, and the prefix of vbump's `<branch>-<input>` |
 | `--differ` | `NIXOS_UPDATE_DIFFER` | `vdiff` | `vdiff` (`vdiff --json`) or `nix` (`nix store diff-closures`, the rollback) |
 | `--vdiff` | `NIXOS_UPDATE_VDIFF` | `vdiff` (the package: vdiff's store path) | The vdiff binary |
 | `--min-mem-mib` | `NIXOS_UPDATE_MIN_MEM_MIB` | `4096` | Skip build if free RAM below this |

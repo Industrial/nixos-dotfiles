@@ -9,7 +9,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use regex::Regex;
+use serde::Deserialize;
 
 use crate::notify::NotificationPayload;
 
@@ -45,24 +45,71 @@ pub fn reboot_differences(booted: &Path, current: &Path) -> Vec<String> {
         .collect()
 }
 
-/// Pull request URLs out of a GitHub `GET /repos/{repo}/pulls` JSON response. Only
-/// top-level PR URLs (`.../pull/<n>`) match; nested `html_url`s of users and repos do not.
-pub fn parse_pull_urls(json: &str) -> Vec<String> {
-    let re = Regex::new(r#""html_url"\s*:\s*"(https://github\.com/[^"/]+/[^"/]+/pull/\d+)""#)
-        .expect("static regex");
-    let mut urls: Vec<String> = re.captures_iter(json).map(|c| c[1].to_string()).collect();
-    urls.dedup();
-    urls
+/// One open pull request, as `GET /repos/{repo}/pulls` lists it. Only the fields the
+/// lookup reads; unknown fields are ignored.
+#[derive(Debug, Deserialize)]
+struct Pull {
+    html_url: String,
+    head: Head,
 }
 
-/// Open PRs from `branch` on public `repo` (`owner/name`), via the unauthenticated GitHub
-/// API. Any failure (offline, rate limit, curl missing) yields an empty list: this is a
-/// courtesy notice, never a reason for the timer unit to fail.
-pub fn open_lock_prs(repo: &str, branch: &str) -> Vec<String> {
-    let Some((owner, _)) = repo.split_once('/') else {
+#[derive(Debug, Deserialize)]
+struct Head {
+    #[serde(rename = "ref")]
+    branch: String,
+    /// `null` when the head repository was deleted (a fork that is gone).
+    repo: Option<HeadRepo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HeadRepo {
+    full_name: String,
+}
+
+/// Is `head` a lock-bump branch: the legacy single PR's `branch` itself, or one of
+/// vbump's per-input `<branch>-<input>` (`update/flake-lock-nixpkgs`, GH-200)?
+pub fn is_lock_branch(head: &str, branch: &str) -> bool {
+    head.strip_prefix(branch)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('-'))
+}
+
+/// Lock-bump PR URLs out of a GitHub `GET /repos/{repo}/pulls` JSON response: PRs whose
+/// head is a lock branch (see [`is_lock_branch`]) **of `repo` itself**. A fork's PR from
+/// a branch of the same name is not a lock bump. Malformed JSON yields nothing.
+pub fn parse_lock_pulls(json: &str, repo: &str, branch: &str) -> Vec<String> {
+    let Ok(pulls) = serde_json::from_str::<Vec<Pull>>(json) else {
         return Vec::new();
     };
-    let url = format!("https://api.github.com/repos/{repo}/pulls?state=open&head={owner}:{branch}");
+    pulls
+        .into_iter()
+        .filter(|p| {
+            is_lock_branch(&p.head.branch, branch)
+                && p.head
+                    .repo
+                    .as_ref()
+                    .is_some_and(|r| r.full_name.eq_ignore_ascii_case(repo))
+        })
+        .map(|p| p.html_url)
+        .collect()
+}
+
+/// The one request the lookup makes: every open PR of `repo`, filtered here on
+/// `head.ref`, because GitHub's `head=` filter only matches a branch exactly and vbump
+/// opens one branch per input. `per_page=100` is GitHub's maximum, so a single page
+/// holds every open PR unless the repository has more than 100 open at once.
+pub fn open_pulls_url(repo: &str) -> String {
+    format!("https://api.github.com/repos/{repo}/pulls?state=open&per_page=100")
+}
+
+/// Open lock-bump PRs (`branch`, or vbump's `branch-<input>`) on public `repo`
+/// (`owner/name`), via the unauthenticated GitHub API. Any failure (offline, rate limit,
+/// curl missing) yields an empty list: this is a courtesy notice, never a reason for the
+/// timer unit to fail.
+pub fn open_lock_prs(repo: &str, branch: &str) -> Vec<String> {
+    if !repo.contains('/') {
+        return Vec::new();
+    }
+    let url = open_pulls_url(repo);
     let out = Command::new("curl")
         .args([
             "-fsS",
@@ -74,7 +121,9 @@ pub fn open_lock_prs(repo: &str, branch: &str) -> Vec<String> {
         .arg(&url)
         .output();
     match out {
-        Ok(o) if o.status.success() => parse_pull_urls(&String::from_utf8_lossy(&o.stdout)),
+        Ok(o) if o.status.success() => {
+            parse_lock_pulls(&String::from_utf8_lossy(&o.stdout), repo, branch)
+        }
         _ => Vec::new(),
     }
 }
@@ -165,18 +214,112 @@ mod tests {
         );
     }
 
-    #[test]
-    fn parses_only_pull_request_urls() {
-        let json = r#"[{"url":"https://api.github.com/repos/o/r/pulls/7",
-            "html_url": "https://github.com/o/r/pull/7",
-            "user":{"html_url":"https://github.com/github-actions"},
-            "head":{"repo":{"html_url":"https://github.com/o/r"}}}]"#;
-        assert_eq!(parse_pull_urls(json), vec!["https://github.com/o/r/pull/7"]);
+    const REPO: &str = "Industrial/nixos-dotfiles";
+    const BRANCH: &str = "update/flake-lock";
+
+    /// One PR as the pulls API lists it, with the nested `html_url`s a regex would trip on.
+    fn pull(n: u32, head_ref: &str, head_repo: Option<&str>) -> String {
+        let repo = head_repo.map_or("null".to_string(), |r| {
+            format!(r#"{{"full_name":"{r}","html_url":"https://github.com/{r}"}}"#)
+        });
+        format!(
+            r#"{{"url":"https://api.github.com/repos/{REPO}/pulls/{n}",
+            "html_url":"https://github.com/{REPO}/pull/{n}",
+            "user":{{"login":"vbump[bot]","html_url":"https://github.com/apps/vbump"}},
+            "head":{{"label":"x:{head_ref}","ref":"{head_ref}","repo":{repo}}},
+            "base":{{"ref":"main","repo":{{"full_name":"{REPO}"}}}}}}"#
+        )
+    }
+
+    fn page(pulls: &[String]) -> String {
+        format!("[{}]", pulls.join(","))
+    }
+
+    fn url(n: u32) -> String {
+        format!("https://github.com/{REPO}/pull/{n}")
     }
 
     #[test]
-    fn empty_pull_list_parses_to_nothing() {
-        assert!(parse_pull_urls("[]").is_empty());
+    fn the_legacy_single_branch_is_a_lock_pr() {
+        let json = page(&[pull(7, "update/flake-lock", Some(REPO))]);
+        assert_eq!(parse_lock_pulls(&json, REPO, BRANCH), vec![url(7)]);
+    }
+
+    #[test]
+    fn a_vbump_per_input_branch_is_a_lock_pr() {
+        let json = page(&[
+            pull(8, "update/flake-lock-nixpkgs", Some(REPO)),
+            pull(9, "update/flake-lock-nix-vscode-extensions", Some(REPO)),
+        ]);
+        assert_eq!(parse_lock_pulls(&json, REPO, BRANCH), vec![url(8), url(9)]);
+    }
+
+    #[test]
+    fn an_unrelated_branch_is_not() {
+        let json = page(&[
+            pull(10, "feat/gh-207-notifier-vdiff", Some(REPO)),
+            // Shares the prefix, but is not `<branch>` or `<branch>-<input>`.
+            pull(11, "update/flake-lockfile-docs", Some(REPO)),
+            pull(12, "fix/update/flake-lock", Some(REPO)),
+        ]);
+        assert!(parse_lock_pulls(&json, REPO, BRANCH).is_empty());
+    }
+
+    #[test]
+    fn a_forks_branch_of_the_same_name_is_refused() {
+        let json = page(&[
+            pull(13, "update/flake-lock", Some("someone/nixos-dotfiles")),
+            pull(
+                14,
+                "update/flake-lock-nixpkgs",
+                Some("someone/nixos-dotfiles"),
+            ),
+            // The fork was deleted: GitHub reports its head repo as null.
+            pull(15, "update/flake-lock", None),
+        ]);
+        assert!(parse_lock_pulls(&json, REPO, BRANCH).is_empty());
+    }
+
+    #[test]
+    fn a_mixed_page_keeps_only_this_repos_lock_prs_in_order() {
+        let json = page(&[
+            pull(20, "update/flake-lock-comin", Some(REPO)),
+            pull(21, "feat/x", Some(REPO)),
+            pull(22, "update/flake-lock", Some("fork/nixos-dotfiles")),
+            pull(23, "update/flake-lock", Some(REPO)),
+        ]);
+        assert_eq!(
+            parse_lock_pulls(&json, REPO, BRANCH),
+            vec![url(20), url(23)]
+        );
+    }
+
+    #[test]
+    fn lock_branch_matching() {
+        assert!(is_lock_branch("update/flake-lock", BRANCH));
+        assert!(is_lock_branch("update/flake-lock-nixpkgs", BRANCH));
+        assert!(!is_lock_branch("update/flake-locks", BRANCH));
+        assert!(!is_lock_branch("update/flake", BRANCH));
+        assert!(!is_lock_branch("", BRANCH));
+    }
+
+    #[test]
+    fn empty_or_malformed_responses_parse_to_nothing() {
+        assert!(parse_lock_pulls("[]", REPO, BRANCH).is_empty());
+        // A rate-limit error body is an object, not a list.
+        assert!(
+            parse_lock_pulls(r#"{"message":"API rate limit exceeded"}"#, REPO, BRANCH).is_empty()
+        );
+        assert!(parse_lock_pulls("not json", REPO, BRANCH).is_empty());
+    }
+
+    #[test]
+    fn one_request_lists_every_open_pr_a_page_at_a_time_of_100() {
+        // No `head=` filter: GitHub matches it exactly, which hides vbump's branches.
+        assert_eq!(
+            open_pulls_url(REPO),
+            "https://api.github.com/repos/Industrial/nixos-dotfiles/pulls?state=open&per_page=100"
+        );
     }
 
     #[test]
