@@ -1,0 +1,139 @@
+-- What the cache serves, counted (GH-248): narinfo lookups that hit and miss,
+-- NAR requests that hit and miss, and the NAR bytes offered (the recorded
+-- narSize of every NAR served). The handlers add to atomics (one relaxed
+-- fetch_add, a few nanoseconds, against a request's database lookup); a
+-- separate fiber writes them to vcache.prom on a Schedule, so the hot path
+-- never touches the file system.
+
+import std::fs
+import std::io::Write
+import std::path::Path
+import std::sync::Arc
+import std::sync::atomic::{AtomicU64, Ordering}
+import std::time::Duration
+import id_effect::{Effect, HNil, Never, Schedule, succeed, suspend}
+import nix_store_core::narinfo::NarInfo
+
+export data Counters
+  { export narinfo_hit AtomicU64
+  , export narinfo_miss AtomicU64
+  , export nar_hit AtomicU64
+  , export nar_miss AtomicU64
+  , export nar_bytes AtomicU64
+  }
+  deriving (Debug, Default)
+
+export const FILE : &str = "vcache.prom"
+export const FLUSH_SECS : u64 = 30
+
+-- A narinfo request's outcome.
+export narinfo_seen : &Counters -> &Option<NarInfo> -> ()
+narinfo_seen c found =
+  if found.is_some ()
+    c.narinfo_hit.fetch_add 1 Ordering::Relaxed
+  else
+    c.narinfo_miss.fetch_add 1 Ordering::Relaxed
+  ()
+
+-- A NAR request's outcome, and the bytes it offers.
+export nar_seen : &Counters -> &Option<NarInfo> -> ()
+nar_seen c found =
+  case found of
+    Some info ->
+      c.nar_hit.fetch_add 1 Ordering::Relaxed
+      c.nar_bytes.fetch_add info.nar_size Ordering::Relaxed
+    None ->
+      c.nar_miss.fetch_add 1 Ordering::Relaxed
+  ()
+
+counter : &str -> &str -> String -> String
+counter name help value = "# HELP #{name} #{help}\n# TYPE #{name} counter\n#{name} #{value}\n"
+
+-- The textfile now.
+export text_of : &Counters -> String
+text_of c =
+  hit = c.narinfo_hit.load Ordering::Relaxed
+  miss = c.narinfo_miss.load Ordering::Relaxed
+  nar_hit = c.nar_hit.load Ordering::Relaxed
+  nar_miss = c.nar_miss.load Ordering::Relaxed
+  mut out = .to_string "# HELP vcache_narinfo_requests_total narinfo lookups, by whether the store had the path.\n# TYPE vcache_narinfo_requests_total counter\n"
+  out.push_str (&"vcache_narinfo_requests_total{result=\"hit\"} #{hit}\nvcache_narinfo_requests_total{result=\"miss\"} #{miss}\n")
+  out.push_str "# HELP vcache_nar_requests_total NAR requests, by whether the store had the path.\n# TYPE vcache_nar_requests_total counter\n"
+  out.push_str (&"vcache_nar_requests_total{result=\"hit\"} #{nar_hit}\nvcache_nar_requests_total{result=\"miss\"} #{nar_miss}\n")
+  out.push_str (&counter "vcache_nar_bytes_served_total" "NAR bytes offered: the recorded narSize of every NAR served." (c.nar_bytes.load Ordering::Relaxed |> .to_string))
+  out
+
+write_atomic : &Path -> &str -> std::io::Result<()>
+write_atomic file text =
+  dir = file.parent () |> .unwrap_or (Path::new ".")
+  tmp = dir.join (".#{FILE}.tmp")
+  -- A temp file a crash left behind may belong to an earlier DynamicUser uid: unlink it
+  -- (the directory is group-writable) rather than fail to open it.
+  fs::remove_file (&tmp) |> .ok
+  mut out = (fs::File::create (&tmp))?
+  (out.write_all (text.as_bytes ()))?
+  (out.sync_all ())?
+  -- 0644 whatever the unit's UMask (0077, for the signing key): node_exporter reads it.
+  (fs::set_permissions (&tmp) (std::os::unix::fs::PermissionsExt::from_mode 0o644))?
+  fs::rename (&tmp) file
+
+flushed : Arc<Counters> -> String -> Effect<(), Never, HNil>
+flushed c dir =
+  suspend (move \-> flush_now c dir)
+
+flush_now : Arc<Counters> -> String -> Effect<(), Never, HNil>
+flush_now c dir =
+  file = Path::new (&dir) |> .join FILE
+  said (write_atomic (&file) (&text_of (&c)))
+
+said : std::io::Result<()> -> Effect<(), Never, HNil>
+said r =
+  if r is Err e
+    eprintln! \-> "vcache: metrics: #{e}"
+  succeed (())
+
+-- The flusher: the counters into `dir`/vcache.prom now and every FLUSH_SECS.
+export flusher : Arc<Counters> -> String -> Effect<(), Never, HNil>
+flusher c dir =
+  every = Schedule::spaced (Duration::from_secs FLUSH_SECS)
+  Effect::repeat (move \-> flushed (c.clone ()) (dir.clone ())) every |> .map (\_ -> ())
+
+#[cfg(test)]
+sample : NarInfo
+sample = NarInfo { store_path = .to_string "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-x", nar_hash = .to_string "sha256:00", nar_size = 256, references = Vec::new (), deriver = None, sigs = Vec::new (), ca = None }
+
+test "hits, misses and bytes are counted, and rendered as counters"
+  c = Counters::default ()
+  narinfo_seen (&c) (&Some (sample ()))
+  narinfo_seen (&c) (&None)
+  narinfo_seen (&c) (&None)
+  nar_seen (&c) (&Some (sample ()))
+  nar_seen (&c) (&None)
+  t = text_of (&c)
+  for line in ["vcache_narinfo_requests_total{result=\"hit\"} 1\n", "vcache_narinfo_requests_total{result=\"miss\"} 2\n", "vcache_nar_requests_total{result=\"hit\"} 1\n", "vcache_nar_requests_total{result=\"miss\"} 1\n", "vcache_nar_bytes_served_total 256\n"]
+    assert! \-> t.contains line
+
+test "the hot path's cost: a million counts in well under a second"
+  c = Counters::default ()
+  hit = Some (sample ())
+  start = std::time::Instant::now ()
+  for _ in 0 .. 1000000
+    narinfo_seen (&c) (&hit)
+  took = start.elapsed ()
+  assert_eq! \-> c.narinfo_hit.load Ordering::Relaxed \-> 1000000
+  -- A request's lookup is a database query (~100 µs); a count is nanoseconds.
+  assert! \-> took.as_millis () < 1000
+
+test "the flusher writes the file atomically"
+  d = std::env::temp_dir () |> .join ("vcache-metrics-#{std::process::id ()}")
+  fs::remove_dir_all (&d) |> .ok
+  fs::create_dir_all (&d) |> .ok
+  c = Arc::new (Counters::default ())
+  narinfo_seen (&c) (&None)
+  assert! \-> id_effect::testing::run_test (flushed (Arc::clone (&c)) (d.to_string_lossy () |> .to_string)) |> .into_result |> .is_ok
+  written = fs::read_to_string (d.join FILE) |> .unwrap_or_default
+  assert! \-> written.contains "vcache_narinfo_requests_total{result=\"miss\"} 1\n"
+  assert! \-> !(d.join (".#{FILE}.tmp") |> .exists)
+  mode = fs::metadata (d.join FILE) |> .map (\m -> std::os::unix::fs::PermissionsExt::mode (&m.permissions ()) % 0o1000) |> .unwrap_or 0
+  assert_eq! \-> mode \-> 0o644
+  fs::remove_dir_all (&d) |> .ok

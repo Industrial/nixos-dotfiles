@@ -28,13 +28,13 @@ let
   nixTargets = builtins.concatMap (p: p.targets or []) (builtins.filter (p: p.type != "row") nixDash.panels);
   inherit (nixos) lib;
   # Every metric name a panel uses: identifiers with an exporter's prefix.
-  prefixes = ["vexporter_" "vci_" "vdeploy_" "vhealth_" "vverify_" "node_"];
+  prefixes = ["vexporter_" "vci_" "vdeploy_" "vhealth_" "vverify_" "vcache_" "node_"];
   metricsIn = expr:
     builtins.filter (t: builtins.any (p: lib.hasPrefix p t) prefixes)
     (map builtins.head (builtins.filter builtins.isList (builtins.split "([a-z][a-z0-9_]*)" expr)));
   panelMetrics = lib.unique (builtins.concatMap (t: metricsIn t.expr) nixTargets);
   # What the exporters write: their sources (node_exporter's own names are its).
-  tools = ["vexporter" "vci" "vdeploy" "vhealth" "vverify"];
+  tools = ["vexporter" "vci" "vdeploy" "vhealth" "vverify" "vcache"];
   sources = builtins.concatMap (tool: let
     dir = ../../../rust/tools + "/${tool}/src";
   in
@@ -89,6 +89,7 @@ in
     nixDashboardUsesTheLiveDatasource = assay.eq (lib.unique (map (t: t.datasource.uid) nixTargets)) [liveDsUid];
     nixDashboardMetricsExist = assay.eq (builtins.filter (m: !(written m)) panelMetrics) [];
     nixDashboardNamesVexporter = assay.eq (builtins.elem "vexporter_deploy_lag_seconds" panelMetrics) true;
+    nixDashboardNamesVcache = assay.eq (builtins.all (m: builtins.elem m panelMetrics) ["vcache_narinfo_requests_total" "vcache_nar_bytes_served_total"]) true;
     # The check bites: a name no exporter writes is caught.
     aTypoIsCaught = assay.eq [(written "vexporter_deploy_lag_secnds") (written "vci_build_seconds")] [false true];
   }

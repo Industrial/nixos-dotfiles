@@ -15,6 +15,8 @@ import nix_store_core::narinfo::{NarInfo, cache_info, fingerprint, render}
 import nix_store_core::signing::{SecretKey, sign}
 import crate::route::{Route, route}
 import crate::store::{PathInfoStore, StoreError}
+import crate::metrics::{Counters, nar_seen, narinfo_seen}
+import std::sync::Arc
 
 -- What the routes read besides the store.
 export data Settings
@@ -22,6 +24,8 @@ export data Settings
   , export store_dir String
   , export priority i64
   , export sign_key_file Option<String>
+  , export textfile_dir Option<String>
+  , export meter Arc<Counters>
   }
   deriving (Clone, Debug)
 
@@ -92,14 +96,18 @@ narinfo_effect hash =
   effect!
     let store = ~PathInfoStore;
     let signer = ~Signer;
+    let settings = ~Settings;
     let found = ~store.0.lookup(hash);
+    narinfo_seen(&settings.meter, &found);
     narinfo_page(signer, found)
 
 nar_effect : String -> Effect<Response, StoreError, AppEnv>
 nar_effect hash =
   effect!
     let store = ~PathInfoStore;
+    let settings = ~Settings;
     let found = ~store.0.lookup(hash);
+    nar_seen(&settings.meter, &found);
     nar_page(found)
 
 -- What a request is answered with.
@@ -136,7 +144,7 @@ sample_info = NarInfo {
 #[cfg(test)]
 test_env : AppEnv
 test_env =
-  settings = Settings { db = String::new (), store_dir = .to_string "/nix/store", priority = 41, sign_key_file = None }
+  settings = Settings { db = String::new (), store_dir = .to_string "/nix/store", priority = 41, sign_key_file = None, textfile_dir = None, meter = Arc::new (Counters::default ()) }
   HCons::new (crate::store::memory (.to_vec ([sample_info ()]))) (HCons::new settings (HCons::new (Signer None) HNil))
 
 -- The status a request's effect answers with, run on the test executor.
