@@ -54,6 +54,11 @@ in {
     # Rollback: features.nix.vci.enable = lib.mkForce false;
     features.nix.vci.enable = lib.mkDefault (fleet.isCacheIn fleet.hosts (config.networking.hostName or ""));
 
+    # The Nix and fleet metrics no other tool owns (features/monitoring/vexporter, GH-248):
+    # the store, the system generations and the deploy lag, on every host.
+    # Rollback: features.monitoring.vexporter.enable = lib.mkForce false;
+    features.monitoring.vexporter.enable = true;
+
     # Performance Optimization
     features.performance.environment.enable = true;
     features.performance.hardware.enable = true;

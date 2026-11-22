@@ -76,6 +76,19 @@ in
     # vci runs exactly on the cache hosts (common/fleet.nix `isCacheIn`: drakkar today),
     # whose store vcache serves, and one option turns it off.
     vciOnlyOnTheCache = assay.eq (lib.filter (n: vciWith n []) fleet.order) (lib.filter (fleet.isCacheIn fleet.hosts) fleet.order);
+    # vexporter on every host (GH-248), and one option turns it off.
+    vexporterOnEveryHost = assay.eq (has "monitoring.vexporter") true;
+    vexporterRollsBack = let
+      off = features.enabledFeatures (features.evalSelection {
+        modules = [
+          ({lib, ...}: {
+            profiles.base.enable = true;
+            features.monitoring.vexporter.enable = lib.mkForce false;
+          })
+        ];
+      });
+    in
+      assay.eq (builtins.elem "monitoring.vexporter" off) false;
     vciOnSomeHost = assay.eq ((lib.filter (n: vciWith n []) fleet.order) != []) true;
     vciRollsBackWithOneOption = assay.eq (lib.filter (n: vciWith n [{features.nix.vci.enable = lib.mkForce false;}]) fleet.order) [];
   }
