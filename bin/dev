@@ -284,7 +284,7 @@ cmd_check() {
     plan+=(
       'cargo-clippy|nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#clippy -c bash -c "cd rust && cargo clippy --workspace --all-targets -- -D warnings"'
       'cargo-test|nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c "cd rust && cargo test --workspace"'
-      'cargo-nix-drift|nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c "cd rust && cargo generate-lockfile" && git diff --exit-code rust/tools/*/Cargo.nix'
+      'cargo-nix-drift|bin/ci/cargo-standalone workspace-drift'
       'cargo-standalone|bin/ci/cargo-standalone all'
     )
   fi

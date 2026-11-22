@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Lint, test and drift-check the standalone crates under rust/tools/.
+# Lint, test and drift-check the standalone crates under rust/tools/, and drift-check the
+# workspace members' Cargo.nix files.
 #
 #   bin/ci/cargo-standalone --list           JSON array of the standalone crates' names
 #   bin/ci/cargo-standalone clippy <crate>   cargo clippy --all-targets -- -D warnings
@@ -7,6 +8,8 @@
 #   bin/ci/cargo-standalone drift <crate>    Cargo.nix against a fresh crate2nix (if it has one)
 #   bin/ci/cargo-standalone package <crate>  nix build its default.nix as the fleet does
 #   bin/ci/cargo-standalone all [<crate>…]   all four, for every crate or the ones named
+#   bin/ci/cargo-standalone --members        JSON array of rust/Cargo.toml's members under rust/tools
+#   bin/ci/cargo-standalone workspace-drift  `drift` for every workspace member with a Cargo.nix
 #
 # A standalone crate has its own Cargo.lock and an empty [workspace] table, so the
 # workspace jobs (`cd rust && cargo … --workspace`) never see it. The list is found, not
@@ -15,6 +18,14 @@
 #
 # --list fails when it finds no crate, and when a rust/tools/*/Cargo.toml is neither a
 # member of rust/Cargo.toml nor standalone: that crate would be checked by no job.
+#
+# workspace-drift is ci.yml's `cargo-nix-drift` job. A workspace member can still carry a
+# Cargo.nix of its own (oomkiller does: its `oomkiller-src` flake input builds the crate
+# directory alone, with its own Cargo.lock), and the workspace jobs never look at it. The
+# job used to run `cargo generate-lockfile` in rust/ and diff the Cargo.nix files, which
+# regenerates no Cargo.nix and so passed on any drift (#165); it now runs the same
+# copy-regenerate-diff as `drift`. --members, and so workspace-drift, fails when rust/tools
+# has no workspace member left: the job checks nothing then, and should go.
 #
 # `package` exists because cargo passing says nothing about the Nix package: vgc built and
 # linked under cargo, then failed in drakkar's build with `ld: cannot find -lsqlite3`
@@ -42,11 +53,12 @@ die() {
   exit 1
 }
 
+# list [standalone|members]: the crates of that kind under rust/tools, as a JSON array.
 list() {
-  python3 -I - "${RUST_DIR:-$ROOT/rust}" <<'PY'
+  python3 -I - "${RUST_DIR:-$ROOT/rust}" "${1:-standalone}" <<'PY'
 import glob, json, os, sys, tomllib
 
-rust = sys.argv[1]
+rust, kind = sys.argv[1], sys.argv[2]
 with open(os.path.join(rust, "Cargo.toml"), "rb") as f:
     ws = tomllib.load(f).get("workspace", {})
 
@@ -57,7 +69,7 @@ def expand(patterns):
     return out
 
 members = expand(ws.get("members", [])) - expand(ws.get("exclude", []))
-found, orphans = [], []
+found, in_ws, orphans = [], [], []
 for manifest in sorted(glob.glob(os.path.join(rust, "tools", "*", "Cargo.toml"))):
     crate = os.path.dirname(manifest)
     with open(manifest, "rb") as f:
@@ -65,6 +77,8 @@ for manifest in sorted(glob.glob(os.path.join(rust, "tools", "*", "Cargo.toml"))
     if os.path.normpath(crate) in members:
         if standalone:
             orphans.append(f"{crate}: has its own [workspace] but is a member of {rust}/Cargo.toml")
+        else:
+            in_ws.append(os.path.basename(crate))
     elif standalone:
         found.append(os.path.basename(crate))
     else:
@@ -74,6 +88,13 @@ for o in orphans:
     print(f"cargo-standalone: {o}", file=sys.stderr)
 if orphans:
     sys.exit(1)
+if kind == "members":
+    if not in_ws:
+        print(f"cargo-standalone: no workspace member under {rust}/tools: "
+              "the cargo-nix-drift job checks nothing, remove it", file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps(in_ws))
+    sys.exit(0)
 if not found:
     print(f"cargo-standalone: no standalone crate under {rust}/tools", file=sys.stderr)
     sys.exit(1)
@@ -111,6 +132,11 @@ test_crate() {
 drift() {
   local dir
   dir="$(crate_dir "$1")" || return 1
+  drift_dir "$dir"
+}
+
+drift_dir() {
+  local dir="$1"
   if [[ ! -f "$dir/Cargo.nix" ]]; then
     echo "cargo-standalone: $dir has no Cargo.nix, nothing to drift"
     return 0
@@ -120,6 +146,18 @@ drift() {
   drift_in "$dir" "$tmp/crate" || status=$?
   rm -rf "$tmp"
   return "$status"
+}
+
+# Every workspace member's Cargo.nix, each regenerated from a copy of the member's directory
+# alone: what its path: flake input sees, so its own Cargo.lock, not rust/Cargo.lock.
+workspace_drift() {
+  local members m failed=()
+  members="$(list members)" || return 1
+  echo "cargo-standalone: workspace members under rust/tools: $members"
+  while IFS= read -r m; do
+    drift_dir "rust/tools/$m" || failed+=("$m")
+  done < <(jq -r '.[]' <<<"$members")
+  ((${#failed[@]} == 0)) || die "Cargo.nix drift in: ${failed[*]}"
 }
 
 # drift_in <crate dir> <scratch dir>: the committed files only, with the old Cargo.nix
@@ -169,6 +207,8 @@ cmd="${1:-}"
 [[ $# -gt 0 ]] && shift
 case "$cmd" in
   --list) list ;;
+  --members) list members ;;
+  workspace-drift) workspace_drift ;;
   clippy) clippy "${1:?usage: bin/ci/cargo-standalone clippy <crate>}" ;;
   test) test_crate "${1:?usage: bin/ci/cargo-standalone test <crate>}" ;;
   drift) drift "${1:?usage: bin/ci/cargo-standalone drift <crate>}" ;;
@@ -187,7 +227,7 @@ case "$cmd" in
     ((${#failed[@]} == 0)) || die "failed: ${failed[*]}"
     ;;
   *)
-    sed -n '2,10s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,13s/^# \{0,1\}//p' "$0" >&2
     exit 64
     ;;
 esac

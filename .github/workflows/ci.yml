@@ -166,11 +166,11 @@ jobs:
           persist-credentials: false
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
+      # The workspace members' Cargo.nix (oomkiller's, for its oomkiller-src flake input),
+      # regenerated from a copy with crate2nix and diffed, as cargo-standalone's drift step
+      # does for the standalone crates (#165). Fails when no workspace member is left.
       - name: Check Cargo.nix drift
-        run: |
-          nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c "cd rust && cargo generate-lockfile"
-          # Check if any Cargo.nix files would change
-          git diff --exit-code rust/tools/*/Cargo.nix || (echo 'Cargo.nix is out of date. Run cargo regenerate-lockfile and commit.' && exit 1)
+        run: bin/ci/cargo-standalone workspace-drift
   # The crates under rust/tools/* with their own Cargo.lock and empty [workspace], which the
   # three jobs above never see. Found, not listed, like the hosts below: a new crate gets a
   # cargo-standalone leg without an edit here. The lister fails when it finds no crate, or a
