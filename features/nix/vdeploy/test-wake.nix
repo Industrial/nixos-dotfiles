@@ -25,10 +25,14 @@
 #   6. the FIFO deleted while vdeploy runs: vdeploy stays up and says so; recreated,
 #      wakes work again;
 #   7. switched out live: no wake support, vdeploy up, the interval poll as before;
+#   GH-221: main's commits are signed with a test key the target trusts (test-key.nix). An
+#   unsigned commit is refused: `wake --wait` says so and exits 1, nothing switches, and
+#   nothing is marked bad; the next signed commit is deployed as usual;
 #   and after every step, the daemon answers alice and the web page is the generation's.
 {pkgs}: let
   inherit (pkgs) busybox;
   keys = import "${pkgs.path}/nixos/tests/ssh-keys.nix" pkgs;
+  testKey = import ./test-key.nix {inherit pkgs;};
   lock = pkgs.writeText "flake.lock" ''{"nodes":{"root":{}},"root":"root","version":7}'';
 
   target = {
@@ -59,6 +63,8 @@
         dotfiles.enable = false;
         wake.enable = gen != "base";
         wake.operators = ["alice"];
+        # The local forge's commits are signed with the test key, not GitHub's.
+        trustedSigningKeys = ["${testKey}/public.asc"];
       };
       nix.settings.allowed-users = ["@wheel"];
       features.nix.vhealth.restrictedNixUsers = true;
@@ -101,7 +107,7 @@
         isNormalUser = true;
         uid = 1001;
       };
-      environment.systemPackages = [pkgs.curl pkgs.jq];
+      environment.systemPackages = [pkgs.curl pkgs.jq pkgs.gnupg];
       virtualisation = {
         memorySize = 2048;
         cores = 2;
@@ -189,7 +195,18 @@ in
           "EOF"
       )
       target.succeed("cp ${lock} /srv/origin/flake.lock")
-      target.succeed("git -C /srv/origin add -A && git -C /srv/origin -c user.name=t -c user.email=t@t commit -q -m main")
+      # Commits signed with the test key the target trusts (GH-221), or not.
+      target.succeed("gpg --batch --import ${testKey}/secret.asc")
+
+      def commit(msg, signed=True):
+          sign = "-S" if signed else "--no-gpg-sign"
+          target.succeed(
+              f"cd /srv/origin && echo '{msg}' > n && git add -A && git -c user.name=t -c user.email=t@t "
+              f"-c user.signingkey=$(cat ${testKey}/fingerprint) -c gpg.program=${pkgs.gnupg}/bin/gpg commit {sign} -q -m '{msg}'"
+          )
+          return target.succeed("git -C /srv/origin rev-parse HEAD").strip()
+
+      commit("main")
       with subtest("the operator's wake --wait: polled now, planned, switched, health-checked"):
           before = polls()
           status, out = ssh_wake("--wait --timeout 300")
@@ -200,6 +217,26 @@ in
           # What --wait read, alice reads too: status.json, plan.json, last.json.
           for f in ["status.json", "plan.json", "last.json"]:
               target.succeed(as_user("alice", f"jq -e . /var/lib/vdeploy/{f} > /dev/null"))
+          non_root("good")
+
+      with subtest("an unsigned head is refused: wake --wait says so, exit 1, no bad mark; the next signed head deploys (GH-221)"):
+          unsigned = commit("unsigned", signed=False)
+          status, out = ssh_wake("--wait --timeout 120")
+          t.assertEqual(status, 1, out)
+          t.assertIn(f"not deploying main {unsigned[:9]}", out)
+          t.assertIn("the commit is not signed", out)
+          t.assertEqual(current(), good)
+          target.succeed("test ! -e /var/lib/vdeploy/bad || test -z \"$(ls -A /var/lib/vdeploy/bad)\"")
+          target.wait_until_succeeds(f"grep -qx 'vdeploy_commits_unverified_total 1' {prom}", timeout=30)
+          record = json.loads(target.succeed("tail -n 1 /var/lib/vdeploy/plans.jsonl"))
+          t.assertEqual((record["commit"], record["action"], record["signatureVerified"]), (unsigned, "refused", False))
+          target.succeed(f"journalctl -u vdeploy -o cat | grep -q 'not deploying {unsigned[:9]} to target'")
+          signed = commit("signed again")
+          status, out = ssh_wake("--wait --timeout 300")
+          t.assertEqual(status, 0, out)
+          t.assertIn(f"main {signed[:9]}", out)
+          t.assertEqual(json.loads(target.succeed("cat /var/lib/vdeploy/plan.json"))["signatureVerified"], True)
+          t.assertEqual(current(), good)
           non_root("good")
 
       with subtest("a burst of wakes is not a poll per write"):

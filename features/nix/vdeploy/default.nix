@@ -56,6 +56,16 @@
 # poll stays the default. `fleet deploy` is `ssh <host> vdeploy wake --wait`. Rollback:
 # `features.nix.vdeploy.wake.enable = false;`.
 #
+# Commit verification (GH-221): a head of main is planned and deployed only when its
+# signature verifies, with gpgv and no network, against a keyring built here from
+# `trustedSigningKeys` (default: GitHub's web-flow key, pinned in
+# rust/tools/vdeploy/keys/github-web-flow.asc; main takes GitHub merges only, and GitHub
+# signs every one). An unverified head is refused: one journal line saying why,
+# vdeploy_commits_unverified_total, a plans.jsonl record with "signatureVerified": false; no
+# bad mark, and the next verified head deploys normally. `vdeploy wake --wait` reports the
+# refusal and exits 1. Rollback: `features.nix.vdeploy.requireSignedCommits = lib.mkForce
+# false;` (the verdict is still recorded in every plan; nothing is refused).
+#
 # Observe-mode rollback: `features.nix.vdeploy.enable = lib.mkForce false;` removes the unit.
 #
 # Health probe (on the host, no root needed):
@@ -133,6 +143,16 @@
   # The wake FIFO (GH-246), in deploy mode only.
   wakeFifo = "/run/vdeploy/wake";
   wakes = deploy && cfg.wake.enable;
+  # GH-221: the keyring a head's signature is checked against, built here from the pinned
+  # armored key files (gpg --dearmor, one after another: a keyring is a run of key packets).
+  keyring = pkgs.runCommand "vdeploy-trusted-keys.gpg" {nativeBuildInputs = [pkgs.gnupg];} ''
+    export GNUPGHOME="$TMPDIR/gnupg"
+    mkdir -m 0700 "$GNUPGHOME"
+    for key in ${lib.escapeShellArgs cfg.trustedSigningKeys}; do
+      gpg --batch --dearmor < "$key" >> "$out"
+    done
+  '';
+  verifies = cfg.trustedSigningKeys != [];
 in {
   imports = [../../monitoring/textfile-collector.nix];
 
@@ -190,6 +210,28 @@ in {
         hosts a longer window. This never cancels a plan in flight.
       '';
     };
+    # GH-221: commit verification.
+    requireSignedCommits = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Deploy (and plan) a head of main only when its commit signature verifies against
+        trustedSigningKeys (gpgv, no network). A head that does not is refused: logged with
+        the reason, counted (vdeploy_commits_unverified_total), recorded in plans.jsonl
+        (`"action": "refused"`, `"signatureVerified": false`), never marked bad; the next
+        verified head deploys as usual. Rollback: `lib.mkForce false` (verdicts are still
+        recorded, nothing is refused).
+      '';
+    };
+    trustedSigningKeys = lib.mkOption {
+      type = lib.types.listOf lib.types.path;
+      default = [../../../rust/tools/vdeploy/keys/github-web-flow.asc];
+      defaultText = lib.literalExpression "[ rust/tools/vdeploy/keys/github-web-flow.asc ]";
+      description = ''
+        Armored OpenPGP public keys whose signatures vdeploy trusts. The default is GitHub's
+        web-flow key, which signs every merge made through GitHub (main takes merges only).
+      '';
+    };
     # GH-246: let an operator make vdeploy poll main now (`vdeploy wake`, `fleet deploy`).
     wake = {
       enable = lib.mkOption {
@@ -235,6 +277,13 @@ in {
 
   config = lib.mkMerge [
     {
+      assertions = [
+        {
+          assertion = cfg.requireSignedCommits -> verifies;
+          message = "features.nix.vdeploy.requireSignedCommits needs at least one key in features.nix.vdeploy.trustedSigningKeys.";
+        }
+      ];
+
       environment.systemPackages = [vdeploy];
 
       systemd.services.vdeploy = {
@@ -281,6 +330,13 @@ in {
               "--nix"
               "${config.nix.package}/bin/nix"
             ]
+            ++ lib.optionals verifies [
+              "--trusted-keys"
+              "${keyring}"
+              "--gpgv"
+              "${pkgs.gnupg}/bin/gpgv"
+            ]
+            ++ lib.optional cfg.requireSignedCommits "--require-signed"
             ++ lib.optionals deploy ([
                 "--mode"
                 "deploy"

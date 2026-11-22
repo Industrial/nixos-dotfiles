@@ -66,6 +66,9 @@ let
   };
   # The fleet's `vdeploy` role picks deploy mode: a host without it observes.
   byRole = host: (nixos.eval {modules = [./default.nix base fleet probes {features.nix.vdeploy.host = host;}];}).features.nix.vdeploy.mode;
+  # GH-221: commit verification's one rollback option.
+  unsignedOk = nixos.eval {modules = [./default.nix base {features.nix.vdeploy.requireSignedCommits = lib.mkForce false;}];};
+  noKeys = nixos.eval {modules = [./default.nix base {features.nix.vdeploy.trustedSigningKeys = [];}];};
   noVhealth = nixos.eval {modules = [./default.nix base fleet {features.nix.vdeploy.mode = "deploy";}];};
   failedAssertions = c: map (a: a.message) (builtins.filter (a: !a.assertion && lib.hasPrefix "features.nix.vdeploy" a.message) c.assertions);
   tomb = deployed.systemd.services.comin;
@@ -116,6 +119,22 @@ in
     diffsOnTheStoreDatabase = assay.eq (argAfter "--db") "/nix/var/nix/db/db.sqlite";
     gitAndNixPinned =
       assay.eq [(lib.hasSuffix "/bin/git" (argAfter "--git")) (lib.hasSuffix "/bin/nix" (argAfter "--nix"))] [true true];
+
+    # Commit verification (GH-221): on by default, against a keyring built from the pinned
+    # GitHub key, with gpgv from the store.
+    requiresSignedCommitsByDefault =
+      assay.eq [cfg.features.nix.vdeploy.requireSignedCommits (builtins.elem "--require-signed" args)] [true true];
+    trustsThePinnedGithubKey =
+      assay.eq (map baseNameOf (map toString cfg.features.nix.vdeploy.trustedSigningKeys)) ["github-web-flow.asc"];
+    keyringBuiltInTheStore =
+      assay.eq [(lib.hasSuffix "-vdeploy-trusted-keys.gpg" (argAfter "--trusted-keys")) (lib.hasSuffix "/bin/gpgv" (argAfter "--gpgv"))] [true true];
+    # The pinned file holds GitHub's current web-flow key, by fingerprint.
+    pinnedKeyNamesItsFingerprint =
+      assay.eq (lib.hasInfix "9684 79A1 AFF9 27E3 7D1A  566B B569 0EEE BB95 2194" (builtins.readFile ../../../rust/tools/vdeploy/keys/github-web-flow.asc)) true;
+    # The rollback: nothing refused, the verdict still checked and recorded.
+    rollbackStopsRequiringSignatures =
+      assay.eq [(builtins.elem "--require-signed" (argsOf unsignedOk)) (argAfterIn unsignedOk "--trusted-keys" != null)] [false true];
+    requiringSignaturesNeedsAKey = assay.eq (builtins.length (failedAssertions noKeys)) 1;
 
     # The user's checkout, fast-forwarded as the user.
     fastForwardsTheUsersCheckout =
