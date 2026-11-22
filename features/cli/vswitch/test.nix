@@ -154,7 +154,10 @@ in
           t.assertEqual((current(), profile()), (base, boot_default))
 
       with subtest("a vhealth failure rolls back, the boot default never moves, and it is marked bad"):
-          machine.fail(alice(f"vswitch switch --toplevel {broken} --health-window 10s"))
+          status, out = machine.execute(alice(f"vswitch switch --toplevel {broken} --health-window 10s 2>&1"))
+          t.assertEqual(status, 1, out)
+          # `systemd-run --pipe`: the apply's own words reach the operator's terminal.
+          t.assertIn(f"rolled back from {broken} to {base}", out)
           t.assertEqual(current(), base)
           t.assertEqual(profile(), boot_default)
           l = last()
@@ -162,7 +165,6 @@ in
           t.assertEqual(l["health"]["failing"], ["dead-port"], l)
           machine.succeed(f"test -f /var/lib/vdeploy/bad/$(basename {broken})")
           machine.fail("systemctl is-active liar.service")
-          machine.succeed(f"journalctl -u vdeploy-apply -o cat | grep -qF 'rolled back from {broken} to {base}'")
           non_root("base")
 
       with subtest("the rolled-back generation is refused when asked again, with no switch"):
