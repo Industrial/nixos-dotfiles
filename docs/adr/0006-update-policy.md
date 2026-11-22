@@ -59,7 +59,7 @@ after comin has already switched kernels.
    #126), which covers every host check.
 6. **The notifier reports what's pending on the operator.** On a schedule
    `nixos-update-notifier` reports:
-   - any open `update/flake-lock` PR, through the unauthenticated GitHub API on this
+   - any open `update/flake-lock` or `update/flake-lock-<input>` (vbump) PR, through the unauthenticated GitHub API on this
      public repo. While one is open, it skips its local build, since the PR has the diff;
    - a pending reboot, when `kernel`, `initrd` or `kernel-modules` differ between
      `/run/booted-system` and `/run/current-system`;

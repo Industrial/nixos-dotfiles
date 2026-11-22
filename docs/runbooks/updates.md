@@ -122,7 +122,7 @@ fleet-deploy).
 
 | Notice | Meaning | Action |
 |---|---|---|
-| *NixOS lock bump awaiting review* | an `update/flake-lock` PR is open (the legacy single PR; vbump's per-input `update/flake-lock-<input>` PRs are not looked up yet) | review/merge (§2–3) |
+| *NixOS lock bump awaiting review* | a lock-bump PR is open: the legacy single `update/flake-lock` PR or any of vbump's per-input `update/flake-lock-<input>` PRs (GH-200) | review/merge (§2–3) |
 | *NixOS reboot pending* | `kernel`/`initrd`/`kernel-modules` differ from the booted system | reboot |
 | *NixOS updates available* | upstream moved and no PR is open yet | run the workflow (§1) |
 

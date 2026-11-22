@@ -38,6 +38,8 @@ let
 
   # The lock branch the bump workflow uses, read from the workflow so the two cannot drift.
   workflow = builtins.readFile ./../../../.github/workflows/update-flake-lock.yml;
+  # vbump's branch name per input (`branch_of`), read from its source for the same reason.
+  vbumpBody = builtins.readFile ./../../../rust/tools/vbump/src/body.vlt;
 in
   assay.suite "features-cli-nixos-update-notifier" {
     installsTheNotifier = assay.eq (nixos.hasPackage cfg "nixos-update-notifier") true;
@@ -70,10 +72,15 @@ in
     comparesAgainstTheRunningSystem = assay.eq service.environment.NIXOS_UPDATE_CURRENT "/run/current-system";
     # A pending reboot is the running system differing from the booted one.
     comparesAgainstTheBootedSystem = assay.eq service.environment.NIXOS_UPDATE_BOOTED "/run/booted-system";
-    # Open lock-bump PRs are looked up on this (public) repo, on the workflow's branch.
+    # Open lock-bump PRs are looked up on this (public) repo. The notifier matches head.ref by
+    # prefix (src/lib/pending.rs is_lock_branch): the branch itself, or `<branch>-<input>`.
     reportsOpenLockPrs = assay.eq service.environment.NIXOS_UPDATE_GITHUB_REPO "Industrial/nixos-dotfiles";
+    # The branch itself is the workflow's single-PR LOCK_BRANCH (the legacy `lock` job) ...
     lockBranchMatchesTheWorkflow =
       assay.eq (builtins.match ".*LOCK_BRANCH: ${service.environment.NIXOS_UPDATE_LOCK_BRANCH}\n.*" workflow != null) true;
+    # ... and `<branch>-` is what vbump puts before each input's name (GH-200).
+    lockBranchIsVbumpsPrefix =
+      assay.eq (lib.hasInfix "\"${service.environment.NIXOS_UPDATE_LOCK_BRANCH}-#{safe}\"" vbumpBody) true;
     # Building the closure is heavy; it must not fight interactive use.
     runsAtLowPriority = assay.eq [service.serviceConfig.Nice service.serviceConfig.IOSchedulingClass] [10 "idle"];
 
