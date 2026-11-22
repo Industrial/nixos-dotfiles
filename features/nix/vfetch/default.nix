@@ -40,7 +40,7 @@ in {
       ExecStart = "${vfetch}/bin/vfetch serve --listen ${listen}";
       Restart = "always";
       RestartSec = "2s";
-      # Reads /etc/nix/nix.conf and talks HTTP; nothing else.
+      # Reads /etc/nix/nix.conf, talks HTTP, keeps narinfo answers in its state dir.
       DynamicUser = true;
       ProtectSystem = "strict";
       ProtectHome = true;
@@ -48,6 +48,9 @@ in {
       PrivateDevices = true;
       NoNewPrivileges = true;
       RestrictAddressFamilies = ["AF_INET" "AF_INET6" "AF_UNIX"];
+      # The narinfo disk cache (#216): /var/lib/vfetch/narinfo-cache, the only
+      # place it writes. vfetch serve finds it through $STATE_DIRECTORY.
+      StateDirectory = "vfetch";
     };
   };
 }

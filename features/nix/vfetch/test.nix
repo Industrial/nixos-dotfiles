@@ -76,6 +76,10 @@ in
           assert "narinfo ${payload} from http://cache:5000" in journal, journal
           assert "nar http://cache:5000/nar/" in journal, journal
           client.succeed("nix-store --verify-path ${payload}")
+          # serve kept the cache's answer in its state directory (#216).
+          client.succeed(
+              "grep -q '^StorePath: ${payload}$' /var/lib/vfetch/narinfo-cache/http_3A__2F__2F_cache_3A_5000/$(basename ${payload} | cut -c1-32)"
+          )
 
       with subtest("with vfetch serve down, nix substitutes from the next cache, promptly"):
           client.succeed("systemctl stop vfetch-serve")
