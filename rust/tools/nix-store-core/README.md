@@ -138,6 +138,25 @@ their names. The only mode bit recorded is the owner-execute bit.
 | `verify : &PublicKey -> &str -> &str -> bool` | whether the signature is this key's (same name) over this fingerprint |
 | `valid_signatures : &[PublicKey] -> &NarInfo -> usize` | libstore's `checkSignatures`: how many of the narinfo's sigs a trusted key made |
 
+### `veval`: shared evaluation records (GH-243)
+
+A record says that a fleet host's toplevel, evaluated at a commit, is the derivation `drv`
+with the output `out`. vci writes one per (commit, host) it builds, vcache serves it signed
+(`GET /veval/<id>.veval`), and vdeploy and vswitch accept it instead of evaluating.
+
+| Item | Meaning |
+|---|---|
+| `Key { commit, tree, lock, host, nix }: Clone + Eq` | what the evaluation depends on: the commit sha (`self.rev` is an input, so never the tree alone), its tree id, `flake.lock`'s blob id, the host attribute, `nix --version` |
+| `VERSION` (`veval-1`), `FORM` (`git+file?rev`) | in every key id and fingerprint; a change of either is a miss |
+| `key_id : &Key -> String`, `file_name : &Key -> String`, `is_key_id : &str -> bool` | sha256 (base16) over every field: the record's name, `<id>.veval` |
+| `tree_spec`, `lock_spec : &str -> String`, `nix_version_of : &str -> String`, `key_of : &str -> &str -> &str -> &str -> &str -> Result<Key, String>` | how every producer and consumer computes the parts: `git rev-parse <sha>^{tree}`, `git rev-parse <sha>:flake.lock` in the clone it evaluates, the first line of the evaluating `nix --version` |
+| `key_problem : &Key -> Option<String>`, `record_problem : &Record -> Option<String>` | object ids, a host name, one plain line of Nix version, a `.drv` and an output in the store |
+| `Record { key, drv, out, eval_secs, sigs }`, `render`, `parse : &str -> Result<Record, String>` | narinfo-style `Field: value` text. `parse` refuses unknown fields, another version or form, and a `Key` that is not the id of the fields it names |
+| `fingerprint : &Record -> String` | `veval-1;<id>;<drv>;<out>;<eval secs>`, what a signature covers |
+| `signed : &SecretKey -> Record -> Record`, `trusted : &[PublicKey] -> &Record -> bool` | sign with, and verify against, keys in Nix's format (`signing`) |
+| `served : &SecretKey -> &str -> &str -> Option<String>` | the cache's side: the file's record signed, only when it is the record of the id asked for |
+| `accept : &[PublicKey] -> &Key -> &str -> Result<Record, String>` | the consumer's side: parses, is the record of exactly this key, and a trusted key signed it. `Err` is a miss, with its reason |
+
 ### `drv`: store derivations (ATerm)
 
 | Item | Meaning |

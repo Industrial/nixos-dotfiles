@@ -1,0 +1,414 @@
+-- veval (GH-243): a fleet host's evaluated toplevel, shared. vci evaluates
+-- every host at every commit of main; a record says "at this key, the
+-- toplevel's derivation is `drv` and its output `out`", so a host that plans
+-- the same commit can skip its own evaluation.
+--
+-- The key is everything the evaluation's result depends on, and nothing a
+-- host computes differently:
+--
+--   commit  the commit sha. `self.rev` is an evaluation input (lib/mk-host.nix
+--           sets `system.configurationRevision` from it), so two commits with
+--           one tree evaluate differently: a tree-only key would be a stale
+--           hit. Every file and every `self` attribute is a function of it.
+--   tree    the commit's tree id, and
+--   lock    flake.lock's blob id at the commit: implied by the commit, named
+--           anyway so the record says what was evaluated.
+--   host    the `nixosConfigurations` attribute.
+--   nix     the evaluator's `nix --version`: two Nix versions are a miss.
+--   form    how the flake was referenced (FORM): `git+file://<clone>?rev=<sha>`.
+--
+-- A record is text in narinfo's `Key: value` form. Its signature is ed25519,
+-- in Nix's key format (signing.vlt), over `fingerprint`; the cache signs it
+-- with the key its narinfos are signed with, and a consumer verifies it with
+-- the `trusted-public-keys` it already has. Every function here is pure: what
+-- is fetched, and from where, is the consumer's.
+
+import crate::hash::{digest, to_base16}
+import crate::signing::{PublicKey, SecretKey, sign, verify}
+import crate::storepath::{in_store, is_derivation}
+
+-- The version of the key and the fingerprint. A new one never matches an old one.
+export const VERSION : &str = "veval-1"
+
+-- The flake-reference form every producer and consumer evaluates.
+export const FORM : &str = "git+file?rev"
+
+-- What an evaluation is keyed on.
+export data Key
+  { export commit String
+  , export tree String
+  , export lock String
+  , export host String
+  , export nix String
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- A record: the key, what the evaluation produced, and how long it took.
+export data Record
+  { export key Key
+  , export drv String
+  , export out String
+  , export eval_secs u64
+  , export sigs Vec<String>
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- How every producer and consumer computes the key's parts, so they agree:
+-- `git rev-parse <tree_spec>` and `git rev-parse <lock_spec>` in the clone
+-- the commit is evaluated from, and `nix_version_of` the output of the
+-- evaluating `nix --version`.
+export tree_spec : &str -> String
+tree_spec sha = "#{sha}^{tree}"
+
+export lock_spec : &str -> String
+lock_spec sha = "#{sha}:flake.lock"
+
+export nix_version_of : &str -> String
+nix_version_of output = output.lines () |> .next |> .unwrap_or "" |> .trim |> .to_string
+
+-- The key from those outputs, when it is one.
+export key_of : &str -> &str -> &str -> &str -> &str -> Result<Key, String>
+key_of commit tree lock host nix_output =
+  k = Key { commit = commit.trim ().to_string (), tree = tree.trim ().to_string (), lock = lock.trim ().to_string (), host = host.to_string (), nix = nix_version_of nix_output }
+  case key_problem (&k) of
+    Some why -> Err why
+    None -> Ok k
+
+-- Lowercase hex digits only.
+is_hex : &str -> bool
+is_hex s = s.chars () |> .all (\c -> c.is_ascii_digit () || ('a' <= c && c <= 'f'))
+
+-- A git object id: 40 (SHA-1) or 64 (SHA-256) lowercase hex digits.
+export is_object_id : &str -> bool
+is_object_id s =
+  (s.len () == 40 || s.len () == 64) && is_hex s
+
+-- A host attribute name: what the fleet names hosts with.
+export is_host_name : &str -> bool
+is_host_name s =
+  ok = s.chars () |> .all (\c -> c.is_ascii_alphanumeric () || c == '-' || c == '_')
+  !(s.is_empty ()) && s.len () <= 63 && ok
+
+-- One line of printable text with no field separator in it.
+is_plain : &str -> bool
+is_plain s =
+  ok = s.chars () |> .all (\c -> !(c.is_control ()) && c != ';')
+  !(s.trim ().is_empty ()) && s.len () <= 200 && s == s.trim () && ok
+
+-- Why a key is not one, if it is not.
+export key_problem : &Key -> Option<String>
+key_problem k =
+  if !(is_object_id (&k.commit))
+    Some ("commit #{k.commit:?} is not a git object id")
+  else if !(is_object_id (&k.tree))
+    Some ("tree #{k.tree:?} is not a git object id")
+  else if !(is_object_id (&k.lock))
+    Some ("flake.lock #{k.lock:?} is not a git object id")
+  else if !(is_host_name (&k.host))
+    Some ("host #{k.host:?} is not a host name")
+  else if !(is_plain (&k.nix))
+    Some ("nix version #{k.nix:?} is not one plain line")
+  else
+    None
+
+-- The key's id, the record's name: sha256 over every field, base16. Each
+-- field is validated (no separators, no newlines), so the text is unambiguous.
+export key_id : &Key -> String
+key_id k =
+  text = "#{VERSION}\nform=#{FORM}\ncommit=#{k.commit}\ntree=#{k.tree}\nlock=#{k.lock}\nhost=#{k.host}\nnix=#{k.nix}\n"
+  to_base16 (&digest (text.as_bytes ()))
+
+-- Whether `s` can be a key id (and so a record's name): 64 lowercase hex digits.
+export is_key_id : &str -> bool
+is_key_id s = s.len () == 64 && is_hex s
+
+-- The record's file name, under the producer's directory and the cache's `veval/`.
+export file_name : &Key -> String
+file_name k = "#{key_id k}.veval"
+
+-- What a signature covers: the version, the key id, the derivation, the
+-- output and the eval seconds.
+export fingerprint : &Record -> String
+fingerprint r = "#{VERSION};#{key_id (&r.key)};#{r.drv};#{r.out};#{r.eval_secs}"
+
+-- Why a record is not one, if it is not.
+export record_problem : &Record -> Option<String>
+record_problem r =
+  case key_problem (&r.key) of
+    Some why -> Some why
+    None ->
+      if !(in_store (&r.drv)) || !(is_derivation (&r.drv))
+        Some ("#{r.drv:?} is not a derivation in the store")
+      else if !(in_store (&r.out)) || is_derivation (&r.out)
+        Some ("#{r.out:?} is not an output in the store")
+      else
+        None
+
+-- The record's text, in a fixed field order.
+export render : &Record -> String
+render r =
+  mut out = String::with_capacity 640
+  out.push_str (&"Version: #{VERSION}\n")
+  out.push_str (&"Key: #{key_id (&r.key)}\n")
+  out.push_str (&"Form: #{FORM}\n")
+  out.push_str (&"Commit: #{r.key.commit}\n")
+  out.push_str (&"Tree: #{r.key.tree}\n")
+  out.push_str (&"Lock: #{r.key.lock}\n")
+  out.push_str (&"Host: #{r.key.host}\n")
+  out.push_str (&"Nix: #{r.key.nix}\n")
+  out.push_str (&"Drv: #{r.drv}\n")
+  out.push_str (&"Out: #{r.out}\n")
+  out.push_str (&"EvalSeconds: #{r.eval_secs}\n")
+  for s in &r.sigs
+    out.push_str (&"Sig: #{s}\n")
+  out
+
+need : Option<String> -> &str -> Result<String, String>
+need v field = v |> .ok_or ("a veval record needs #{field}")
+
+-- Parse a record. Every field is required, `Version` and `Form` must be
+-- this module's, `Key` must be the id of the fields it names, and the record
+-- must be valid (`record_problem`). Unknown fields are refused: a record is
+-- this module's text and nothing else.
+export parse : &str -> Result<Record, String>
+parse text =
+  mut version = None : Option<String>
+  mut id = None : Option<String>
+  mut form = None : Option<String>
+  mut commit = None : Option<String>
+  mut tree = None : Option<String>
+  mut lock = None : Option<String>
+  mut host = None : Option<String>
+  mut nix = None : Option<String>
+  mut drv = None : Option<String>
+  mut out = None : Option<String>
+  mut eval = None : Option<String>
+  mut sigs = Vec::new () : Vec<String>
+  for line in text.lines ()
+    if !(line.trim ().is_empty ())
+      (field, raw) = (line.split_once ':' |> .ok_or ("not a `Field: value` line: #{line}"))?
+      value = Some (raw.trim ().to_string ())
+      if field == "Version"
+        version := value
+      else if field == "Key"
+        id := value
+      else if field == "Form"
+        form := value
+      else if field == "Commit"
+        commit := value
+      else if field == "Tree"
+        tree := value
+      else if field == "Lock"
+        lock := value
+      else if field == "Host"
+        host := value
+      else if field == "Nix"
+        nix := value
+      else if field == "Drv"
+        drv := value
+      else if field == "Out"
+        out := value
+      else if field == "EvalSeconds"
+        eval := value
+      else if field == "Sig"
+        sigs.push (raw.trim ().to_string ())
+      else
+        return Err ("unknown field #{field:?}")
+  v = (need version "Version")?
+  if v != VERSION
+    return Err ("version #{v:?}, not #{VERSION}")
+  f = (need form "Form")?
+  if f != FORM
+    return Err ("form #{f:?}, not #{FORM}")
+  key = Key { commit = (need commit "Commit")?, tree = (need tree "Tree")?, lock = (need lock "Lock")?, host = (need host "Host")?, nix = (need nix "Nix")? }
+  secs_text = (need eval "EvalSeconds")?
+  eval_secs = (secs_text.parse () : Result<u64, std::num::ParseIntError>) |> .map_err (\e -> "EvalSeconds: #{e}")
+  r = Record { key, drv = (need drv "Drv")?, out = (need out "Out")?, eval_secs = eval_secs?, sigs }
+  if record_problem (&r) is Some why
+    return Err why
+  named = (need id "Key")?
+  if named != key_id (&r.key)
+    return Err ("Key #{named} is not the id of the fields it names (#{key_id (&r.key)})")
+  Ok r
+
+-- The record with `secret`'s signature added (its other signatures kept).
+export signed : &SecretKey -> Record -> Record
+signed secret r =
+  sig = sign secret (&fingerprint (&r))
+  mut out = r
+  out.sigs.push sig
+  out
+
+-- Whether one of `keys` signed the record.
+export trusted : &[PublicKey] -> &Record -> bool
+trusted keys r =
+  fp = fingerprint r
+  r.sigs |> .iter |> .any (\s -> keys.iter () |> .any (\k -> verify k (&fp) s))
+
+-- What a consumer accepts: the text parses, is the record of `wanted` (every
+-- key field equal), and one of `keys` signed it. Anything else is a miss,
+-- with its reason; the caller evaluates for itself.
+export accept : &[PublicKey] -> &Key -> &str -> Result<Record, String>
+accept keys wanted text =
+  r = (parse text)?
+  if &r.key != wanted
+    return Err ("the record is for #{r.key.host} at #{r.key.commit} (nix #{r.key.nix}), not #{wanted.host} at #{wanted.commit} (nix #{wanted.nix})")
+  if !(trusted keys (&r))
+    return Err (.to_string "no trusted signature")
+  Ok r
+
+-- What a cache serves for the file it holds: the record, signed, after
+-- checking that it is the record of the id it was asked for. None when it is
+-- not a record of that id.
+export served : &SecretKey -> &str -> &str -> Option<String>
+served secret id text =
+  case parse text of
+    Err _ -> None
+    Ok r ->
+      if key_id (&r.key) == id
+        Some (render (&signed secret r))
+      else
+        None
+
+-- Golden tests: the key is the whole input. One changed character anywhere
+-- in the key is another id (so a record written for it is never found under
+-- the old one), and a record handed out for another key is refused.
+
+#[cfg(test)]
+sample_key : Key
+sample_key = Key {
+    commit = .to_string "20456cfc2d62540970eb9c40bc34a840da517ca7"
+    , tree = .to_string "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    , lock = .to_string "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d4"
+    , host = .to_string "mimir"
+    , nix = .to_string "nix (Nix) 2.31.2"
+    }
+
+#[cfg(test)]
+sample : Record
+sample = Record {
+    key = sample_key ()
+    , drv = .to_string "/nix/store/vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir-nixos-system-mimir-26.11.20261120.9996594.drv"
+    , out = .to_string "/nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-nixos-system-mimir-26.11.20261120.9996594"
+    , eval_secs = 32
+    , sigs = Vec::new ()
+    }
+
+-- A test key in Nix's secret key format: `name`, from a fixed seed byte.
+#[cfg(test)]
+import base64::Engine
+
+#[cfg(test)]
+key_from : String -> u8 -> crate::signing::SecretKey
+key_from name byte =
+  seed = [byte; 32] : [u8; 32]
+  sk = ed25519_dalek::SigningKey::from_bytes (&seed)
+  mut both = seed.to_vec ()
+  both.extend_from_slice (&sk.verifying_key ().to_bytes ())
+  text = "#{name}:#{base64::engine::general_purpose::STANDARD.encode (&both)}"
+  crate::signing::parse_secret_key (&text) |> .expect "the test key parses"
+
+#[cfg(test)]
+test_secret : String -> crate::signing::SecretKey
+test_secret name = key_from name 7
+
+#[cfg(test)]
+other_secret : crate::signing::SecretKey
+other_secret = key_from (.to_string "drakkar-vcache-1") 9
+
+#[cfg(test)]
+trusted_keys : Vec<PublicKey>
+trusted_keys = .to_vec ([crate::signing::public_of (&test_secret (.to_string "drakkar-vcache-1"))])
+
+#[cfg(test)]
+signed_text : String
+signed_text = render (&signed (&test_secret (.to_string "drakkar-vcache-1")) (sample ()))
+
+test "golden: the key id is fixed for a fixed key"
+  -- `printf 'veval-1\nform=git+file?rev\ncommit=…\n…nix=nix (Nix) 2.31.2\n' | sha256sum`
+  assert_eq! \-> key_id (&sample_key ()) \-> "1f733edb1b68506ea61f19f22a43e51f00b109cf81786ae68f9050be05783426"
+  assert! \-> is_key_id (&key_id (&sample_key ()))
+
+test "golden: a change in any key field is another key"
+  base = key_id (&sample_key ())
+  k = sample_key ()
+  mut changed = Vec::new () : Vec<Key>
+  changed.push (Key { commit = .to_string "20456cfc2d62540970eb9c40bc34a840da517ca8", ...k.clone () })
+  changed.push (Key { tree = .to_string "4b825dc642cb6eb9a060e54bf8d69288fbee4905", ...k.clone () })
+  changed.push (Key { lock = .to_string "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d5", ...k.clone () })
+  changed.push (Key { host = .to_string "drakkar", ...k.clone () })
+  changed.push (Key { nix = .to_string "nix (Nix) 2.31.3", ...k.clone () })
+  ids = changed |> .iter |> .map (\c -> key_id c) |> .collect : Vec<String>
+  assert! \-> ids |> .iter |> .all (\i -> i != &base)
+  mut unique = ids.clone ()
+  unique.sort ()
+  unique.dedup ()
+  assert_eq! \-> unique.len () \-> ids.len ()
+
+test "golden: a record for a changed tree or flake.lock is a miss for the old key"
+  text = signed_text ()
+  k = sample_key ()
+  assert! \-> accept (&trusted_keys ()) (&k) (&text) |> .is_ok
+  assert! \-> accept (&trusted_keys ()) (&Key { tree = .to_string "4b825dc642cb6eb9a060e54bf8d69288fbee4905", ...k.clone () }) (&text) |> .is_err
+  assert! \-> accept (&trusted_keys ()) (&Key { lock = .to_string "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d5", ...k.clone () }) (&text) |> .is_err
+  assert! \-> accept (&trusted_keys ()) (&Key { commit = .to_string "20456cfc2d62540970eb9c40bc34a840da517ca8", ...k.clone () }) (&text) |> .is_err
+  assert! \-> accept (&trusted_keys ()) (&Key { host = .to_string "drakkar", ...k.clone () }) (&text) |> .is_err
+
+test "a rendered record parses back to itself"
+  r = signed (&test_secret (.to_string "drakkar-vcache-1")) (sample ())
+  assert_eq! \-> parse (&render (&r)) \-> Ok (r.clone ())
+
+test "an unsigned, badly signed or foreign-signed record is not accepted"
+  k = sample_key ()
+  unsigned = render (&sample ())
+  assert_eq! \-> accept (&trusted_keys ()) (&k) (&unsigned) \-> Err (.to_string "no trusted signature")
+  -- The right key name, another key's bytes.
+  forged = render (&signed (&other_secret ()) (sample ()))
+  assert! \-> accept (&trusted_keys ()) (&k) (&forged) |> .is_err
+  -- A good signature, then a field changed under it.
+  text = signed_text ()
+  tampered = text.replace "znv01c9nzn3ydv9bvr33vanzcdff8bc3" "a07qj5z2ix5l034ybiy6xgzh0x3ndr8p"
+  assert! \-> accept (&trusted_keys ()) (&k) (&tampered) |> .is_err
+  slower = text.replace "EvalSeconds: 32" "EvalSeconds: 3200"
+  assert! \-> accept (&trusted_keys ()) (&k) (&slower) |> .is_err
+  -- No trusted keys at all.
+  assert! \-> accept (&[]) (&k) (&text) |> .is_err
+
+test "garbage, a wrong version, a wrong id and unknown fields are refused"
+  k = sample_key ()
+  text = signed_text ()
+  assert! \-> accept (&trusted_keys ()) (&k) "" |> .is_err
+  assert! \-> accept (&trusted_keys ()) (&k) "<html>not found</html>" |> .is_err
+  assert! \-> parse (&text.replace "Version: veval-1" "Version: veval-2") |> .is_err
+  assert! \-> parse (&text.replace "Form: git+file?rev" "Form: path") |> .is_err
+  assert! \-> parse (&"#{text}Extra: 1\n") |> .is_err
+  id = key_id (&k)
+  assert! \-> parse (&text.replace (&id) (&"0".repeat 64)) |> .is_err
+  assert! \-> parse (&text.replace "Drv: /nix/store/vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir" "Drv: /tmp/vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir") |> .is_err
+
+test "a key with a separator or a newline in a field is not a key"
+  k = sample_key ()
+  assert! \-> key_problem (&k) |> .is_none
+  assert! \-> key_problem (&Key { nix = .to_string "nix;2", ...k.clone () }) |> .is_some
+  assert! \-> key_problem (&Key { nix = .to_string "nix\nCommit: x", ...k.clone () }) |> .is_some
+  assert! \-> key_problem (&Key { host = .to_string "a b", ...k.clone () }) |> .is_some
+  assert! \-> key_problem (&Key { commit = .to_string "HEAD", ...k.clone () }) |> .is_some
+
+test "the cache serves a record signed, and only under its own id"
+  s = test_secret (.to_string "drakkar-vcache-1")
+  unsigned = render (&sample ())
+  id = key_id (&sample_key ())
+  served_text = served (&s) (&id) (&unsigned)
+  assert! \-> served_text.as_ref () |> .map (\t -> accept (&trusted_keys ()) (&sample_key ()) t |> .is_ok) |> .unwrap_or false
+  other = key_id (&Key { host = .to_string "drakkar", ...sample_key () })
+  assert_eq! \-> served (&s) (&other) (&unsigned) \-> None
+  assert_eq! \-> served (&s) (&id) "garbage" \-> None
+
+test "the key's parts, from the commands' outputs"
+  k = key_of "20456cfc2d62540970eb9c40bc34a840da517ca7\n" "4b825dc642cb6eb9a060e54bf8d69288fbee4904\n" "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d4\n" "mimir" "nix (Nix) 2.31.2\n"
+  assert_eq! \-> k \-> Ok (sample_key ())
+  assert_eq! \-> tree_spec "abc" \-> "abc^{tree}"
+  assert_eq! \-> lock_spec "abc" \-> "abc:flake.lock"
+  -- A commit without a flake.lock (git prints the spec back, or nothing) is no key.
+  assert! \-> key_of "20456cfc2d62540970eb9c40bc34a840da517ca7" "4b825dc642cb6eb9a060e54bf8d69288fbee4904" "" "mimir" "nix (Nix) 2.31.2" |> .is_err
+  assert! \-> key_of "20456cfc2d62540970eb9c40bc34a840da517ca7" "4b825dc642cb6eb9a060e54bf8d69288fbee4904" "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d4" "mimir" "" |> .is_err
