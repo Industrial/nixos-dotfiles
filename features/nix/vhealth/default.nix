@@ -26,9 +26,14 @@
 # vhealth_healthy, …) and vhealth.json into node_exporter's textfile directory
 # (features/monitoring/textfile-collector.nix).
 #
-# Sandbox: a DynamicUser with ProtectSystem=strict; its only writable path is the textfile
-# directory, through the prometheus-textfile group. It needs the network (it connects to
-# the probed services), so it is not PrivateNetwork. Command probes run inside the same
+# Sandbox: the static system user `vhealth`, with ProtectSystem=strict; its only writable
+# path is the textfile directory, through the prometheus-textfile group. Static, not a
+# DynamicUser, because vdeploy (#160) runs its post-switch `vhealth check` as the same
+# identity, outside this unit. Hosts restrict who may use the Nix daemon
+# (features/nixos/users: allowed-users = @wheel), so `vhealth` is added to
+# nix.settings.allowed-users there (access only, never trusted-users); without it the
+# nix-daemon probe is down on every such host, and vdeploy rolls every switch back.
+# It needs the network (it connects to the probed services), so it is not PrivateNetwork. Command probes run inside the same
 # sandbox, as that user.
 #
 # Health probe (run on the host):
@@ -42,6 +47,12 @@
 }: let
   inherit (lib) mkOption types;
   cfg = config.features.nix.vhealth;
+  # Whether something restricts nix.settings.allowed-users on this host: the users feature
+  # (profiles/base.nix, every host) or the STIG control. Read from those switches, not from
+  # the merged list, which this module adds to.
+  restricted =
+    lib.attrByPath ["features" "nixos" "users" "enable"] false config
+    || cfg.restrictedNixUsers;
   vhealth = pkgs.callPackage ../../../rust/tools/vhealth/default.nix {};
   textfileDir = "/var/lib/prometheus-node-exporter-text";
 
@@ -90,6 +101,15 @@ in {
   # features.nix.vhealth.probes is common/vhealth-probes.nix's, imported above (and by
   # every feature that declares a probe).
   options.features.nix.vhealth = {
+    restrictedNixUsers = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Set where nix.settings.allowed-users is restricted by something other than
+        features/nixos/users (which is detected): the STIG control V-268152, a test. Then
+        `vhealth` is added to the list, as it is wherever the users feature is on.
+      '';
+    };
     interval = mkOption {
       type = types.strMatching "[0-9]+[smhdw]?";
       default = "1m";
@@ -112,7 +132,7 @@ in {
       cfg.probes;
 
     # The Nix daemon, on every vhealth host: a real query through the daemon socket, as a
-    # non-root user (vhealth's DynamicUser). A socket unit can be active, and a connect
+    # non-root user (the `vhealth` user). A socket unit can be active, and a connect
     # can succeed, while nothing behind it answers: on 2026-11-21 a proxy held the socket
     # after a live switch and the daemon never re-bound, so every non-root `nix` call got
     # "Connection reset by peer" while systemd reported nothing wrong.
@@ -125,6 +145,19 @@ in {
 
     environment.systemPackages = [vhealth];
     environment.etc."vhealth/probes.json".source = probesFile;
+
+    # The identity the probes run as: this daemon, and vdeploy's post-switch check.
+    users.users.vhealth = {
+      isSystemUser = true;
+      group = "vhealth";
+      description = "vhealth probes";
+    };
+    users.groups.vhealth = {};
+    # It may use the Nix daemon, merged into whatever the host allows (features/nixos/users
+    # sets ["@wheel"], STIG V-268152 ["root" "@wheel"]); never trusted-users. Only where
+    # the list is restricted: a definition here alone would replace nixpkgs' ["*"] with
+    # ["vhealth"] and lock everyone else out.
+    nix.settings.allowed-users = lib.mkIf restricted ["vhealth"];
 
     systemd.services.vhealth = {
       description = "vhealth: the host's services probed, into node_exporter";
@@ -149,7 +182,8 @@ in {
         Restart = "always";
         RestartSec = "10s";
 
-        DynamicUser = true;
+        User = "vhealth";
+        Group = "vhealth";
         SupplementaryGroups = ["prometheus-textfile"];
         # node_exporter (its own user) reads what is written: 0644 files.
         UMask = "0022";

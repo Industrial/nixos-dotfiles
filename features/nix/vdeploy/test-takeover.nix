@@ -120,9 +120,14 @@ in
         };
 
         nix.settings.experimental-features = ["nix-command"];
+        # drakkar's restriction (features/nixos/users): only wheel, and vhealth, may use the
+        # Nix daemon. alice is in wheel, like tom.
+        nix.settings.allowed-users = ["@wheel"];
+        features.nix.vhealth.restrictedNixUsers = true;
         users.users.alice = {
           isNormalUser = true;
           uid = 1000;
+          extraGroups = ["wheel"];
         };
         services.prometheus.exporters.node.enable = true;
         environment.systemPackages = [pkgs.curl pkgs.jq];
@@ -198,6 +203,8 @@ in
           l = last()
           t.assertEqual((l["result"], l["toplevel"], l["prev"]), ("switched", good, takeover))
           t.assertTrue(l["health"]["healthy"], l)
+          # Under drakkar's allowed-users, as the vhealth user: the daemon answered.
+          machine.fail("journalctl -u nix-daemon -o cat | grep -q 'is not allowed to connect'")
           t.assertEqual(machine.succeed("readlink -f /nix/var/nix/profiles/system").strip(), good)
           machine.fail("test -e /var/lib/vdeploy/inflight.json")
           machine.fail("systemctl is-active comin.service")

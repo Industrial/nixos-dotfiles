@@ -88,10 +88,11 @@
     "/nix/var/nix/profiles/system"
     "--gcroot"
     "${gcroots}/candidate"
-    # The probes run as nobody, as vhealth's own daemon runs them: a Nix daemon that
-    # answers root but not other users is not healthy.
+    # The probes run as `vhealth` (features/nix/vhealth's static user, allowed to use the
+    # Nix daemon), as vhealth's own daemon runs them: a Nix daemon that answers root but
+    # not other users is not healthy. Never nobody: hosts restrict allowed-users.
     "--health-as"
-    "nobody"
+    "vhealth"
     "--setpriv"
     "${pkgs.util-linux}/bin/setpriv"
   ];
@@ -276,7 +277,9 @@ in {
           IOSchedulingPriority = 7;
 
           StateDirectory = "vdeploy";
-          StateDirectoryMode = "0750";
+          # Readable by users: last.json, deploys.jsonl and plan.json hold no secrets, and
+          # are how a user (or an agent, without root) sees what vdeploy did.
+          StateDirectoryMode = "0755";
           # node_exporter (its own user) reads what is written: 0644 files.
           UMask = "0022";
 

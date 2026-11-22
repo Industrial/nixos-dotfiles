@@ -155,9 +155,9 @@ in
       assay.eq [(dargAfter "--gcroot") (builtins.elem "d /nix/var/nix/gcroots/vdeploy 0755 root root - -" deployed.systemd.tmpfiles.rules)] ["/nix/var/nix/gcroots/vdeploy/candidate" true];
     profileToolsPinned =
       assay.eq [(lib.hasSuffix "/bin/nix-env" (dargAfter "--nix-env")) (lib.hasSuffix "/bin/nix-store" (dargAfter "--nix-store"))] [true true];
-    # The probes run as nobody (setpriv), as vhealth's own daemon runs them.
-    healthAsNobody =
-      assay.eq [(dargAfter "--health-as") (lib.hasSuffix "/bin/setpriv" (dargAfter "--setpriv"))] ["nobody" true];
+    # The probes run as the vhealth user (setpriv), as vhealth's own daemon runs them.
+    healthAsVhealth =
+      assay.eq [(dargAfter "--health-as") (lib.hasSuffix "/bin/setpriv" (dargAfter "--setpriv"))] ["vhealth" true];
     # The by-hand apply, the same transient unit the daemon uses; deploy mode only.
     applyWrapper = assay.eq [(nixos.hasPackage deployed "vdeploy-apply") (nixos.hasPackage cfg "vdeploy-apply")] [true false];
     # comin is demoted: forced off, whatever the host says.
