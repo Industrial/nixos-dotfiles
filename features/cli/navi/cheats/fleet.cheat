@@ -1,6 +1,7 @@
 % dotfiles, fleet, deploy
 
-; Read out of bin/fleet, docs/runbooks/fleet-deploy.md, docs/runbooks/nix-remote-build.md and
+; Read out of bin/fleet (vdeploy wake by default, deploy-rs behind --legacy),
+; docs/runbooks/fleet-deploy.md, docs/runbooks/nix-remote-build.md and
 ; flake.nix (deploy.nodes, magicRollback = false, autoRollback = false).
 
 # SSH reachability probe for every fleet host, over Tailscale
@@ -9,17 +10,20 @@ bin/fleet status
 # nix flake check, then deploy-rs --dry-activate against one host
 bin/fleet check <host>
 
-# Dry-activate one host; always this first, because there is no automatic rollback on this fleet
-bin/fleet deploy <host> --dry-activate
-
-# Activate one host for real
+# Wake vdeploy on one host: it polls main now and deploys it, health-checked
 bin/fleet deploy <host>
 
-# Activate every host, carrying on past one that is unreachable
-bin/fleet deploy all
+# Wake every host, carrying on past one that is unreachable
+bin/fleet deploy all --timeout 900
 
-# The deploy-rs invocation bin/fleet wraps
-nix run --accept-flake-config github:serokell/deploy-rs -- ".#<host>" --skip-checks
+# The rollback path: deploy-rs, dry-activate one host first (no automatic rollback on this fleet)
+bin/fleet deploy <host> --legacy --dry-activate
+
+# The rollback path, for real: deploy-rs against one host
+bin/fleet deploy <host> --legacy
+
+# The deploy-rs invocation `fleet deploy --legacy` wraps: the flake's locked input, never a GitHub ref
+nix run --accept-flake-config --inputs-from . deploy-rs -- ".#<host>" --skip-checks
 
 # Roll back a host by hand: flake.nix sets magicRollback and autoRollback false, so a failed activation stays applied
 sudo nixos-rebuild switch --rollback

@@ -153,7 +153,9 @@ in
     # The point of the feature. Generic help already knows about tar; only this repo knows these.
     coversTheHostEvalIdiom =
       assay.eq (has allSheets "nix eval --raw \".#nixosConfigurations.<host>.config.system.build.toplevel.drvPath\"") true;
-    coversFleetDeploy = assay.eq (has allSheets "bin/fleet deploy <host> --dry-activate") true;
+    coversFleetDeploy = assay.eq (has allSheets "bin/fleet deploy <host> --legacy --dry-activate") true;
+    # #143: the rollback is the flake's locked deploy-rs, so no sheet hands out an unpinned one.
+    noUnpinnedDeployRs = assay.eq (has allSheets "github:serokell/deploy-rs") false;
     coversAssay = assay.eq (has allSheets "devenv shell -- assay run <path>") true;
     coversCoverageCheck = assay.eq (has allSheets "./bin/assay-coverage-check") true;
     coversStigVmTests = assay.eq (has allSheets "STIG_VM=1 bin/ci/stig") true;
