@@ -20,8 +20,12 @@
 # vhealth is on (`vhealth`, as vdeploy's apply uses: restricted Nix daemons refuse
 # `nobody`).
 #
-# Take-over rollback: `features.cli.vswitch.enable = lib.mkForce false;` on a host brings nh
-# back (profiles/cli-core.nix), and bin/update/system falls back to nixos-rebuild.
+# While another apply runs (vdeploy, or a second vswitch), vswitch stops before sudo and
+# says so; nothing is activated or marked. Only `switch` (vdeploy's apply) can mark a
+# generation bad, and a mark is per store path (that exact generation), never per commit.
+#
+# Take-over rollback: `features.cli.vswitch.enable = lib.mkForce false;` on a host, and
+# bin/update/system falls back to nixos-rebuild; nh stays installed (profiles/cli-core.nix).
 {
   config,
   lib,

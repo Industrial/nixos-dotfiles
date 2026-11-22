@@ -57,11 +57,12 @@
 
     # Nix Tooling
     features.cli.assay.enable = true;
-    # vswitch is the local rebuild (GH-241): bin/update/system switches through it, and nh
-    # is its rollback, installed only when a host turns vswitch off
-    # (`features.cli.vswitch.enable = lib.mkForce false;`).
+    # vswitch is the local rebuild (GH-241): bin/update/system switches through it. nh stays
+    # installed off the default path (nothing calls it), so it works as the rollback at once;
+    # `features.cli.vswitch.enable = lib.mkForce false;` sends bin/update/system back to
+    # nixos-rebuild.
     features.cli.vswitch.enable = true;
-    features.cli.nh.enable = lib.mkDefault (!config.features.cli.vswitch.enable);
+    features.cli.nh.enable = true;
     features.cli.nix-index.enable = true;
     features.cli.nixdrv.enable = true;
     features.cli.nixfetch.enable = true;

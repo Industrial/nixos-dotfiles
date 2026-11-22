@@ -77,10 +77,24 @@ when the host runs vhealth (restricted Nix daemons refuse `nobody`).
 
 ## Take-over and rollback
 
-`profiles/cli-core.nix` enables `features.cli.vswitch` and turns `features.cli.nh` off;
-`bin/update/system` switches through vswitch. The rollback is one option:
-`features.cli.vswitch.enable = lib.mkForce false;` brings nh back and `bin/update/system`
-falls back to `nixos-rebuild` (asserted in `profiles/cli-core.assay.nix`).
+`profiles/cli-core.nix` enables `features.cli.vswitch`, and `bin/update/system` switches
+through it. nh stays installed off the default path (nothing calls it), so the rollback has
+a working tool at once. The rollback is one option: `features.cli.vswitch.enable =
+lib.mkForce false;` sends `bin/update/system` back to `nixos-rebuild` (asserted in
+`profiles/cli-core.assay.nix` and `bin/dev.d/test.sh`).
+
+## Bad marks and the shared unit
+
+- Only `switch` runs vdeploy's apply, so only `switch` can mark a generation bad. `test`
+  and `boot` never write the ledger. A mark names a **store path** (that exact
+  generation), not a commit. vdeploy refusing it later is intended: the same closure
+  failed the same host's health check. A commit whose generation differs is unaffected,
+  and switching to the marked generation by other means clears the mark (vdeploy's own
+  rule for the running generation).
+- When `vdeploy-apply.service` is already running (vdeploy, or another vswitch), vswitch
+  stops before elevating, says so, and touches nothing: no activation, no mark, no
+  rollback of the other's switch. A start that races past that check is refused by
+  systemd itself, because a unit of that name already exists.
 
 ## Tests
 

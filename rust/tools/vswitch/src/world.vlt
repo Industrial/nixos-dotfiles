@@ -22,6 +22,7 @@ import id_effect::{Effect, HNil, Never, fail, succeed, suspend}
 import crate::common::SwitchError
 import crate::common::SwitchError::{Activate, Build}
 import crate::common::lifted
+import crate::plan::UNIT
 import vdiff::closure::{both, resolve}
 import vdiff::report::{diff, render_text}
 
@@ -33,6 +34,7 @@ export class World
   show_diff : &self -> String -> String -> Effect<(), Never, HNil>
   ask : &self -> String -> Effect<bool, Never, HNil>
   say : &self -> String -> Effect<(), Never, HNil>
+  busy : &self -> Effect<bool, Never, HNil>
 
 export newtype WorldTool = WorldTool (export Arc<dyn World + Send + Sync>)
 
@@ -41,11 +43,11 @@ instance Clone WorldTool
   clone self = WorldTool (Arc::clone (&self.0))
 
 -- The live host: the running system's link, the boot profile and the store database.
-export data Live { export current String, export profile String, export db String }
+export data Live { export current String, export profile String, export db String, export systemctl String }
   deriving (Debug, Clone)
 
-export live : String -> Live
-live db = Live { current = .to_string "/run/current-system", profile = .to_string "/nix/var/nix/profiles/system", db }
+export live : String -> String -> Live
+live db systemctl = Live { current = .to_string "/run/current-system", profile = .to_string "/nix/var/nix/profiles/system", db, systemctl }
 
 -- Run a command with our stdio; its failure as a message.
 ran : &[String] -> Result<(), String>
@@ -63,6 +65,18 @@ canonical : &str -> Result<String, String>
 canonical link =
   path = (fs::canonicalize link |> .map_err (\e -> "#{link}: #{e}"))?
   Ok (path.to_string_lossy () |> .to_string)
+
+-- The boot default, or "" when there is no system profile yet (a fresh
+-- install, a VM booted from its own closure): no boot default, so any `boot`
+-- or `switch` sets one.
+export boot_default : &str -> String
+boot_default profile = canonical profile |> .unwrap_or_default
+
+-- Whether the activation unit is running now (vdeploy, or another vswitch, is
+-- switching this host). Read as the caller: no root needed.
+unit_running : &str -> bool
+unit_running systemctl =
+  Command::new systemctl |> .args ([.to_string "is-active", .to_string "--quiet", "#{UNIT}.service"]) |> .status () |> .map (\s -> s.success ()) |> .unwrap_or false
 
 built : Vec<String> -> String -> Result<String, SwitchError>
 built cmd link =
@@ -104,7 +118,7 @@ instance World Live
   state self =
     current = self.current.clone ()
     profile = self.profile.clone ()
-    suspend (move \-> lifted (canonical (&current) |> .and_then (\c -> canonical (&profile) |> .map (\p -> (c, p))) |> .map_err (\e -> Activate ("the running system: #{e}"))))
+    suspend (move \-> lifted (canonical (&current) |> .map (\c -> (c, boot_default (&profile))) |> .map_err (\e -> Activate ("the running system: #{e}"))))
   show_diff : &self -> String -> String -> Effect<(), Never, HNil>
   show_diff self old new =
     db = self.db.clone ()
@@ -115,6 +129,10 @@ instance World Live
   say : &self -> String -> Effect<(), Never, HNil>
   say self line =
     suspend (move \-> succeed (eprintln! \-> "#{line}"))
+  busy : &self -> Effect<bool, Never, HNil>
+  busy self =
+    systemctl = self.systemctl.clone ()
+    suspend (move \-> succeed (unit_running (&systemctl)))
 
 -- A scripted host, for tests: the build yields `built` (or fails when it is
 -- None), a run of a command containing a word in `failing` fails, `answer` is
@@ -125,6 +143,7 @@ export data Scripted
   , export profile String
   , export failing Vec<String>
   , export answer bool
+  , export busy bool
   , export log Arc<Mutex<Vec<String>>>
   }
   deriving (Clone, Default)
@@ -172,3 +191,8 @@ instance World Scripted
   say self line =
     noted (&self.log) ("say #{line}")
     succeed (())
+  busy : &self -> Effect<bool, Never, HNil>
+  busy self = succeed self.busy
+
+test "no system profile yet (a fresh install): no boot default, not an error"
+  assert_eq! \-> boot_default "/nonexistent/vswitch/profiles/system" \-> String::new ()

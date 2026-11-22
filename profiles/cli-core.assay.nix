@@ -64,12 +64,13 @@ in
     nixTreeRollsBack = assay.eq [(builtins.elem "cli.vwhy" rolledBack) (builtins.elem "cli.nix-tree" rolledBack)] [true true];
 
     # vswitch took over from nh and nixos-rebuild (GH-241): bin/update/system switches
-    # through it, and nh is not installed beside it.
-    vswitchReplacesNh = assay.eq [(has "cli.vswitch") (has "cli.nh")] [true false];
+    # through it (bin/dev.d/test.sh checks the script). nh stays installed off the default
+    # path, so the rollback has a working tool the moment it is needed.
+    vswitchIsTheDefaultNhKept = assay.eq [(has "cli.vswitch") (has "cli.nh")] [true true];
 
-    # The rollback is one option: a host that turns vswitch off gets nh back (and
-    # bin/update/system falls back to nixos-rebuild), with nothing else to change.
-    rollbackRestoresNh = let
+    # The rollback is one option: a host that turns vswitch off still has nh, and
+    # bin/update/system falls back to nixos-rebuild, with nothing else to change.
+    rollbackKeepsNh = let
       off = features.enabledFeatures (features.evalSelection {
         modules = [
           ({lib, ...}: {

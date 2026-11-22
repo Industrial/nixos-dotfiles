@@ -141,16 +141,22 @@ in
       non_root("base")
       base = current()
       good, broken = gen("good"), gen("broken")
+      # A test VM boots its closure with no system profile at all (as a fresh install has
+      # none): vswitch reads that as "no boot default", not as an error.
+      boot_default = profile()
+
+      def marks():
+          return machine.succeed("ls /var/lib/vdeploy/bad 2>/dev/null || true").split()
 
       with subtest("build needs no root: it only resolves and diffs"):
           out = machine.succeed(alice(f"vswitch build --toplevel {good} 2>&1"))
           t.assertIn(f"built {good}", out)
-          t.assertEqual((current(), profile()), (base, base))
+          t.assertEqual((current(), profile()), (base, boot_default))
 
       with subtest("a vhealth failure rolls back, the boot default never moves, and it is marked bad"):
           machine.fail(alice(f"vswitch switch --toplevel {broken} --health-window 10s"))
           t.assertEqual(current(), base)
-          t.assertEqual(profile(), base)
+          t.assertEqual(profile(), boot_default)
           l = last()
           t.assertEqual((l["result"], l["toplevel"], l["prev"]), ("rolled-back", broken, base), l)
           t.assertEqual(l["health"]["failing"], ["dead-port"], l)
@@ -176,6 +182,25 @@ in
           t.assertIn("Closure size:", out)
           non_root("good")
 
+      with subtest("while vdeploy is mid-apply, vswitch stops at once, says why, and touches nothing"):
+          # A stand-in for vdeploy's apply: the same transient unit name, still running.
+          machine.succeed("systemd-run --unit=vdeploy-apply --service-type=exec --collect sleep 300")
+          machine.wait_until_succeeds("systemctl is-active vdeploy-apply.service", timeout=30)
+          before = marks()
+          for verb in ["switch", "test", "boot"]:
+              # `timeout`: a hang is a failure too; --elevate false: it must not get as far as sudo.
+              status, out = machine.execute(alice(f"timeout 60 vswitch {verb} --toplevel {base} --elevate /run/current-system/sw/bin/false 2>&1"))
+              t.assertEqual(status, 1, out)
+              t.assertIn("vdeploy-apply.service is running", out)
+              t.assertEqual((current(), profile()), (good, good))
+          # The other's switch is not rolled back or stopped, and no mark was written.
+          machine.succeed("systemctl is-active vdeploy-apply.service")
+          t.assertEqual(marks(), before)
+          # A start that raced past the check is refused by systemd itself, at once.
+          machine.fail("timeout 30 systemd-run --unit=vdeploy-apply --wait --quiet true")
+          machine.succeed("systemctl stop vdeploy-apply.service")
+          non_root("good")
+
       with subtest("switching to the running generation is a no-op"):
           out = machine.succeed(alice(f"vswitch switch --toplevel {good} --elevate /run/current-system/sw/bin/false 2>&1"))
           t.assertIn("nothing to switch", out)
@@ -190,6 +215,9 @@ in
           machine.succeed(alice(f"vswitch boot --toplevel {base}"))
           t.assertEqual((current(), profile()), (base, base))
           non_root("base")
+
+      with subtest("only switch marks a generation bad; test and boot never write the ledger"):
+          t.assertEqual(marks(), [broken.removeprefix("/nix/store/")])
 
       with subtest("every activation ran in vdeploy's unit"):
           machine.succeed("journalctl -o cat | grep -qF 'vswitch switch: '")

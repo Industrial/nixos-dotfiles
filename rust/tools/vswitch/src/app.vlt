@@ -38,9 +38,26 @@ export data Run
   }
   deriving (Debug, Clone, PartialEq, Eq)
 
--- Step 5.
+-- Step 5. The unit is vdeploy's: when it runs, vdeploy (or another vswitch)
+-- is switching this host, and this run stops here, before any elevation,
+-- touching nothing. (A start that races past this check is refused by
+-- systemd itself, as a unit that already exists: still nothing touched.)
+export const BUSY : &str = "vdeploy-apply.service is running: vdeploy or another vswitch is switching this host now. Nothing was activated; run vswitch again when it has finished (journalctl -fu vdeploy-apply)."
+
 activated : WorldTool -> Run -> Verb -> String -> Effect<(), SwitchError, HNil>
 activated w r v x =
+  w2 = w.clone ()
+  w.0.busy () |> .widen |> .flat_map (move \b -> launched w2 r v x b)
+
+launched : WorldTool -> Run -> Verb -> String -> bool -> Effect<(), SwitchError, HNil>
+launched w r v x busy =
+  if busy
+    fail (Activate (BUSY.to_string ()))
+  else
+    started w r v x
+
+started : WorldTool -> Run -> Verb -> String -> Effect<(), SwitchError, HNil>
+started w r v x =
   a = Activation { verb = v, toplevel = x, program = r.program.clone (), state_dir = r.state_dir.clone (), health_window = r.health_window.clone (), health_as = r.health_as.clone () }
   w.0.run (activation_command (&r.tools) (&a) r.root)
 
@@ -188,7 +205,7 @@ program parsed =
     Ok (Command::Run o) ->
       db = o.db.clone ()
       r = suspend (move \-> succeed (run_of o))
-      r |> .flat_map (move \run -> switched (WorldTool (Arc::new (live db))) run)
+      r |> .flat_map (move \run -> switched (WorldTool (Arc::new (live db (run.tools.systemctl.clone ())))) run)
 
 -- On a fiber of the runtime's executor (as rust/tools/vdeploy's app.vlt):
 -- `run_main` polls its root outside the executor's context.
@@ -290,6 +307,22 @@ test "a rolled-back apply fails the run; a given toplevel is not built"
   assert! \-> !(log_of (&w) |> .iter |> .any (\l -> l.starts_with "build "))
   first_run = runs (&w)
   assert! \-> first_run[0].contains "--toplevel /nix/store/given"
+
+test "while vdeploy-apply runs, nothing is elevated or activated, and the error says why"
+  w = Scripted { busy = true, ...world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new") }
+  for verb in [Verb::Switch, Verb::Test, Verb::Boot]
+    out = ran_in (w.clone ()) (run_for verb)
+    assert! \-> out |> .err |> .map (\e -> e.contains "vdeploy-apply.service is running") |> .unwrap_or false
+  assert! \-> runs (&w) |> .is_empty
+  -- Build and dry do not need the unit, so they still run.
+  assert! \-> ran_in (w.clone ()) (run_for Verb::Build) |> .is_ok
+
+test "only switch can mark a generation bad: test and boot are not vdeploy's apply"
+  w = world "/nix/store/old" "/nix/store/old" (Some "/nix/store/new")
+  assert! \-> ran_in (w.clone ()) (run_for Verb::Test) |> .is_ok
+  assert! \-> ran_in (w.clone ()) (run_for Verb::Boot) |> .is_ok
+  for line in runs (&w)
+    assert! \-> !(line.contains " apply ") && line.contains " activate "
 
 test "the activate subcommand's arguments"
   a = activate_of (&.to_vec ([.to_string "boot", .to_string "/x", .to_string "--nix-env", .to_string "/n/nix-env"])) |> .expect "activate"
