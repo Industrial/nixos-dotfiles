@@ -104,6 +104,10 @@ export data Status
   , export failed u64
   , export skipped u64
   , export unverified u64
+  , export cache_hits u64
+  , export cache_misses u64
+  , export cache_fallbacks u64
+  , export cache_saved u64
   , export last_plan Option<u64>
   , export last_duration f64
   , export pending bool
@@ -133,6 +137,10 @@ export data Totals
   , export failed u64
   , export skipped u64
   , export unverified u64
+  , export cache_hits u64
+  , export cache_misses u64
+  , export cache_fallbacks u64
+  , export cache_saved u64
   }
   deriving (Debug, Clone, Default, PartialEq, Eq)
 
@@ -140,7 +148,7 @@ export data Totals
 export totals_of : &Status -> Totals
 totals_of st =
   b = &st.base
-  Totals { polls = b.polls + st.watch.polls, poll_failures = b.poll_failures + st.poll_failures, head_changes = b.head_changes + st.watch.changes, started = b.started + st.started, finished = b.finished + st.finished, failed = b.failed + st.failed, skipped = b.skipped + st.skipped, unverified = b.unverified + st.unverified }
+  Totals { polls = b.polls + st.watch.polls, poll_failures = b.poll_failures + st.poll_failures, head_changes = b.head_changes + st.watch.changes, started = b.started + st.started, finished = b.finished + st.finished, failed = b.failed + st.failed, skipped = b.skipped + st.skipped, unverified = b.unverified + st.unverified, cache_hits = b.cache_hits + st.cache_hits, cache_misses = b.cache_misses + st.cache_misses, cache_fallbacks = b.cache_fallbacks + st.cache_fallbacks, cache_saved = b.cache_saved + st.cache_saved }
 
 -- The worker took `head` (at change count `changes`): it is done whatever
 -- the plan's outcome, so a failing commit is not retried until main moves.
@@ -167,6 +175,18 @@ finished_with st pending out at secs =
 export failed_with : Status -> u64 -> f64 -> Status
 failed_with st at secs =
   Status { finished = st.finished + 1, failed = st.failed + 1, last_plan = Some at, last_duration = secs, ...st }
+
+-- The eval cache (GH-243): a hit saves the record's eval seconds; a miss
+-- evaluated as without the cache; a fallback is a record that was refused
+-- after it was accepted (its narinfo, or the realised path, disagreed).
+export cache_hit_with : Status -> u64 -> Status
+cache_hit_with st saved = Status { cache_hits = st.cache_hits + 1, cache_saved = st.cache_saved + saved, ...st }
+
+export cache_miss_with : Status -> Status
+cache_miss_with st = Status { cache_misses = st.cache_misses + 1, ...st }
+
+export cache_fallback_with : Status -> Status
+cache_fallback_with st = Status { cache_fallbacks = st.cache_fallbacks + 1, ...st }
 
 #[cfg(test)]
 head : &str -> Head

@@ -23,6 +23,9 @@ import crate::common::{DeployError, now_secs}
 import crate::dotfiles::{Checkout, state_name}
 import crate::report::{Plan, SAME, json_of, line_of, publish_metrics, publish_plan, publish_totals, totals_in}
 import crate::wake::{Wakes, publish_status, reader, waited, wakes}
+import crate::evalcache::{Lookup, cache_said}
+import nix_store_core::veval::Record
+import crate::watch::{cache_fallback_with, cache_hit_with, cache_miss_with}
 import crate::watch::{Decision, Head, Status, decide, failed_with, finished_with, observed, refused_with, taken, unobserved, woke_still}
 
 -- How the agent runs.
@@ -173,14 +176,58 @@ diffed differ old new =
   else
     differ.0.json old new |> .map (\j -> (Some j, String::new ())) |> .catch (\e -> succeed ((None, e.to_string ())))
 
+-- Evaluated here, then realised: the derivation, its output, and how.
+local : Caps -> String -> Effect<(String, String, String), DeployError, HNil>
+local caps sha =
+  c = caps.clone ()
+  caps.nix.0.drv sha |> .flat_map (move \drv -> realised c (drv.clone ()) |> .map (move \p -> (drv, p.0, p.1)))
+
+-- A record refused after it was accepted: counted, then evaluated here.
+fell_back : Caps -> Ref<Status> -> String -> Effect<(String, String, String), DeployError, HNil>
+fell_back caps state sha =
+  (state.update (\st -> cache_fallback_with st) : Effect<(), Never, HNil>) |> .widen |> .flat_map (move \_ -> local caps sha)
+
+missed : Caps -> Ref<Status> -> String -> Effect<(String, String, String), DeployError, HNil>
+missed caps state sha =
+  (state.update (\st -> cache_miss_with st) : Effect<(), Never, HNil>) |> .widen |> .flat_map (move \_ -> local caps sha)
+
+-- A hit, realised: kept only when the realised path is the record's out.
+checked_hit : Caps -> Ref<Status> -> String -> Record -> (String, String) -> Effect<(String, String, String), DeployError, HNil>
+checked_hit caps state sha r got =
+  (out, how) = got
+  if out == r.out
+    saved = r.eval_secs
+    drv = r.drv.clone ()
+    (state.update (move \st -> cache_hit_with st saved) : Effect<(), Never, HNil>) |> .widen |> .map (move \_ -> (drv, out, how))
+  else
+    eprintln! \-> "vdeploy: eval cache record refused, evaluating: #{r.drv} realised #{out}, the record says #{r.out}"
+    fell_back caps state sha
+
+took : Caps -> Ref<Status> -> String -> Record -> Effect<(String, String, String), DeployError, HNil>
+took caps state sha r =
+  c = caps.clone ()
+  realised caps (r.drv.clone ()) |> .flat_map (move \got -> checked_hit c state sha r got)
+
+-- The derivation and its output (GH-243): vci's record of this commit when the
+-- eval cache has one this host trusts, else evaluated here. Never fails
+-- because of the cache: a miss or a refused record is a local evaluation.
+export evaluated : Caps -> Ref<Status> -> String -> Lookup -> Effect<(String, String, String), DeployError, HNil>
+evaluated caps state sha found =
+  eprintln! \-> "vdeploy: #{cache_said (&found)}"
+  case found of
+    Lookup::Hit r -> took caps state sha r
+    Lookup::Bad _ -> fell_back caps state sha
+    Lookup::Miss _ -> missed caps state sha
+    Lookup::Off -> local caps sha
+
 -- One plan for `head`: everything but the switch.
-export planned : Caps -> Settings -> Head -> u64 -> bool -> Effect<Plan, DeployError, HNil>
-planned caps s head skipped verified =
+export planned : Caps -> Settings -> Ref<Status> -> Head -> u64 -> bool -> Effect<Plan, DeployError, HNil>
+planned caps s state head skipped verified =
   effect!
     ~caps.source.0.verify(head.sha.clone());
     let running = ~caps.host.0.running();
-    let drv = ~caps.nix.0.drv(head.sha.clone());
-    let (out, how) = ~realised(caps.clone(), drv.clone());
+    let found = ~caps.nix.0.shared(head.sha.clone());
+    let (drv, out, how) = ~evaluated(caps.clone(), state.clone(), head.sha.clone(), found);
     let (diff, note) = ~diffed(caps.differ.clone(), running.toplevel.clone(), out.clone());
     Plan { host: s.host.clone(), commit: head.sha.clone(), commit_time: head.time, signed: head.signed, verified, refused: false, skipped, running_rev: running.rev.clone(), running: running.toplevel.clone(), drv, switch: out != running.toplevel, out, realised: how, diff, note, planned_at: now_secs(), deploy: s.deploy }
 
@@ -242,7 +289,7 @@ plan_cycle caps s state head changes sig =
     let skipped = ~state.modify::<u64, Never, HNil>(move |st| taken(st, sha, changes));
     eprintln!("vdeploy: planning {} for {} ({})", short(&head.sha), s.host, sig.why);
     let began = Instant::now();
-    let result = ~settled(planned(caps.clone(), s.clone(), head.clone(), skipped, sig.verified));
+    let result = ~settled(planned(caps.clone(), s.clone(), state.clone(), head.clone(), skipped, sig.verified));
     let secs = began.elapsed().as_secs_f64();
     let at = now_secs();
     match result {
@@ -596,3 +643,42 @@ test "with signatures not required (the rollback), an unsigned head is planned, 
   h = Head { sha = .to_string "c1", time = 1, signed = false }
   r = refusal (&settings 0) (&h) (&crate::signature::unverified "the commit is not signed") (crate::caps::Running { rev = None, toplevel = .to_string "/nix/store/old" }) 0
   assert! \-> json_of (&r) false |> .contains "\"signatureVerified\":false"
+
+-- The eval cache (GH-243), end to end on the test clock.
+#[cfg(test)]
+cached_run : crate::caps::Scripted -> Status
+cached_run world = verified_run (crate::caps::Scripted { cache_on = true, ...world })
+
+test "eval cache hit: vci's record is planned and deployed with no local evaluation"
+  world = crate::caps::Scripted { heads = heads 1, build_secs = 1, cached = .to_vec ([(.to_string "c1", .to_string "/nix/store/c1.drv", .to_string "/nix/store/out-c1")]), ...crate::caps::Scripted::default () }
+  st = cached_run (world.clone ())
+  assert! \-> logged (&world.evaluated) |> .is_empty
+  assert_eq! \-> logged (&world.deployer.log) \-> .to_vec ([.to_string "apply /nix/store/out-c1"])
+  assert_eq! \-> (st.cache_hits, st.cache_misses, st.cache_fallbacks, st.cache_saved, st.failed) \-> (1, 0, 0, 30, 0)
+
+test "eval cache miss: evaluated here, as without the cache, and counted"
+  world = crate::caps::Scripted { heads = heads 1, build_secs = 1, ...crate::caps::Scripted::default () }
+  st = cached_run (world.clone ())
+  assert_eq! \-> logged (&world.evaluated) \-> .to_vec ([.to_string "c1"])
+  assert_eq! \-> logged (&world.deployer.log) \-> .to_vec ([.to_string "apply /nix/store/out-c1"])
+  assert_eq! \-> (st.cache_hits, st.cache_misses, st.cache_fallbacks, st.failed) \-> (0, 1, 0, 0)
+
+test "eval cache off: evaluated here, nothing counted"
+  world = crate::caps::Scripted { heads = heads 1, build_secs = 1, ...crate::caps::Scripted::default () }
+  st = verified_run (world.clone ())
+  assert_eq! \-> logged (&world.evaluated) \-> .to_vec ([.to_string "c1"])
+  assert_eq! \-> (st.cache_hits, st.cache_misses, st.cache_fallbacks) \-> (0, 0, 0)
+
+test "a record whose drv realises another out falls back to a local evaluation, counted, and still deploys"
+  world = crate::caps::Scripted { heads = heads 1, build_secs = 1, cached = .to_vec ([(.to_string "c1", .to_string "/nix/store/c1.drv", .to_string "/nix/store/out-other")]), ...crate::caps::Scripted::default () }
+  st = cached_run (world.clone ())
+  assert_eq! \-> logged (&world.evaluated) \-> .to_vec ([.to_string "c1"])
+  assert_eq! \-> logged (&world.deployer.log) \-> .to_vec ([.to_string "apply /nix/store/out-c1"])
+  assert_eq! \-> (st.cache_hits, st.cache_fallbacks, st.failed) \-> (0, 1, 0)
+
+test "a record the cache's narinfo contradicts is refused before realising: a local evaluation, counted"
+  world = crate::caps::Scripted { heads = heads 1, build_secs = 1, bad_records = .to_vec ([.to_string "c1"]), ...crate::caps::Scripted::default () }
+  st = cached_run (world.clone ())
+  assert_eq! \-> logged (&world.evaluated) \-> .to_vec ([.to_string "c1"])
+  assert_eq! \-> logged (&world.started) \-> .to_vec ([.to_string "c1"])
+  assert_eq! \-> (st.cache_hits, st.cache_fallbacks, st.failed) \-> (0, 1, 0)

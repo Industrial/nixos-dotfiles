@@ -18,6 +18,7 @@ import crate::watch::quiet_polls_of
 import std::sync::Arc
 import crate::apply::{Apply, LiveSystem, SystemTool, accepted, apply}
 import crate::takeover::LiveDeployer
+import crate::evalcache::{Cache, off}
 
 -- The user's checkout, when vdeploy manages one.
 export checkout_of : &Options -> Option<Dotfiles>
@@ -59,8 +60,17 @@ self_exe = std::env::current_exe () |> .map (\p -> p.to_string_lossy () |> .to_s
 export deployer_of : &Options -> LiveDeployer
 deployer_of o = LiveDeployer { systemd_run = o.systemd_run.clone (), systemctl = o.systemctl.clone (), program = self_exe (), args = apply_args_of o, state_dir = state_dir_of o, comin_unit = o.comin_unit.clone (), unit = .to_string "vdeploy-apply" }
 
+-- The eval cache (GH-243): the caches and keys asked for, none with
+-- `--no-eval-cache` (or when none is given).
+export cache_of : &Options -> Cache
+cache_of o =
+  if o.no_eval_cache
+    off ()
+  else
+    Cache { urls = o.eval_cache.clone (), keys = o.eval_cache_keys.clone (), curl = o.curl.clone (), git = o.git.clone (), nix = o.nix.clone () }
+
 export caps_of : &Options -> Caps
-caps_of o = live (Wiring { git = o.git.clone (), gpgv = o.gpgv.clone (), keyring = o.trusted_keys.clone (), nix = o.nix.clone (), repo = o.repo.clone (), url = o.url.clone (), branch = o.branch.clone (), host = o.host.clone (), db = o.db.clone (), checkout = checkout_of o, deployer = deployer_of o })
+caps_of o = live (Wiring { git = o.git.clone (), gpgv = o.gpgv.clone (), keyring = o.trusted_keys.clone (), nix = o.nix.clone (), repo = o.repo.clone (), url = o.url.clone (), branch = o.branch.clone (), host = o.host.clone (), db = o.db.clone (), checkout = checkout_of o, deployer = deployer_of o, cache = cache_of o })
 
 export settings_of : &Options -> Settings
 settings_of o = Settings { host = o.host.clone (), interval = o.interval, quiet_polls = quiet_polls_of o.debounce o.interval, tick = o.tick, textfile_dir = o.textfile_dir.clone (), state_dir = o.state_dir.clone (), dotfiles = o.dotfiles.clone () |> .unwrap_or_default, deploy = o.deploy, require_signed = o.require_signed }

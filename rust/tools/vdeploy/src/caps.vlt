@@ -33,6 +33,8 @@ import crate::dotfiles::{Checkout, Dotfiles, fast_forward}
 import crate::watch::Head
 import crate::signature::{NOT_SIGNED, Signature, checked, scratch_for, unverified}
 import crate::takeover::{DeployerTool, LiveDeployer}
+import crate::evalcache::{Cache, Lookup, lookup}
+import nix_store_core::veval::{Key, Record}
 
 -- The system this host runs: its toplevel store path, and the commit it was
 -- built from (`system.configurationRevision`), when it records one.
@@ -47,6 +49,7 @@ export class Source
 
 export class Nix
   drv : &self -> String -> Effect<String, DeployError, HNil>
+  shared : &self -> String -> Effect<Lookup, Never, HNil>
 
 export class Fetcher
   fetch : &self -> String -> Effect<Option<String>, DeployError, HNil>
@@ -203,7 +206,8 @@ nix_args rest =
 export toplevel_attr : &str -> &str -> &str -> String
 toplevel_attr repo sha host = "git+file://#{repo}?rev=#{sha}#nixosConfigurations.\"#{host}\".config.system.build.toplevel.drvPath"
 
-export data LiveNix { export nix String, export repo String, export host String }
+-- `cache`: the eval cache (GH-243) the plan asks before evaluating.
+export data LiveNix { export nix String, export repo String, export host String, export cache Cache }
 
 -- The three long steps (evaluate, fetch, build) are tokio child processes
 -- (`exec`), awaited, so a build holds no executor thread and the poller keeps
@@ -214,6 +218,8 @@ instance Nix LiveNix
     attr = toplevel_attr (&self.repo) (&sha) (&self.host)
     shown = attr.clone ()
     exec (cmd (&self.nix) (nix_args (&["eval", "--raw", attr.as_str ()]))) |> .map_err (move \e -> Eval ("evaluating #{shown}: #{e}")) |> .map (\r -> r.stdout.trim () |> .to_string)
+  shared : &self -> String -> Effect<Lookup, Never, HNil>
+  shared self sha = lookup (self.cache.clone ()) (self.repo.clone ()) sha (self.host.clone ())
 
 -- The output to realise: a toplevel has one, `out`.
 export installable : &str -> String
@@ -297,13 +303,13 @@ instance Host LiveHost
     suspend (move \-> checked_out d head)
 
 -- The live capabilities.
-export data Wiring { export git String, export gpgv String, export keyring Option<String>, export nix String, export repo String, export url String, export branch String, export host String, export db String, export checkout Option<Dotfiles>, export deployer LiveDeployer }
+export data Wiring { export git String, export gpgv String, export keyring Option<String>, export nix String, export repo String, export url String, export branch String, export host String, export db String, export checkout Option<Dotfiles>, export deployer LiveDeployer, export cache Cache }
   deriving (Debug, Clone)
 
 export live : Wiring -> Caps
 live w =
   source = SourceTool (Arc::new (LiveSource { git = w.git.clone (), repo = w.repo.clone (), url = w.url.clone (), branch = w.branch.clone (), gpgv = w.gpgv.clone (), keyring = w.keyring.clone () }))
-  nix = NixTool (Arc::new (LiveNix { nix = w.nix.clone (), repo = w.repo.clone (), host = w.host.clone () }))
+  nix = NixTool (Arc::new (LiveNix { nix = w.nix.clone (), repo = w.repo.clone (), host = w.host.clone (), cache = w.cache.clone () }))
   fetcher = FetcherTool (Arc::new (NixFetcher { nix = w.nix.clone () }))
   builder = BuilderTool (Arc::new (NixBuilder { nix = w.nix.clone () }))
   differ = DifferTool (Arc::new (Vdiff { db = w.db.clone () }))
@@ -328,6 +334,10 @@ export data Scripted
   , export unsigned Vec<String>
   , export untrusted Vec<String>
   , export off_main Vec<String>
+  , export cache_on bool
+  , export cached Vec<(String, String, String)>
+  , export bad_records Vec<String>
+  , export evaluated Arc<Mutex<Vec<String>>>
   , export deployer crate::takeover::Scripted
   }
   deriving (Clone, Default)
@@ -375,9 +385,29 @@ instance Source Scripted
   commit_time : &self -> String -> Effect<Option<u64>, Never, HNil>
   commit_time self _rev = succeed (Some 0)
 
+-- A scripted eval cache (GH-243): off unless `cache_on`; then `cached`
+-- (sha, drv, out) are hits, `bad_records` refused records, the rest misses.
+unscripted : bool -> Lookup
+unscripted on =
+  if on
+    Lookup::Miss (.to_string "scripted: no record")
+  else
+    Lookup::Off
+
+export scripted_record : &str -> &str -> &str -> Record
+scripted_record sha drv out = Record { key = Key { commit = sha.to_string (), tree = "e".repeat 40, lock = "f".repeat 40, host = .to_string "scripted", nix = .to_string "nix (Nix) 2.31.2" }, drv = drv.to_string (), out = out.to_string (), eval_secs = 30, sigs = Vec::new () }
+
 instance Nix Scripted
   drv : &self -> String -> Effect<String, DeployError, HNil>
-  drv self sha = succeed ("/nix/store/#{sha}.drv")
+  drv self sha = pushed (self.evaluated.clone ()) (sha.clone ()) |> .map (move \_ -> "/nix/store/#{sha}.drv")
+  shared : &self -> String -> Effect<Lookup, Never, HNil>
+  shared self sha =
+    if self.bad_records.contains (&sha)
+      succeed (Lookup::Bad (.to_string "scripted: the narinfo names another derivation"))
+    else
+      case self.cached.iter () |> .find (\c -> c.0 == sha) of
+        Some (_, drv, out) -> succeed (Lookup::Hit (scripted_record (&sha) drv out))
+        None -> succeed (unscripted self.cache_on)
 
 instance Fetcher Scripted
   fetch : &self -> String -> Effect<Option<String>, DeployError, HNil>

@@ -169,6 +169,10 @@ metrics st =
   out.push_str (&counter "vdeploy_plans_failed_total" "Plans that failed (evaluation, realisation, verification)." t.failed)
   out.push_str (&counter "vdeploy_commits_skipped_total" "Commits on main never planned, because a newer one landed first (latest-wins)." t.skipped)
   out.push_str (&counter "vdeploy_commits_unverified_total" "Heads of main refused, never planned, because their signature did not verify against the trusted keys." t.unverified)
+  out.push_str (&counter "vdeploy_eval_cache_hits_total" "Plans that took vci's signed evaluation record instead of evaluating (GH-243)." t.cache_hits)
+  out.push_str (&counter "vdeploy_eval_cache_misses_total" "Plans that found no usable record and evaluated (no record, unsigned, badly signed, another key, the out not cached)." t.cache_misses)
+  out.push_str (&counter "vdeploy_eval_cache_fallbacks_total" "Records refused after they were accepted (the narinfo or the realised path disagreed): evaluated instead." t.cache_fallbacks)
+  out.push_str (&counter "vdeploy_eval_seconds_saved_total" "Evaluation seconds the hits saved: vci's own eval time for each record taken." t.cache_saved)
   out.push_str "# HELP vdeploy_dotfiles_state The user's dotfiles checkout after the last poll (1 for the current state).\n# TYPE vdeploy_dotfiles_state gauge\n"
   current = st.dotfiles |> .as_ref |> .map (\c -> state_name c)
   for s in STATES
@@ -197,7 +201,7 @@ publish_metrics dir st =
 
 -- The totals as counters.json (schema 1).
 export totals_text : &Totals -> String
-totals_text t = "{\"schema\":1,\"polls\":#{t.polls},\"pollFailures\":#{t.poll_failures},\"headChanges\":#{t.head_changes},\"plansStarted\":#{t.started},\"plansFinished\":#{t.finished},\"plansFailed\":#{t.failed},\"commitsSkipped\":#{t.skipped},\"commitsUnverified\":#{t.unverified}}\n"
+totals_text t = "{\"schema\":1,\"polls\":#{t.polls},\"pollFailures\":#{t.poll_failures},\"headChanges\":#{t.head_changes},\"plansStarted\":#{t.started},\"plansFinished\":#{t.finished},\"plansFailed\":#{t.failed},\"commitsSkipped\":#{t.skipped},\"commitsUnverified\":#{t.unverified},\"evalCacheHits\":#{t.cache_hits},\"evalCacheMisses\":#{t.cache_misses},\"evalCacheFallbacks\":#{t.cache_fallbacks},\"evalSecondsSaved\":#{t.cache_saved}}\n"
 
 field : &Value -> &str -> u64
 field doc key = doc.get key |> .and_then (\v -> v.as_u64 ()) |> .unwrap_or 0
@@ -210,7 +214,7 @@ totals_from text =
   if schema != Some 1
     Err (.to_string "not schema 1")
   else
-    Ok (Totals { polls = field (&doc) "polls", poll_failures = field (&doc) "pollFailures", head_changes = field (&doc) "headChanges", started = field (&doc) "plansStarted", finished = field (&doc) "plansFinished", failed = field (&doc) "plansFailed", skipped = field (&doc) "commitsSkipped", unverified = field (&doc) "commitsUnverified" })
+    Ok (Totals { polls = field (&doc) "polls", poll_failures = field (&doc) "pollFailures", head_changes = field (&doc) "headChanges", started = field (&doc) "plansStarted", finished = field (&doc) "plansFinished", failed = field (&doc) "plansFailed", skipped = field (&doc) "commitsSkipped", unverified = field (&doc) "commitsUnverified", cache_hits = field (&doc) "evalCacheHits", cache_misses = field (&doc) "evalCacheMisses", cache_fallbacks = field (&doc) "evalCacheFallbacks", cache_saved = field (&doc) "evalSecondsSaved" })
 
 -- The totals a restart starts from: counters.json, or zero when there is none
 -- yet. One that cannot be read is said and counted from zero (a reset the
@@ -351,3 +355,14 @@ test "a counters.json that cannot be read starts from zero, and says so"
   assert! \-> totals_from "{" |> .is_err
   assert! \-> totals_from "{\"schema\":2}" |> .is_err
   assert_eq! \-> totals_from "{\"schema\":1,\"plansStarted\":7}" |> .map (\t -> t.started) \-> Ok 7
+
+test "the eval cache's counters (GH-243): in the metrics, and through counters.json across a restart"
+  st = Status { cache_hits = 2, cache_misses = 1, cache_fallbacks = 1, cache_saved = 64, ...Status::default () }
+  m = metrics (&st)
+  for line in ["vdeploy_eval_cache_hits_total 2\n", "vdeploy_eval_cache_misses_total 1\n", "vdeploy_eval_cache_fallbacks_total 1\n", "vdeploy_eval_seconds_saved_total 64\n"]
+    assert! \-> m.contains line
+  back = totals_from (&totals_text (&totals_of (&st))) |> .expect "round trip"
+  assert_eq! \-> (back.cache_hits, back.cache_misses, back.cache_fallbacks, back.cache_saved) \-> (2, 1, 1, 64)
+  -- A counters.json from before GH-243 reads as zero hits.
+  old = totals_from "{\"schema\":1,\"polls\":3}" |> .expect "old file"
+  assert_eq! \-> (old.polls, old.cache_hits) \-> (3, 0)
