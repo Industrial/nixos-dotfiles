@@ -1,0 +1,1 @@
+SetCVar("cameraSmoothStyle",0)
