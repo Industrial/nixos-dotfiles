@@ -24,6 +24,27 @@ let
   };
   tokened = withToken.systemd.services.vci;
 
+  # GH-247: statuses with a token minted from the vbump app's key.
+  withApp = nixos.eval {
+    modules = [
+      ./default.nix
+      {features.nix.vci.statusApp.privateKeyFile = "/var/lib/secrets/vbump-app.pem";}
+    ];
+  };
+  appVci = withApp.systemd.services.vci;
+  minter = withApp.systemd.services.vci-token;
+  minterExec = minter.serviceConfig.ExecStart;
+  both = nixos.eval {
+    modules = [
+      ./default.nix
+      {
+        features.nix.vci.statusApp.privateKeyFile = "/k";
+        features.nix.vci.statusTokenFile = "/t";
+      }
+    ];
+  };
+  failed = c: map (a: a.message) (builtins.filter (a: !a.assertion) c.assertions);
+
   # GH-287: on each cache host (common/fleet.nix `isCacheIn`, never named here), vci is told
   # its own name, so that host's entry is evaluated and built first.
   caches = lib.filter (fleet.isCacheIn fleet.hosts) fleet.order;
@@ -51,6 +72,24 @@ in
     tokenAsCredential = assay.eq tokened.serviceConfig.LoadCredential ["status-token:/var/lib/secrets/vci-status-token"];
     tokenPathOnlyByCredentialDir = assay.eq [(lib.hasInfix "--status-token-file %d/status-token" tokened.serviceConfig.ExecStart) (lib.hasInfix "vci-status-token" tokened.serviceConfig.ExecStart)] [true false];
     tokenNotInEnvironment = assay.eq (lib.any (v: lib.hasInfix "token" (toString v)) (lib.attrValues tokened.environment)) false;
+
+    # The minted path (GH-247) is off by default: no minter unit, no user.
+    mintingOffByDefault = assay.eq [plain.features.nix.vci.statusApp.privateKeyFile (plain.systemd.services ? vci-token) (plain.users.users ? vci-token)] [null false false];
+    # On: the key reaches only the minter, as a credential; never vci, argv or environment.
+    keyAsMinterCredential = assay.eq minter.serviceConfig.LoadCredential ["app-key:/var/lib/secrets/vbump-app.pem"];
+    keyPathOnlyByCredentialDir = assay.eq [(lib.hasInfix "--key-file %d/app-key" minterExec) (lib.hasInfix "vbump-app.pem" minterExec)] [true false];
+    vciNeverSeesTheKey = assay.eq [(appVci.serviceConfig ? LoadCredential) (lib.hasInfix "vbump-app" appVci.serviceConfig.ExecStart)] [false false];
+    # The app, the repository, absolute tools, a refresh well inside a token's hour.
+    mintsForThisAppAndRepo = assay.eq [(lib.hasInfix "--app-id 5886494" minterExec) (lib.hasInfix "--repo-slug Industrial/nixos-dotfiles" minterExec) (lib.hasInfix "--every 30m" minterExec)] [true true true];
+    minterToolsAbsolute = assay.eq (map (f: lib.hasInfix "${f} /nix/store/" minterExec) ["--curl" "--openssl"]) [true true];
+    # The token: written by the minter's own user into its runtime directory, 0440 with
+    # group vci, kept across a restart; vci reads that file and starts after the minter.
+    tokenForVciOnly = assay.eq [minter.serviceConfig.User minter.serviceConfig.Group withApp.users.users.vci-token.group minter.serviceConfig.UMask minter.serviceConfig.RuntimeDirectoryMode minter.serviceConfig.RuntimeDirectoryPreserve] ["vci-token" "vci" "vci" "0227" "0750" "yes"];
+    vciReadsTheMintedToken = assay.eq [(lib.hasInfix "--status-token-file /run/vci-token/token" appVci.serviceConfig.ExecStart) (lib.hasInfix "--out /run/vci-token/token" minterExec)] [true true];
+    vciAfterTheMinter = assay.eq [(builtins.elem "vci-token.service" appVci.after) (builtins.elem "vci-token.service" appVci.wants)] [true true];
+    minterSandboxed = assay.eq [minter.serviceConfig.ProtectSystem minter.serviceConfig.NoNewPrivileges minter.serviceConfig.CapabilityBoundingSet] ["strict" true ""];
+    # A token file and a key are two sources for the same flag: one or the other.
+    oneTokenSource = assay.eq [(failed withApp) (builtins.length (failed both))] [[] 1];
 
     # Its own unprivileged user, allowed the daemon (never trusted), where it is restricted.
     ownUser = assay.eq [svc.serviceConfig.User plain.users.users.vci.isSystemUser] ["vci" true];
