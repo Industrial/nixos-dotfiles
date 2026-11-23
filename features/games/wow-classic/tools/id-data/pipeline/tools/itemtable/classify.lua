@@ -89,6 +89,45 @@ M.context = function(doc)
     end
     return nil
   end
+  -- The shared cooldown group an item's use belongs to (nil when none).
+  ctx.cooldownCategoryOf = function(item)
+    local _list_0 = (idx.effectsByItem[item.id] or { })
+    for _index_0 = 1, #_list_0 do
+      local fx = _list_0[_index_0]
+      if fx.trigger == "use" and (fx.cooldownCategory or 0) > 0 then
+        return fx.cooldownCategory
+      end
+    end
+    return nil
+  end
+  -- The shared cooldown group most consumables of a subclass use: the potion
+  -- cooldown for "Potion", the eating group for "Food". Derived from the
+  -- data, so no category number is written down.
+  local dominant = { }
+  ctx.dominantCategory = function(subclass)
+    if dominant[subclass] ~= nil then
+      return dominant[subclass] or nil
+    end
+    local counts, best, bestN = { }, nil, 0
+    local _list_0 = doc.items or { }
+    for _index_0 = 1, #_list_0 do
+      local item = _list_0[_index_0]
+      if item.class == "Consumable" and item.subclass == subclass then
+        local cat = ctx.cooldownCategoryOf(item)
+        if cat then
+          counts[cat] = (counts[cat] or 0) + 1
+          if counts[cat] > bestN then
+            best, bestN = cat, counts[cat]
+          end
+        end
+      end
+    end
+    dominant[subclass] = best or false
+    return best
+  end
+  ctx.potionCategory = function()
+    return ctx.dominantCategory("Potion")
+  end
   ctx.hasNoEffect = function(item)
     return #(idx.effectsByItem[item.id] or { }) == 0
   end

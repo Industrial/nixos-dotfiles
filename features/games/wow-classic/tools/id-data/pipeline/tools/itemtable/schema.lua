@@ -30,7 +30,9 @@ M.records = {
       itemId = field("int", true),
       spellId = field("int", true),
       trigger = field("string", true, "use|equip|proc"),
-      charges = field("int", false)
+      charges = field("int", false),
+      cooldownCategory = field("int", false, "shared cooldown group (SpellCategoryID); 0/nil = none"),
+      categoryCooldown = field("int", false, "ms the shared group stays on cooldown")
     }
   },
   spells = {

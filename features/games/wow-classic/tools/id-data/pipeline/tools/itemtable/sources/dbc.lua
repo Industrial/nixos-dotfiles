@@ -624,7 +624,9 @@ M.toModel = function(tables, opts)
         itemId = itemId,
         spellId = spellId,
         trigger = TRIGGER[num(row.TriggerType) or -1] or "use",
-        charges = num(row.Charges)
+        charges = num(row.Charges),
+        cooldownCategory = num(row.SpellCategoryID),
+        categoryCooldown = num(row.CategoryCoolDownMSec)
       }
       _continue_0 = true
     until true

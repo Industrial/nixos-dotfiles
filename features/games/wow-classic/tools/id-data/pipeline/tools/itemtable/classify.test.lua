@@ -105,6 +105,33 @@ return describe("itemtable classifier", function()
       assert.is_nil(result.sets["Consumable.Cooldown.Stone.Health.Warlock"][90012])
       return assert.is_nil((result.sets["Consumable.Potion.Recovery.Healing.Basic"] or { })[90015])
     end)
+    it("puts a non-potion on the potion cooldown in the cooldown set", function()
+      local result = run()
+      assert.are.equal(500, result.sets["Consumable.Cooldown.Potion.Health.Basic"][90017])
+      assert.is_nil(result.sets["Consumable.Cooldown.Potion.Health.Basic"][90012])
+      return assert.is_nil(result.sets["Consumable.Cooldown.Potion.Health.Basic"][90015])
+    end)
+    it("counts an 'Other' item on food's cooldown group as food", function()
+      local doc = fixtures()
+      local foodSpell = nil
+      local _list_0 = doc.itemEffects
+      for _index_0 = 1, #_list_0 do
+        local fx = _list_0[_index_0]
+        if fx.itemId == 90004 or fx.itemId == 90006 then
+          fx.cooldownCategory = 11
+        end
+        if fx.itemId == 90004 then
+          foodSpell = fx.spellId
+        end
+      end
+      doc.items[#doc.items + 1] = { id = 90102, name = "FIXTURE Old Fish", class = "Consumable", subclass = "Other" }
+      doc.items[#doc.items + 1] = { id = 90103, name = "FIXTURE Balm", class = "Consumable", subclass = "Other" }
+      doc.itemEffects[#doc.itemEffects + 1] = { itemId = 90102, spellId = foodSpell, trigger = "use", cooldownCategory = 11 }
+      doc.itemEffects[#doc.itemEffects + 1] = { itemId = 90103, spellId = foodSpell, trigger = "use", cooldownCategory = 1153 }
+      local result = classify.run(doc, rules)
+      assert.is_not_nil(result.sets["Consumable.Food.Edible.Basic.Non-Conjured"][90102])
+      return assert.is_nil(result.sets["Consumable.Food.Edible.Basic.Non-Conjured"][90103])
+    end)
     return it("discriminates weapon enchant families by miscValue", function()
       local result = run()
       assert.are.equal(8, result.sets["Consumable.Weapon Buff.Stone.Sharpening Stone"][90007])

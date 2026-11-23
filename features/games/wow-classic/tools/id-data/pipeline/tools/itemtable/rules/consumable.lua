@@ -18,12 +18,22 @@ statAura = function(ctx, item, stat)
   end
   return math.abs(pair.effect.amount or 1), pair.spell
 end
+-- Food is what the client files as Food, or what shares food's cooldown
+-- group (old fish and meat the client files as "Other").
+local isFood
+isFood = function(ctx, item)
+  if item.subclass == "Food" then
+    return true
+  end
+  local cat = ctx.cooldownCategoryOf and ctx.cooldownCategoryOf(item)
+  return cat ~= nil and cat == ctx.dominantCategory("Food")
+end
 local statBuff
 statBuff = function(stat, kind)
   return function(ctx, item)
     -- A food's stats are Well Fed, owned by the Consumable.Food.Buff.* sets;
     -- counting them here would offer a fish as a Stamina elixir.
-    if item.subclass == "Food" then
+    if isFood(ctx, item) then
       return nil
     end
     local amount, spell = statAura(ctx, item, stat)
@@ -40,10 +50,6 @@ statBuff = function(stat, kind)
     end
     return amount
   end
-end
-local isFood
-isFood = function(ctx, item)
-  return item.subclass == "Food"
 end
 local foodBuff
 foodBuff = function(stat)
@@ -103,6 +109,21 @@ conjuredStone = function(auraType)
     return instantRestore(auraType)(ctx, item)
   end
 end
+-- Not a potion, but shares the potion cooldown and restores instantly
+-- (Whipper Root Tuber, Night Dragon's Breath, Combat Mana Potion).
+local onPotionCooldown
+onPotionCooldown = function(auraType)
+  return function(ctx, item)
+    if item.subclass == "Potion" or isConjured(item) then
+      return nil
+    end
+    local cat = ctx.cooldownCategoryOf(item)
+    if not (cat and cat == ctx.potionCategory()) then
+      return nil
+    end
+    return instantRestore(auraType)(ctx, item)
+  end
+end
 local weaponBuff
 weaponBuff = function(discriminator)
   return function(ctx, item)
@@ -124,7 +145,7 @@ end
 -- statBuff. Food never counts: its stats are Well Fed, which the food sets own.
 local auraBuff = function(auraType, kind, miscTest)
   return function(ctx, item)
-    if item.subclass == "Food" then
+    if isFood(ctx, item) then
       return nil
     end
     local pair = ctx.findEffect(item, function(effect)
@@ -342,8 +363,12 @@ M.sets = {
       return amount or restores("PERIODIC_HEAL")(ctx, item)
     end
   },
-  ["Consumable.Cooldown.Potion.Health.Basic"] = unsupported("model has no spell cooldown-category field"),
-  ["Consumable.Cooldown.Potion.Mana.Basic"] = unsupported("model has no spell cooldown-category field"),
+  ["Consumable.Cooldown.Potion.Health.Basic"] = {
+    predicate = onPotionCooldown("HEAL")
+  },
+  ["Consumable.Cooldown.Potion.Mana.Basic"] = {
+    predicate = onPotionCooldown("ENERGIZE")
+  },
   ["Consumable.Cooldown.Stone.Health.Warlock"] = {
     predicate = conjuredStone("HEAL")
   },

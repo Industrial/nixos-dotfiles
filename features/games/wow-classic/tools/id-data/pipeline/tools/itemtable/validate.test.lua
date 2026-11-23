@@ -45,7 +45,7 @@ return describe("itemtable model validation", function()
         local item = _list_0[_index_0]
         byId[item.id] = item
       end
-      assert.are.equal(16, #doc.items)
+      assert.are.equal(17, #doc.items)
       assert.is_true(byId[90015].conjured)
       assert.are.equal("Potion", byId[90012].subclass)
       assert.are.equal("Bandage", byId[90014].subclass)

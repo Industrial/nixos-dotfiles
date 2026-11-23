@@ -112,6 +112,14 @@ return {
       conjured = true
     },
     {
+      id = 90017,
+      name = "FIXTURE Whipper Root Tuber",
+      class = "Consumable",
+      subclass = "Food",
+      quality = 1,
+      stackable = 20
+    },
+    {
       id = 90009,
       name = "FIXTURE Iron Bar",
       class = "Trade Goods",
@@ -301,12 +309,16 @@ return {
     {
       itemId = 90012,
       spellId = 91012,
-      trigger = "use"
+      trigger = "use",
+      cooldownCategory = 4,
+      categoryCooldown = 120000
     },
     {
       itemId = 90013,
       spellId = 91013,
-      trigger = "use"
+      trigger = "use",
+      cooldownCategory = 4,
+      categoryCooldown = 120000
     },
     {
       itemId = 90014,
@@ -322,6 +334,13 @@ return {
       itemId = 90016,
       spellId = 91016,
       trigger = "use"
+    },
+    {
+      itemId = 90017,
+      spellId = 91015,
+      trigger = "use",
+      cooldownCategory = 4,
+      categoryCooldown = 120000
     }
   },
   spellEffects = {
