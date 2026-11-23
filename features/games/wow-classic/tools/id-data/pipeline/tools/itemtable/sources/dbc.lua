@@ -313,6 +313,9 @@ local TARGET_NAME = {
   [1] = "SELF",
   [21] = "FRIEND",
   [56] = "GROUP",
+  [20] = "GROUP",
+  [153] = "GROUP",
+  [57] = "FRIEND",
   [6] = "ENEMY"
 }
 M.TARGET_NAME = TARGET_NAME

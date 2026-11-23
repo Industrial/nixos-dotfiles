@@ -265,6 +265,30 @@ return describe("itemtable spell domain", function()
         assert.is_true(matched < inScope, ("exclusion %q matches every in-scope spell"):format(exclusion.reason))
       end
     end)
+    it("excludes each out-of-scope kind with its reason", function()
+      local probe = function(spell, effect)
+        local doc = fixtures()
+        spell.id, spell.name = 92200, "FIXTURE Probe"
+        doc.spells[#doc.spells + 1] = spell
+        doc.spellClass[#doc.spellClass + 1] = { spellId = 92200, classFile = "MAGE" }
+        effect.spellId, effect.index = 92200, 1
+        doc.spellEffects[#doc.spellEffects + 1] = effect
+        return (run(doc)).excluded[92200] or ""
+      end
+      assert.is_truthy(probe({ duration = -1, passive = true }, { effect = "APPLY_AURA", auraType = "290", target = "SELF" }):find("passive", 1, true))
+      assert.is_truthy(probe({ duration = -1 }, { effect = "APPLY_AURA", auraType = "MOD_SHAPESHIFT", target = "SELF" }):find("toggle", 1, true))
+      assert.is_truthy(probe({ duration = 18000, channeled = true }, { effect = "APPLY_AURA", auraType = "4", target = "SELF" }):find("channeled", 1, true))
+      assert.is_truthy(probe({ duration = 30000 }, { effect = "APPLY_AURA", auraType = "MOD_ATTACK_POWER", target = "ENEMY" }):find("enemy", 1, true))
+      assert.is_truthy(probe({ duration = 12000 }, { effect = "APPLY_AURA", auraType = "PERIODIC_HEAL", target = "FRIEND" }):find("shorter than a buff", 1, true))
+      return assert.is_truthy(probe({ duration = 0 }, { effect = "2", target = "ENEMY" }):find("enemy", 1, true))
+    end)
+    it("never excludes a damaging periodic aura that reached no DoT set", function()
+      local doc = fixtures()
+      doc.spells[#doc.spells + 1] = { id = 92201, name = "FIXTURE Broken DoT" }
+      doc.spellClass[#doc.spellClass + 1] = { spellId = 92201, classFile = "WARLOCK" }
+      doc.spellEffects[#doc.spellEffects + 1] = { spellId = 92201, index = 1, effect = "APPLY_AURA", auraType = "PERIODIC_DAMAGE", target = "ENEMY", amount = 40 }
+      return assert.is_nil((run(doc)).excluded[92201])
+    end)
     it("still reports unclassified spells rather than hiding them", function()
       local doc = fixtures()
       doc.spells[#doc.spells + 1] = {

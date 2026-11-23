@@ -106,6 +106,39 @@ describe("itemtable dbc source on Forever's vocabulary", function()
     assert.is_true(doc.items[1].conjured)
   end)
 
+  it("names who a buff lands on: self, one friend, the caster's group", function()
+    local targets = {}
+    for code, want in pairs({ [1] = "SELF", [21] = "FRIEND", [57] = "FRIEND", [56] = "GROUP", [20] = "GROUP", [153] = "GROUP", [6] = "ENEMY" }) do
+      local r = row(100, 0, 6, 29, 4, 3)
+      r.ImplicitTarget_0 = tostring(code)
+      targets[code] = { want, effectsOf(model({ r }), 100)[1].target }
+    end
+    for code, pair in pairs(targets) do
+      assert.are.equal(pair[1], pair[2], "ImplicitTarget " .. code)
+    end
+  end)
+
+  it("links a conjure to the item it makes (Conjure Water makes 5350)", function()
+    local r = row(100, 0, 24, 0, 2)
+    r.EffectItemType = "5350"
+    local se = effectsOf(model({ r }), 100)[1]
+    assert.are.equal("CREATE_ITEM", se.effect)
+    assert.are.equal(5350, se.createdItem)
+  end)
+
+  it("reads passive, hidden and channeled from the spell's attributes", function()
+    local doc = model({ row(100, 0, 6, 29, 4, 3) }, {
+      spellMisc = {
+        { SpellID = "100", Attributes_0 = "262544", Attributes_1 = "16", DurationIndex = "0" },
+        { SpellID = "200", Attributes_0 = "0", Attributes_1 = "139268", DurationIndex = "0" },
+      },
+    })
+    local byId = {}
+    for _, sp in ipairs(doc.spells) do byId[sp.id] = sp end
+    assert.is_true(byId[100].passive) -- Weaponmaster: DO_NOT_DISPLAY
+    assert.is_true(byId[200].channeled) -- Eagle Eye
+  end)
+
   it("produces a document the model validator accepts", function()
     local doc = model({ row(100, 0, 64, 0, 0, 0, 200), row(200, 0, 6, 84, 58), row(100, 1, 54, 0, 1800, 40) }, {
       spellItemEnchantment = { { ID = "40", Name_lang = "Sharpened +2", EffectPointsMin_0 = "2" } },

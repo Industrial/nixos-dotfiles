@@ -282,13 +282,84 @@ M.sets = {
     predicate = conjures("PERIODIC_ENERGIZE")
   }
 }
+-- Every name the dbc adapter gives an effect. A name outside this list is
+-- vocabulary the rules have never seen, so a spell carrying one is never
+-- excluded: it stays unclassified and blocks the gate until a rule reads it.
+-- Raw client numbers and unnamed effects are the adapter's deliberate gaps.
+local KNOWN_NAMES = { }
+for name in ([[
+  APPLY_AURA APPLY_AREA_AURA_PARTY APPLY_AREA_AURA_RAID HEAL ENERGIZE CREATE_ITEM
+  SUMMON ENCHANT_HELD_ITEM PERIODIC_DAMAGE PERIODIC_HEAL PERIODIC_ENERGIZE
+  MOD_DAMAGE_DONE MOD_RESISTANCE MOD_RESISTANCE_EXCLUSIVE MOD_STAT
+  MOD_TOTAL_STAT_PERCENTAGE MOD_ATTACK_POWER MOD_RANGED_ATTACK_POWER
+  MOD_HEALTH_REGEN_IN_COMBAT OBS_MOD_HEALTH OBS_MOD_POWER MOD_INCREASE_HEALTH
+  MOD_MAX_POWER SCHOOL_ABSORB MOD_SHAPESHIFT MOD_STEALTH TRACK_CREATURES
+  TRACK_RESOURCES TRACK_STEALTHED FEIGN_DEATH MOUNTED
+]]):gmatch("%S+") do
+  KNOWN_NAMES[name] = true
+end
+M.KNOWN_NAMES = KNOWN_NAMES
+local allKnown
+allKnown = function(ctx, spell)
+  return ctx.findSpellEffect(spell, function(e)
+    local a = e.auraType
+    return a ~= nil and tonumber(a) == nil and not KNOWN_NAMES[a]
+  end) == nil
+end
+local excluding
+excluding = function(reason, test)
+  return {
+    reason = reason,
+    match = function(ctx, spell)
+      -- A periodic damage aura that reached no DoT set has an incomplete
+      -- descriptor; it stays visible rather than being excluded as an attack.
+      -- (A zero-damage one is a marker debuff, Death Mark, and may go.)
+      local dot = ctx.findSpellEffect(spell, function(e)
+        return e.auraType == "PERIODIC_DAMAGE" and (e.index or 1) < 100 and (e.amount == nil or e.amount ~= 0)
+      end)
+      return dot == nil and allKnown(ctx, spell) and test(ctx, spell)
+    end
+  }
+end
+-- SCOPE: idUpkeep keeps buffs up, conjures and summons; the other sets
+-- (heals, mana, DoTs) are kept for any consumer that wants them. Every class
+-- spell that lands in none is excluded below by what it IS.
 M.exclusions = {
   {
     reason = "castable spell with no recorded effect",
     match = function(ctx, spell)
       return ctx.spellHasNoEffect(spell)
     end
-  }
+  },
+  excluding("passive or hidden: a talent rank, racial or weapon skill, always on", function(ctx, spell)
+    return spell.passive == true
+  end),
+  excluding("rune engraving: enchants gear, not a buff", function(ctx, spell)
+    return ctx.findSpellEffect(spell, function(e)
+      return e.auraType == "ENCHANT_HELD_ITEM"
+    end) ~= nil
+  end),
+  excluding("a toggle: form, stance, stealth, tracking, mount or Feign Death", function(ctx, spell)
+    return M.isToggle(ctx, spell)
+  end),
+  excluding("channeled: held for its duration (drains, Mind Control, Eagle Eye)", function(ctx, spell)
+    return spell.channeled == true
+  end),
+  excluding("lands on an enemy: an attack, debuff or crowd control", function(ctx, spell)
+    return ctx.findSpellEffect(spell, function(e)
+      return e.target == "ENEMY"
+    end) ~= nil
+  end),
+  excluding("aura shorter than a buff: a cooldown, HoT or shield", function(ctx, spell)
+    return not lasting(spell) and ctx.findSpellEffect(spell, function(e)
+      return BUFF_EFFECTS[e.effect or ""] == true
+    end) ~= nil
+  end),
+  excluding("no aura, conjure or summon: an attack or instant utility", function(ctx, spell)
+    return ctx.findSpellEffect(spell, function(e)
+      return BUFF_EFFECTS[e.effect or ""] == true or e.effect == "CREATE_ITEM" or e.effect == "SUMMON"
+    end) == nil
+  end)
 }
 M.gate = "ratchet"
 M.overrides = { }
