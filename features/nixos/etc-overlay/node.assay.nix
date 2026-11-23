@@ -25,5 +25,7 @@ in
     onePackageSet = assay.eq (drakkar.module.nixpkgs.config.content or null) {};
     # The resume device lives in disko's LUKS container (huginn), so the VM has none.
     noResumeDevice = assay.eq (drakkar.module.boot.resumeDevice.content or null) "";
+    # The nodes start without the feature, whatever the host enables.
+    withoutTheFeature = assay.eq [(drakkar.module.features.nixos.etc-overlay.enable.priority or null) (drakkar.module.features.nixos.etc-overlay.enable.content or null)] [60 false];
     vmSize = assay.eq [drakkar.module.virtualisation.cores drakkar.module.virtualisation.memorySize] [4 6144];
   }

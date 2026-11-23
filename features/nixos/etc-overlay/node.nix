@@ -50,6 +50,11 @@ in {
       overlays = lib.mkForce [];
     };
 
+    # Every test starts from the host WITHOUT the feature, also once the host enables it:
+    # this beats the host's plain `true`, and the live-switch gate's extension turns it
+    # back on with lib.mkForce (test-live-switch.nix).
+    features.nixos.etc-overlay.enable = lib.mkOverride 60 false;
+
     # VM-only adjustments, the minimum for a host's config to coexist with qemu-vm.
     services.timesyncd.enable = lib.mkForce false;
     systemd.settings.Manager.DefaultTimeoutStartSec = lib.mkForce 300;
