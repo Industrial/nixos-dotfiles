@@ -1,0 +1,1 @@
+SetCVar("UnitNameNPC",1)
