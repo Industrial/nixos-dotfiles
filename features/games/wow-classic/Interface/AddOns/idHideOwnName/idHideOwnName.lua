@@ -1,0 +1,1 @@
+SetCVar("UnitNameOwn",0)
