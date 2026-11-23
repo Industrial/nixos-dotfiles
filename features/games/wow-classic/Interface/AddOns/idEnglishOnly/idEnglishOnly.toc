@@ -1,3 +1,0 @@
-## Interface: 16001
-## Title: idEnglishOnly
-idEnglishOnly.lua
