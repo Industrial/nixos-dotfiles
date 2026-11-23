@@ -12,6 +12,7 @@ vci --host NAME [--host NAME...] [--once] [--url URL] [--branch NAME]
     [--pulls-url URL | --no-pulls] [--repo-slug OWNER/REPO] [--repo DIR]
     [--state-dir DIR] [--textfile-dir DIR] [--interval DURATION]
     [--status-token-file FILE] [--api URL] [--git PROG] [--curl PROG] [--nix PROG] [--db FILE]
+    [--systemctl PROG] [--max-load N] [--min-free-memory SIZE] [--own-host NAME]
 ```
 
 ## One step
@@ -31,7 +32,10 @@ Every `--interval` (2 minutes in the feature), on a spaced id_effect Schedule:
    left the fleet) are dropped, so vgc can collect what only they kept.
 4. **Pick** the next commit (`refs.vlt` `next_of`): main first (deploys follow it), then the
    PRs newest first. A commit is built once, whichever ref names it.
-5. **Build it for every host**, one after another:
+5. **Build it for every host**, one after another, in `--host` order except that
+   `--own-host` (the host vci runs on, the feature's `ownHost` = `networking.hostName`)
+   goes first when it is one of them (GH-287): the cache host's vdeploy plans a new commit
+   at once, so its veval record has to be written before the others':
    `nix eval --raw git+file://<repo>?rev=<sha>#nixosConfigurations."<host>".config.system.build.toplevel.drvPath`,
    then `nix build --out-link /var/lib/vci/roots/<ref>-<host> <drv>^out`. Each out-link is
    an indirect GC root. For a PR, vdiff's summary against main's generation for the same

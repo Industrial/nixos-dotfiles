@@ -37,6 +37,16 @@ joined main pulls =
   all.extend pulls
   all
 
+-- The hosts in build order (GH-287): the host vci runs on first, when it is
+-- one of them, then the rest in the order given (common/fleet.nix's). The
+-- cache host's vdeploy plans a new commit at once, so its veval record has to
+-- be written first; the other hosts' vdeploys wait out a debounce.
+export own_first : &[String] -> Option<&str> -> Vec<String>
+own_first hosts own =
+  mut ordered = hosts.iter () |> .filter (\h -> Some (h.as_str ()) == own) |> .cloned |> .collect : Vec<String>
+  ordered.extend (hosts.iter () |> .filter (\h -> Some (h.as_str ()) != own) |> .cloned)
+  ordered
+
 -- The open refs.
 export listed : Caps -> Effect<Vec<Target>, VciError, HNil>
 listed caps =
@@ -321,6 +331,27 @@ test "a closed PR's roots are dropped; main's stay"
   roots = snapshot (&w.roots) |> .into_iter |> .map (\r -> r.0) |> .collect : Vec<String>
   assert_eq! \-> roots \-> .to_vec ([.to_string "main-drakkar", .to_string "main-mimir"])
   assert! \-> logged (&w) |> .iter |> .any (\l -> l == "drop pull-7-drakkar")
+
+test "own_first: the host vci runs on first, the rest in the order given"
+  fleet = .to_vec ([.to_string "mimir", .to_string "drakkar", .to_string "huginn", .to_string "muninn"]) : Vec<String>
+  assert_eq! \-> own_first (&fleet) (Some "drakkar") \-> .to_vec ([.to_string "drakkar", .to_string "mimir", .to_string "huginn", .to_string "muninn"])
+  -- Already first, not a fleet host, or not told: the order is unchanged.
+  assert_eq! \-> own_first (&fleet) (Some "mimir") \-> fleet.clone ()
+  assert_eq! \-> own_first (&fleet) (Some "cache") \-> fleet.clone ()
+  assert_eq! \-> own_first (&fleet) None \-> fleet.clone ()
+  assert_eq! \-> own_first (&fleet) (Some "muninn") \-> .to_vec ([.to_string "muninn", .to_string "mimir", .to_string "drakkar", .to_string "huginn"])
+  assert! \-> own_first (&[]) (Some "drakkar") |> .is_empty
+
+test "own host first: its veval record is written before the next host is evaluated"
+  w = Scripted { main = main_at 'a', ...Scripted::default () }
+  s = Settings { hosts = own_first (&[.to_string "mimir", .to_string "drakkar"]) (Some "drakkar"), interval = 1 }
+  id_effect::testing::run_test (step (scripted_caps (w.clone ())) s) |> .into_result |> .ok
+  assert_eq! \-> results (&w) \-> .to_vec ([(.to_string "main", .to_string "drakkar", .to_string "built"), (.to_string "main", .to_string "mimir", .to_string "built")])
+  work = logged (&w) |> .into_iter |> .filter (\l -> l.starts_with "eval " || l.starts_with "veval ") |> .map (\l -> l.split_whitespace () |> .take 3 |> .last |> .unwrap_or "" |> .to_string) |> .collect : Vec<String>
+  -- eval <sha> drakkar, veval <sha> drakkar, eval <sha> mimir, veval <sha> mimir
+  assert_eq! \-> work \-> .to_vec ([.to_string "drakkar", .to_string "drakkar", .to_string "mimir", .to_string "mimir"])
+  kinds = logged (&w) |> .into_iter |> .filter (\l -> l.starts_with "eval " || l.starts_with "veval ") |> .map (\l -> l.split_whitespace () |> .next |> .unwrap_or "" |> .to_string) |> .collect : Vec<String>
+  assert_eq! \-> kinds \-> .to_vec ([.to_string "eval", .to_string "veval", .to_string "eval", .to_string "veval"])
 
 test "pending counts distinct commits not built"
   ts = .to_vec ([(main_at 'a' |> .expect "main"), pull 3 'a', pull 4 'b']) : Vec<Target>
