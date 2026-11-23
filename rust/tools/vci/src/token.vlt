@@ -283,12 +283,16 @@ test "base64url without padding, the JWT's encoding"
   assert_eq! \-> b64url (HEADER.as_bytes ()) \-> "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9"
 
 test "the claims name the app, a minute back and nine minutes ahead"
-  assert_eq! \-> claims_of "5886494" 1000 \-> "{\"iat\":940,\"exp\":1540,\"iss\":5886494}"
-  assert_eq! \-> claims_of "Iv23abc" 1000 \-> "{\"iat\":940,\"exp\":1540,\"iss\":\"Iv23abc\"}"
+  -- Literals with braces are bound first: inside a macro argument Voltaic escapes them.
+  numeric = "{\"iat\":940,\"exp\":1540,\"iss\":5886494}"
+  client = "{\"iat\":940,\"exp\":1540,\"iss\":\"Iv23abc\"}"
+  assert_eq! \-> claims_of "5886494" 1000 \-> numeric
+  assert_eq! \-> claims_of "Iv23abc" 1000 \-> client
   assert! \-> unsigned_of "1" 1000 |> .starts_with "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
 
 test "the token asked for is this repository's, commit statuses only"
-  assert_eq! \-> request_body "Industrial/nixos-dotfiles" \-> "{\"permissions\":{\"statuses\":\"write\"},\"repositories\":[\"nixos-dotfiles\"]}"
+  want = "{\"permissions\":{\"statuses\":\"write\"},\"repositories\":[\"nixos-dotfiles\"]}"
+  assert_eq! \-> request_body "Industrial/nixos-dotfiles" \-> want
 
 test "the command line needs the app, the key and the output; the rest defaults"
   o = parse_args (&strs (&["--app-id", "5886494", "--key-file", "/run/credentials/vci-token.service/app-key", "--out", "/run/vci-token/token"])) |> .expect "options"
