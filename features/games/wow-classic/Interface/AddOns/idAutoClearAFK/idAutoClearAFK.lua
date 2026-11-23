@@ -1,0 +1,1 @@
+SetCVar("autoClearAFK",1)
