@@ -77,4 +77,7 @@
   # (GH-187). Root is locked: switch over and roll back per docs/runbooks/userborn.md.
   # Rollback: set it to false, then userdel any user created while it was on.
   features.nixos.users.userborn.enable = true;
+  # /etc is the upstream overlay, with the host's stateful files carried in and out (GH-185;
+  # gate: etc-overlay-live-switch). Rollback: lib.mkForce false copies the state back out.
+  features.nixos.etc-overlay.enable = true;
 }

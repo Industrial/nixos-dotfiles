@@ -1,6 +1,6 @@
 # /etc as the upstream overlay (GH-185): an erofs metadata image under a mutable
-# overlayfs, mounted instead of being written by setup-etc.pl. Off by default; enabled on
-# no host. The measurement behind it: docs/history/20261122-etc-overlay-measurement.md.
+# overlayfs, mounted instead of being written by setup-etc.pl. Off by default; a host
+# enables it in hosts/<h>/configuration.nix. The measurement behind it: docs/history/20261122-etc-overlay-measurement.md.
 #
 # Upstream mounts the overlay over the old /etc and migrates nothing, so a host that
 # enables it loses its machine-id, ssh host keys, NetworkManager connections, user
