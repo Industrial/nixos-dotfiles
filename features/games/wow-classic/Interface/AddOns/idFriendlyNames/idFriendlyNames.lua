@@ -1,0 +1,1 @@
+SetCVar("UnitNameFriendlyPlayerName",0)
