@@ -1,6 +1,7 @@
 # vci (rust/tools/vci, GH-242): the fleet's CI on the cache host. Every `interval` it lists
 # main and the open same-repository PRs (`git ls-remote`, and GitHub's open-PR list read
-# without a token), and builds the next unbuilt head commit for every fleet host:
+# without a token), and builds the next unbuilt head commit for every fleet host (its own
+# host first, `ownHost`, GH-287; then common/fleet.nix order):
 # `nix eval` of the host's toplevel drvPath, then `nix build` into an out-link under
 # /var/lib/vci/roots (an indirect GC root per ref and host, dropped when the PR closes).
 #
@@ -58,6 +59,7 @@
   args =
     ["${vci}/bin/vci"]
     ++ lib.concatMap (h: ["--host" h]) cfg.hosts
+    ++ lib.optionals (cfg.ownHost != null) ["--own-host" cfg.ownHost]
     ++ [
       "--url"
       cfg.url
@@ -97,6 +99,18 @@ in {
       default = fleet.order;
       defaultText = lib.literalExpression "(import common/fleet.nix).order";
       description = "The nixosConfigurations to build for every commit: the fleet's hosts.";
+    };
+    ownHost = mkOption {
+      type = types.nullOr types.str;
+      default = config.networking.hostName;
+      defaultText = lib.literalExpression "config.networking.hostName";
+      description = ''
+        The host vci runs on (GH-287): when it is one of `hosts`, it is evaluated and built
+        first, then the rest in `hosts` order. The cache host's vdeploy plans a new commit at
+        once, so its veval record has to be the first one written; the other hosts' vdeploys
+        wait out a debounce. The same name profiles/base.nix enables vci by
+        (`fleet.isCacheIn`). null: `hosts` order only.
+      '';
     };
     url = mkOption {
       type = types.str;

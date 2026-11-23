@@ -15,7 +15,8 @@
 # Covered:
 #   1. switched in live: vci runs as its own user and reaches the restricted daemon;
 #   2. main is built for every host first: done marker, two `built` records with eval and
-#      build seconds, a root per host, the metrics;
+#      build seconds, a root per host, the metrics; the host vci runs on (`ownHost`,
+#      GH-287) is built before the others;
 #   3. a deploy of that commit does ZERO local builds: the client substitutes main's alpha
 #      toplevel from vcache with max-jobs 0;
 #   4. an open same-repository PR is built (with vdiff's summary against main) and a fork's
@@ -100,6 +101,8 @@ in
           nix.settings.allowed-users = ["@wheel"];
           features.nix.vci = {
             hosts = ["alpha" "beta"];
+            # The host vci runs on, as a cache host's own name (GH-287): built first.
+            ownHost = "beta";
             url = "file:///srv/repo.git";
             pullsUrl = "file:///srv/pulls.json";
             repoSlug = "Industrial/nixos-dotfiles";
@@ -205,6 +208,10 @@ in
       with subtest("main is built first, for every host: records, roots and metrics"):
           r = built(main1)
           t.assertEqual(sorted(r), ["alpha", "beta"])
+          # GH-287: its own host (ownHost = beta) is evaluated and built first, then the
+          # rest in `hosts` order.
+          t.assertEqual([x["host"] for x in records() if x["sha"] == main1], ["beta", "alpha"])
+          cache.succeed("journalctl -u vci -o cat | grep -q 'vci: building main at .* for beta, alpha'")
           for host in ["alpha", "beta"]:
               t.assertEqual((r[host]["result"], r[host]["ref"]), ("built", "main"), r[host])
               t.assertTrue(r[host]["drv"].endswith(".drv") and r[host]["out"].startswith("/nix/store/"), r[host])

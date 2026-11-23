@@ -23,11 +23,24 @@ let
     ];
   };
   tokened = withToken.systemd.services.vci;
+
+  # GH-287: on each cache host (common/fleet.nix `isCacheIn`, never named here), vci is told
+  # its own name, so that host's entry is evaluated and built first.
+  caches = lib.filter (fleet.isCacheIn fleet.hosts) fleet.order;
+  asHost = name: nixos.eval {modules = [./default.nix {networking.hostName = name;}];};
+  execOf = c: c.systemd.services.vci.serviceConfig.ExecStart;
+  notOwn = nixos.eval {modules = [./default.nix {features.nix.vci.ownHost = null;}];};
 in
   assay.suite "nix-vci" {
     # Every fleet host, read from common/fleet.nix, never named here.
     buildsEveryFleetHost = assay.eq plain.features.nix.vci.hosts fleet.order;
     passesEachHost = assay.eq (map (h: has "--host ${h}") fleet.order) (map (_: true) fleet.order);
+    # Its own host first (GH-287): the name comes from the host, the order from fleet.nix.
+    aCacheHostToCheck = assay.eq (caches != []) true;
+    ownHostIsTheHostName = assay.eq (map (n: (asHost n).features.nix.vci.ownHost) caches) caches;
+    ownHostPassed = assay.eq (map (n: lib.hasInfix "--own-host ${n}" (execOf (asHost n))) caches) (map (_: true) caches);
+    hostsStayInFleetOrder = assay.eq (map (n: (asHost n).features.nix.vci.hosts) caches) (map (_: fleet.order) caches);
+    ownHostOff = assay.eq (lib.hasInfix "--own-host" (execOf notOwn)) false;
     thisRepositoryMainAndPrs = assay.eq [(has "--url https://github.com/Industrial/nixos-dotfiles.git") (has "--repo-slug Industrial/nixos-dotfiles") (has "--no-pulls")] [true true false];
     absoluteTools = assay.eq (map (f: has "${f} /nix/store/") ["--git" "--curl" "--nix"]) [true true true];
     metricsToNodeExporter = assay.eq (has "--textfile-dir /var/lib/prometheus-node-exporter-text") true;
