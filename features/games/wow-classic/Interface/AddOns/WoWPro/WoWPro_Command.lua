@@ -192,10 +192,8 @@ local function handler(msg, editbox)
                 _G.ChatFrame1:AddMessage(text)
             end
         end
-    elseif ltoken == "easyfind" and WoWPro.EasyFind then
-        WoWPro.EasyFind.Slash(tokens)
     else
-        local text = ("%s or %s [where|flightids¦reset¦guide-bug¦taint¦etrace-start¦etrace-end¦clear-log¦log¦api-probe¦devcoords¦devzone|devmode¦disable-addons¦enable-addons¦easyfind]"):format(_G.SLASH_WOWPRO1, _G.SLASH_WOWPRO2)
+        local text = ("%s or %s [where|flightids¦reset¦guide-bug¦taint¦etrace-start¦etrace-end¦clear-log¦log¦api-probe¦devcoords¦devzone|devmode¦disable-addons¦enable-addons]"):format(_G.SLASH_WOWPRO1, _G.SLASH_WOWPRO2)
         _G.ChatFrame1:AddMessage(text)
     end
 end

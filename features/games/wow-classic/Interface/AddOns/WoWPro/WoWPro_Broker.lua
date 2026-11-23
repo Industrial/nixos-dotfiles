@@ -5246,8 +5246,7 @@ function WoWPro.LockdownHandler(self, elapsed)
     if WoWPro.LockdownTimer ~= nil then
         WoWPro.LockdownTimer = WoWPro.LockdownTimer - elapsed
         if WoWPro.LockdownTimer < 0 then
-            -- EasyFind's GPS is an arrow too (WoWPro_EasyFind.lua): no "missing TomTom" nag.
-            if (TomTom and TomTom.AddWaypoint) or (WoWPro.EasyFind and WoWPro.EasyFind.Active()) then
+            if TomTom and TomTom.AddWaypoint then
                 WoWPro:CarboniteProfileHack()
             else
                 WoWPro:dbp("Waiting for TomTom or Carbonite to init...%s", tostring(WoWPro.LockdownCounter))
