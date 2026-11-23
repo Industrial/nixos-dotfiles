@@ -2,7 +2,7 @@
 --
 --   vswitch switch|boot|test|build|dry [--flake DIR] [--host NAME] [--toplevel PATH]
 --           [--out-link PATH] [--ask] [--health-window DURATION] [--health-as USER]
---           [--state-dir DIR] [TOOLS]
+--           [--state-dir DIR] [--eval-cache URL --eval-cache-key KEY ... | --no-eval-cache] [TOOLS]
 --
 -- Options may come before the verb as well as after it: the NixOS feature's
 -- wrapper puts the host's absolute tool paths first. Two subcommands are the
@@ -13,7 +13,7 @@
 import crate::plan::{Tools, Verb, verb_of}
 import vdeploy::cli::parse_duration
 
-export const USAGE : &str = "usage: vswitch switch|boot|test|build|dry [--flake DIR] [--host NAME] [--toplevel PATH] [--out-link PATH] [--ask] [--health-window DURATION] [--health-as USER] [--state-dir DIR] [--db FILE] [TOOLS]\nTOOLS: [--nix PROG] [--vmon PROG | --no-vmon] [--systemd-run PROG] [--systemctl PROG] [--nix-env PROG] [--nix-store PROG] [--setpriv PROG] [--elevate PROG]\n  switch  build, diff, then vdeploy's apply: switch-to-configuration test, vhealth, keep (boot default) or roll back\n  boot    build, diff, make it the boot default; nothing is activated\n  test    build, diff, activate it; the boot default is not touched\n  build   build and diff only\n  dry     what would be built and fetched"
+export const USAGE : &str = "usage: vswitch switch|boot|test|build|dry [--flake DIR] [--host NAME] [--toplevel PATH] [--out-link PATH] [--ask] [--health-window DURATION] [--health-as USER] [--state-dir DIR] [--db FILE] [--eval-cache URL --eval-cache-key KEY ... | --no-eval-cache] [TOOLS]\nTOOLS: [--nix PROG] [--vmon PROG | --no-vmon] [--systemd-run PROG] [--systemctl PROG] [--nix-env PROG] [--nix-store PROG] [--setpriv PROG] [--elevate PROG] [--curl PROG] [--git PROG]\n  switch  build, diff, then vdeploy's apply: switch-to-configuration test, vhealth, keep (boot default) or roll back\n  boot    build, diff, make it the boot default; nothing is activated\n  test    build, diff, activate it; the boot default is not touched\n  build   build and diff only\n  dry     what would be built and fetched"
 
 -- What the command line asked for.
 export data Command
@@ -35,6 +35,11 @@ export data Options
   , export state_dir String
   , export db String
   , export tools Tools
+  , export eval_cache Vec<String>
+  , export eval_cache_keys Vec<String>
+  , export no_eval_cache bool
+  , export curl String
+  , export git String
   }
   deriving (Debug, Clone, PartialEq, Eq)
 
@@ -42,7 +47,7 @@ export default_tools : Tools
 default_tools = Tools { nix = .to_string "nix", vmon = None, systemd_run = .to_string "systemd-run", systemctl = .to_string "systemctl", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", setpriv = .to_string "setpriv", elevate = .to_string "sudo" }
 
 export defaults : Verb -> Options
-defaults verb = Options { verb, flake = .to_string ".", host = None, toplevel = None, out_link = None, ask = false, health_window = .to_string "2m", health_as = None, state_dir = .to_string "/var/lib/vdeploy", db = (vdeploy::cli::defaults ()).db, tools = default_tools () }
+defaults verb = Options { verb, flake = .to_string ".", host = None, toplevel = None, out_link = None, ask = false, health_window = .to_string "2m", health_as = None, state_dir = .to_string "/var/lib/vdeploy", db = (vdeploy::cli::defaults ()).db, tools = default_tools (), eval_cache = Vec::new (), eval_cache_keys = Vec::new (), no_eval_cache = false, curl = .to_string "curl", git = .to_string "git" }
 
 value : Option<&String> -> &str -> Result<String, String>
 value v flag =
@@ -107,6 +112,16 @@ parse_args args =
         o.tools.nix_store := (value (it.next ()) "--nix-store")?
       "--setpriv" ->
         o.tools.setpriv := (value (it.next ()) "--setpriv")?
+      "--eval-cache" ->
+        o.eval_cache.push ((value (it.next ()) "--eval-cache")?)
+      "--eval-cache-key" ->
+        o.eval_cache_keys.push ((value (it.next ()) "--eval-cache-key")?)
+      "--no-eval-cache" ->
+        o.no_eval_cache := true
+      "--curl" ->
+        o.curl := (value (it.next ()) "--curl")?
+      "--git" ->
+        o.git := (value (it.next ()) "--git")?
       "--elevate" ->
         o.tools.elevate := (value (it.next ()) "--elevate")?
       other ->
@@ -155,3 +170,8 @@ test "bad command lines are refused with the reason"
   assert_eq! \-> parse_args (&args (&["switch", "--health-window", "0"])) \-> Err (.to_string "--health-window: not a positive duration: 0")
   assert_eq! \-> parse_args (&args (&["switch", "--flake"])) \-> Err (.to_string "--flake needs a value")
   assert_eq! \-> parse_args (&args (&["switch", "apply"])) \-> Err (.to_string "unknown argument: apply")
+
+test "the eval cache (GH-243): caches and keys repeat, and --no-eval-cache turns it off"
+  o = run_of (&["--eval-cache", "http://a:5100", "--eval-cache-key", "a-1:x", "switch", "--curl", "/c/curl", "--git", "/g/git"])
+  assert_eq! \-> (o.eval_cache.clone (), o.eval_cache_keys.clone (), o.no_eval_cache, o.curl.as_str (), o.git.as_str ()) \-> (.to_vec ([.to_string "http://a:5100"]), .to_vec ([.to_string "a-1:x"]), false, "/c/curl", "/g/git")
+  assert! \-> (run_of (&["--eval-cache", "http://a:5100", "switch", "--no-eval-cache"])).no_eval_cache

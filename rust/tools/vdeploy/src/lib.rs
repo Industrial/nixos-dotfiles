@@ -38,6 +38,7 @@ macro_rules! voltaic {
 }
 
 voltaic!(common);
+voltaic!(evalcache);
 voltaic!(signature);
 voltaic!(watch);
 voltaic!(wake);

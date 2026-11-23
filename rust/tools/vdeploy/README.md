@@ -211,6 +211,44 @@ header, which is not a check).
 Rollback: `features.nix.vdeploy.requireSignedCommits = lib.mkForce false;`. The verdict is
 still checked and recorded in every plan; nothing is refused.
 
+## The eval cache (GH-243)
+
+```
+vdeploy … [--eval-cache URL --eval-cache-key KEY …] [--curl PROG] | --no-eval-cache
+```
+
+vci (GH-242) evaluates every fleet host at every commit of main on the cache host, and
+vdeploy evaluates the same (commit, host) again: the drv is identical (34 of 34 plans, #243).
+So before evaluating, a plan asks each `--eval-cache`, in order, for vci's record of it
+(`src/evalcache.vlt`, nix-store-core's `veval`):
+
+1. the key: the commit, `git rev-parse <sha>^{tree}` and `<sha>:flake.lock` in vdeploy's
+   clone, the host, and `--nix`'s `nix --version`;
+2. `GET <cache>/veval/<key id>.veval`, accepted only when it parses, is the record of exactly
+   that key, and one of the `--eval-cache-key`s signed it (the cache's key, the one the
+   host already trusts for store paths);
+3. `GET <cache>/<out's hash part>.narinfo`: the cache has the out, and its `Deriver` is the
+   record's drv.
+
+Then the plan:
+
+- **hit**: the record's drv is realised as any drv is (Fetcher, else Builder). No
+  evaluation. If the realised path is not the record's out, the record is refused after
+  all: a **fallback**;
+- **fallback** (the narinfo names another drv, or the realised path differs): evaluated
+  here, as without the cache;
+- **miss** (no cache answered, no record, unsigned, badly signed, unparseable, another key,
+  the out not cached): evaluated here. A miss is never an error;
+- `--no-eval-cache`, or no `--eval-cache`: nothing is asked.
+
+The commit is verified (signature, on main) before any of this. One journal line says which
+it was (`eval cache hit: <drv> (vci evaluated it in 32s)`, `eval cache miss, evaluating: …`).
+On a host where vdeploy plans before vci has built the commit (the cache host itself: vci
+builds the other hosts first) the answer is a miss, and the plan is what it was before.
+
+Rollback: `features.nix.vdeploy.evalCache.enable = lib.mkForce false;` (`--no-eval-cache`,
+for vswitch too).
+
 ## Metrics
 
 The metrics go in `<textfile-dir>/vdeploy.prom` for node_exporter's textfile collector,
@@ -223,6 +261,8 @@ rewritten on every poll:
 | `vdeploy_plans_started_total`, `…_finished_total`, `…_failed_total` | finished equals started, or is one behind while a plan runs (never cancelled) |
 | `vdeploy_commits_skipped_total` | commits never planned because a newer one landed (latest-wins) |
 | `vdeploy_commits_unverified_total` | heads refused because their signature did not verify (GH-221) |
+| `vdeploy_eval_cache_hits_total`, `…_misses_total`, `…_fallbacks_total` | plans that took vci's record, found none usable, or refused one after accepting it (GH-243) |
+| `vdeploy_eval_seconds_saved_total` | vci's own eval seconds for every record taken |
 | `vdeploy_last_poll_timestamp_seconds`, `vdeploy_poll_failures_total`, `vdeploy_polls_total`, `vdeploy_head_changes_total` | the poller |
 | `vdeploy_last_plan_timestamp_seconds`, `vdeploy_last_plan_duration_seconds` | the worker |
 | `vdeploy_dotfiles_state{state=…}` | 1 for the checkout's current state |
@@ -240,7 +280,7 @@ does not know what it planned last), and that shows as one more plan started and
 | capability | live | tests |
 |---|---|---|
 | `Source` (head, verify, signature, commit_time) | `git` on vdeploy's clone, `gpgv` | `Scripted` (`unsigned`, `untrusted`, `off_main`) |
-| `Nix` (drv) | `nix eval` | `Scripted` |
+| `Nix` (drv, shared) | `nix eval`; the eval cache (curl, GH-243) | `Scripted` (`cache_on`, `cached`, `bad_records`) |
 | `Fetcher` (fetch) | `nix build --max-jobs 0` (temporary, until vfetch) | `Scripted` |
 | `Builder` (build) | `nix build` | `Scripted` (a build takes N s on the test clock) |
 | `Differ` (json) | vdiff on the store database | `Scripted` |

@@ -1,0 +1,253 @@
+-- The eval cache's consumer side (GH-243): before evaluating a host's
+-- toplevel at a commit, ask the fleet's caches for vci's record of the same
+-- (commit, host), signed by a key this host already trusts for store paths.
+-- vdeploy's plan and vswitch's build both use it.
+--
+-- The key is computed here, from the clone the commit would be evaluated in
+-- (nix-store-core's veval: the commit, its tree and flake.lock blob ids, the
+-- host, this host's `nix --version`). Then, per cache, in order:
+--
+--   1. GET <cache>/veval/<key id>.veval; `veval::accept` it: it parses, it is
+--      the record of exactly this key, and a trusted key signed it;
+--   2. GET <cache>/<hash part of the out>.narinfo: the cache has the out, and
+--      its Deriver is the record's drv.
+--
+-- What it answers (`judged`, pure):
+--
+--   Hit    both hold: plan with the record's drv, no evaluation;
+--   Bad    the record was accepted, but the cache's narinfo for its out names
+--          another derivation: fall back to evaluating, and count it;
+--   Miss   anything else (no cache answered, no record, unsigned, badly
+--          signed, unparseable, another key, the out not in the cache): evaluate,
+--          as without the cache. Never an error;
+--   Off    no caches configured (`--no-eval-cache`, or the feature's rollback).
+--
+-- The caller checks one more thing after realising a hit: the realised path is
+-- the record's out. Anything else is a fallback too.
+
+import nix_store_core::narinfo
+import nix_store_core::signing::{PublicKey, parse_public_key}
+import nix_store_core::storepath::hash_part_of
+import nix_store_core::veval::{Key, Record, accept, key_id, key_of, lock_spec, tree_spec}
+import id_effect::{Effect, HNil, Never, succeed, suspend}
+import crate::common::{cmd, run, strs, tail_lines}
+
+-- Where to ask, whom to believe, and the programs that ask.
+export data Cache
+  { export urls Vec<String>
+  , export keys Vec<String>
+  , export curl String
+  , export git String
+  , export nix String
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- No caches: every lookup is Off.
+export off : Cache
+off = Cache { urls = Vec::new (), keys = Vec::new (), curl = .to_string "curl", git = .to_string "git", nix = .to_string "nix" }
+
+export data Lookup
+  = Hit Record
+  | Bad String
+  | Miss String
+  | Off
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The keys a record may be signed with, in Nix's format; one that does not
+-- parse trusts nothing.
+export trusted_of : &[String] -> Vec<PublicKey>
+trusted_of keys = keys.iter () |> .filter_map (\k -> parse_public_key k |> .ok) |> .collect
+
+base_of : &str -> &str
+base_of url = url.trim_end_matches '/'
+
+export record_url : &str -> &Key -> String
+record_url cache k = "#{base_of cache}/veval/#{key_id k}.veval"
+
+export narinfo_url : &str -> &str -> Option<String>
+narinfo_url cache out = hash_part_of out |> .map (\h -> "#{base_of cache}/#{h}.narinfo")
+
+-- Why the cache's narinfo does not vouch for the record, if it does not: its
+-- StorePath must be the record's out and its Deriver the record's drv.
+export deriver_problem : &Record -> &str -> Option<String>
+deriver_problem r text =
+  case narinfo::parse text of
+    Err e -> Some ("the narinfo of #{r.out} does not parse: #{e}")
+    Ok f ->
+      if f.info.store_path != r.out
+        Some ("the narinfo asked for #{r.out} is for #{f.info.store_path}")
+      else if f.info.deriver.as_deref () != Some (r.drv.as_str ())
+        Some ("#{r.out} was built from #{f.info.deriver.clone ().unwrap_or_else (\-> .to_string "an unknown derivation")}, not #{r.drv}")
+      else
+        None
+
+-- The decision, from what one cache answered (None: nothing, or an error).
+export judged : &[PublicKey] -> &Key -> Option<&str> -> Option<&str> -> Lookup
+judged keys k record info =
+  case record of
+    None -> Miss (.to_string "no record")
+    Some text ->
+      case accept keys k text of
+        Err why -> Miss why
+        Ok r ->
+          case info of
+            None -> Miss ("the cache does not have #{r.out}")
+            Some n ->
+              case deriver_problem (&r) n of
+                Some why -> Bad why
+                None -> Hit r
+
+-- The key of `sha` for `host`, from the clone at `repo`.
+export key_in : &Cache -> &str -> &str -> &str -> Result<Key, String>
+key_in c repo sha host =
+  tree = (run (&cmd (&c.git) (strs (&["-C", repo, "rev-parse", "--verify", "--quiet", tree_spec sha |> .as_str]))) |> .map (\r -> r.stdout))?
+  lock = (run (&cmd (&c.git) (strs (&["-C", repo, "rev-parse", "--verify", "--quiet", lock_spec sha |> .as_str]))) |> .map (\r -> r.stdout))?
+  version = (run (&cmd (&c.nix) (strs (&["--version"]))) |> .map (\r -> r.stdout))?
+  key_of sha (&tree) (&lock) host (&version)
+
+-- One GET, bounded: an offline tailnet peer drops packets, so the connect
+-- timeout is what a miss costs at worst.
+fetched : &Cache -> &str -> Option<String>
+fetched c url =
+  run (&cmd (&c.curl) (strs (&["--silent", "--fail", "--connect-timeout", "3", "--max-time", "10", url]))) |> .ok |> .map (\r -> r.stdout)
+
+-- One cache's answer.
+asked : &Cache -> &[PublicKey] -> &Key -> &str -> Lookup
+asked c keys k url =
+  record = fetched c (&record_url url k)
+  out = record |> .as_deref |> .and_then (\t -> nix_store_core::veval::parse t |> .ok) |> .map (\r -> r.out)
+  info = out |> .and_then (\o -> narinfo_url url (&o)) |> .and_then (\u -> fetched c (&u))
+  judged keys k (record.as_deref ()) (info.as_deref ())
+
+-- Every cache in order: the first Hit or Bad decides, else a Miss with each
+-- cache's reason.
+export lookup_now : &Cache -> &str -> &str -> &str -> Lookup
+lookup_now c repo sha host =
+  if c.urls.is_empty ()
+    return Off
+  case key_in c repo sha host of
+    Err why -> Miss ("no key: #{tail_lines (&why) 1}")
+    Ok k ->
+      keys = trusted_of (&c.keys)
+      first_of c (&keys) (&k) (&c.urls) (Vec::new ())
+
+-- The caches from the first: the first Hit or Bad stops the walk.
+first_of : &Cache -> &[PublicKey] -> &Key -> &[String] -> Vec<String> -> Lookup
+first_of c keys k urls why =
+  case urls.split_first () of
+    None -> Miss (why.join "; ")
+    Some (url, rest) ->
+      case asked c keys k url of
+        Hit r -> Hit r
+        Bad b -> Bad "#{url}: #{b}"
+        Miss m ->
+          mut more = why
+          more.push "#{url}: #{m}"
+          first_of c keys k rest more
+        Off -> first_of c keys k rest why
+
+-- The lookup as one step of a fiber (a few short commands, each bounded).
+export lookup : Cache -> String -> String -> String -> Effect<Lookup, Never, HNil>
+lookup c repo sha host = suspend (move \-> succeed (lookup_now (&c) (&repo) (&sha) (&host)))
+
+-- A lookup's kind, for tests and the journal.
+export kind : &Lookup -> &'static str
+kind l =
+  case l of
+    Hit _ -> "hit"
+    Bad _ -> "bad"
+    Miss _ -> "miss"
+    Off -> "off"
+
+-- The journal's words for a lookup.
+export cache_said : &Lookup -> String
+cache_said l =
+  case l of
+    Hit r -> "eval cache hit: #{r.drv} (vci evaluated it in #{r.eval_secs}s)"
+    Bad why -> "eval cache record refused, evaluating: #{why}"
+    Miss why -> "eval cache miss, evaluating: #{why}"
+    Off -> .to_string "eval cache off, evaluating"
+
+-- A key for the tests only (`nix key generate-secret --key-name test-vcache-1`).
+#[cfg(test)]
+const TEST_SECRET : &str = "test-vcache-1:2kDtNwcDPPeTWBkV+9ETrTMKazto/WkPmn96l6drwlg4JEOzCseS8/jfEJpvdqohsbpOPuVkamCK2c73bhibHg=="
+
+#[cfg(test)]
+const TEST_PUBLIC : &str = "test-vcache-1:OCRDswrHkvP43xCab3aqIbG6Tj7lZGpgitnO924Ymx4="
+
+#[cfg(test)]
+sample_key : Key
+sample_key = Key { commit = .to_string "20456cfc2d62540970eb9c40bc34a840da517ca7", tree = .to_string "4b825dc642cb6eb9a060e54bf8d69288fbee4904", lock = .to_string "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d4", host = .to_string "mimir", nix = .to_string "nix (Nix) 2.31.2" }
+
+#[cfg(test)]
+sample_record : Record
+sample_record = Record { key = sample_key (), drv = .to_string "/nix/store/vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir-nixos-system-mimir.drv", out = .to_string "/nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-nixos-system-mimir", eval_secs = 32, sigs = Vec::new () }
+
+#[cfg(test)]
+signed_text : String
+signed_text =
+  secret = nix_store_core::signing::parse_secret_key TEST_SECRET |> .expect "the test key parses"
+  nix_store_core::veval::render (&nix_store_core::veval::signed (&secret) (sample_record ()))
+
+#[cfg(test)]
+narinfo_for : &str -> &str -> String
+narinfo_for path deriver = "StorePath: #{path}\nURL: nar/x.nar\nCompression: none\nNarHash: sha256:00\nNarSize: 1\nReferences: \nDeriver: #{deriver}\n"
+
+#[cfg(test)]
+trusted : Vec<PublicKey>
+trusted = trusted_of (&[TEST_PUBLIC.to_string ()])
+
+test "a signed record of this key, whose out the cache has from its drv, is a hit"
+  info = narinfo_for "/nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-nixos-system-mimir" "vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir-nixos-system-mimir.drv"
+  r = judged (&trusted ()) (&sample_key ()) (Some (signed_text ().as_str ())) (Some (info.as_str ()))
+  assert_eq! \-> kind (&(r)) \-> "hit"
+  if r is Hit got
+    assert_eq! \-> (got.drv.as_str (), got.eval_secs) \-> ("/nix/store/vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir-nixos-system-mimir.drv", 32)
+
+test "unsigned, tampered, foreign-signed, unparseable and absent records are misses, never errors"
+  info = narinfo_for "/nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-nixos-system-mimir" "vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir-nixos-system-mimir.drv"
+  k = sample_key ()
+  unsigned = nix_store_core::veval::render (&sample_record ())
+  tampered = signed_text ().replace "EvalSeconds: 32" "EvalSeconds: 1"
+  for text in [unsigned.as_str (), tampered.as_str (), "garbage", "<html>404</html>"]
+    assert_eq! \-> kind (&(judged (&trusted ()) (&k) (Some text) (Some (info.as_str ())))) \-> "miss"
+  assert_eq! \-> kind (&(judged (&trusted ()) (&k) None (Some (info.as_str ())))) \-> "miss"
+  -- A good record under a key this host does not trust.
+  assert_eq! \-> kind (&(judged (&trusted_of (&[.to_string "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="])) (&k) (Some (signed_text ().as_str ())) (Some (info.as_str ())))) \-> "miss"
+  -- No trusted keys at all, and a key list that does not parse.
+  assert_eq! \-> kind (&(judged (&[]) (&k) (Some (signed_text ().as_str ())) (Some (info.as_str ())))) \-> "miss"
+  assert_eq! \-> kind (&(judged (&trusted_of (&[.to_string "not-a-key"])) (&k) (Some (signed_text ().as_str ())) (Some (info.as_str ())))) \-> "miss"
+
+test "golden: a record for another tree, flake.lock, commit, host or Nix is a miss"
+  info = narinfo_for "/nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-nixos-system-mimir" "vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir-nixos-system-mimir.drv"
+  k = sample_key ()
+  text = signed_text ()
+  others = .to_vec ([Key { tree = .to_string "4b825dc642cb6eb9a060e54bf8d69288fbee4905", ...k.clone () }, Key { lock = .to_string "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d5", ...k.clone () }, Key { commit = .to_string "20456cfc2d62540970eb9c40bc34a840da517ca8", ...k.clone () }, Key { host = .to_string "drakkar", ...k.clone () }, Key { nix = .to_string "nix (Nix) 2.32.0", ...k.clone () }]) : Vec<Key>
+  for other in &others
+    assert_eq! \-> kind (&(judged (&trusted ()) other (Some (text.as_str ())) (Some (info.as_str ())))) \-> "miss"
+
+test "the cache without the out is a miss; one whose out came from another drv is refused"
+  k = sample_key ()
+  text = signed_text ()
+  assert_eq! \-> kind (&(judged (&trusted ()) (&k) (Some (text.as_str ())) None)) \-> "miss"
+  other = narinfo_for "/nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-nixos-system-mimir" "a07qj5z2ix5l034ybiy6xgzh0x3ndr8p-other.drv"
+  assert_eq! \-> kind (&(judged (&trusted ()) (&k) (Some (text.as_str ())) (Some (other.as_str ())))) \-> "bad"
+  wrong_path = narinfo_for "/nix/store/a07qj5z2ix5l034ybiy6xgzh0x3ndr8p-other" "vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir-nixos-system-mimir.drv"
+  assert_eq! \-> kind (&(judged (&trusted ()) (&k) (Some (text.as_str ())) (Some (wrong_path.as_str ())))) \-> "bad"
+  no_deriver = "StorePath: /nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-nixos-system-mimir\nURL: nar/x.nar\nNarHash: sha256:00\nNarSize: 1\nReferences: \n"
+  assert_eq! \-> kind (&(judged (&trusted ()) (&k) (Some (text.as_str ())) (Some no_deriver))) \-> "bad"
+
+test "the URLs a lookup asks"
+  k = sample_key ()
+  want = "http://drakkar:5100/veval/#{key_id (&k)}.veval"
+  assert_eq! \-> record_url "http://drakkar:5100/" (&k) \-> want
+  assert_eq! \-> narinfo_url "http://drakkar:5100" "/nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-x" \-> Some (.to_string "http://drakkar:5100/znv01c9nzn3ydv9bvr33vanzcdff8bc3.narinfo")
+  assert_eq! \-> narinfo_url "http://drakkar:5100" "not a store path" \-> None
+
+test "no caches: off, and nothing is run"
+  c = Cache { git = .to_string "/nonexistent/git", nix = .to_string "/nonexistent/nix", curl = .to_string "/nonexistent/curl", ...off () }
+  assert_eq! \-> lookup_now (&c) "/r" "abc" "mimir" \-> Off
+
+test "a key that cannot be computed is a miss, not an error"
+  c = Cache { urls = .to_vec ([.to_string "http://127.0.0.1:9"]), git = .to_string "/nonexistent/git", ...off () }
+  assert_eq! \-> kind (&(lookup_now (&c) "/r" "abc" "mimir")) \-> "miss"

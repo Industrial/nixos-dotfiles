@@ -1428,6 +1428,7 @@ version = "0.1.0"
 dependencies = [
  "id_effect",
  "id_effect_cli",
+ "nix-store-core",
  "vdeploy",
  "vdiff",
  "voltaic-diag",
