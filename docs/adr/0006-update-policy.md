@@ -101,6 +101,28 @@ rejected: it is tied to a person, it must be rotated by hand, and the PRs would 
 that person's. Without the secrets, the job falls back to `FLAKE_LOCK_UPDATE_TOKEN`, then
 `GITHUB_TOKEN`, with a warning in the job summary. Setup: `docs/runbooks/updates.md` §6.
 
+## Amendment (2026-11-23, GH-247): vbump is the only updater, and its PRs auto-merge
+
+User decision (2026-11-23, "Installed; auto-merge green"): **decision 4 is replaced.** Every
+vbump PR arms GitHub's auto-merge (squash) when it is opened or refreshed, and merges
+itself once `main`'s required `ci / all-green` passes. No distinction is drawn between a
+closure-only bump and one that touches an evaluated module: CI is the merge gate, and after
+the merge vdeploy's health check and rollback are the deploy gate. To hold one bump, an
+operator disables auto-merge on its PR or closes it.
+
+`.github/workflows/update-flake-lock.yml` (the `DeterminateSystems/update-flake-lock`
+single-PR jobs and their `FLAKE_LOCK_UPDATER` selector), the whole-lock fallback of
+`bin/update/flake` and the uncalled `bin/ci/update-host` are deleted. vbump runs from
+`.github/workflows/vbump.yml`, the only lock updater; the `FLAKE_LOCK_UPDATE_TOKEN` fallback
+is gone (the app token, or `GITHUB_TOKEN` with a warning). Rollback, the one option:
+restore the old workflow and script from `056a7031` (`docs/runbooks/updates.md` §1).
+`features/cli/vbump/default.assay.nix` checks that exactly one lock updater exists.
+
+The "Auto-merge green bump PRs" row under *Alternatives considered* is now the decision.
+The old reason (main not reliably green) no longer holds: `ci / all-green` has been
+required on `main` since #126 and checks every host. vci's `vci/<host>` statuses on drakkar
+(optional, `docs/runbooks/updates.md` §7) are informational and not required.
+
 ## Why the PR shows evaluated versions, not a built closure diff
 
 A real closure diff (`nix store diff-closures`, nvd) needs both closures realised for each

@@ -9,8 +9,9 @@
 #   * it would activate an unreviewed lock from a local working tree: a third
 #     activator next to comin and deploy-rs, and one that comin reverts within
 #     300s anyway.
-# The replacement: .github/workflows/update-flake-lock.yml opens a lock-bump PR,
-# the operator reviews and merges it, and comin converges every host from main.
+# The replacement: .github/workflows/vbump.yml opens one lock-bump PR per input,
+# each merges itself once main's required CI passes, and comin converges every host
+# from main.
 #
 # What is left is the guard: nixpkgs' own unattended upgrader must stay off,
 # because it would be exactly that third activator.
@@ -20,8 +21,8 @@
       assertion = !config.system.autoUpgrade.enable;
       message = ''
         system.autoUpgrade.enable is set, but comin is this fleet's only unattended
-        activator (ADR-0002, ADR-0006). Lock bumps arrive as reviewed PRs from
-        .github/workflows/update-flake-lock.yml; hosts converge from merged main.
+        activator (ADR-0002, ADR-0006). Lock bumps arrive as CI-gated PRs from
+        .github/workflows/vbump.yml; hosts converge from merged main.
       '';
     }
   ];

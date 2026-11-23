@@ -47,7 +47,7 @@ pub struct Config {
     #[arg(long, default_value = "", env = "NIXOS_UPDATE_GITHUB_REPO")]
     pub github_repo: String,
 
-    /// Lock-bump branch: the update-flake-lock workflow's single PR branch, and the prefix
+    /// Lock-bump branch: the old whole-lock workflow's single PR branch (deleted in GH-247), and the prefix
     /// of vbump's per-input `<branch>-<input>` branches. Both count as a lock bump.
     #[arg(
         long,

@@ -2,9 +2,9 @@
 
 Tells the operator what an update is waiting on (see `docs/runbooks/updates.md`):
 
-- an **open lock-bump PR** from `.github/workflows/update-flake-lock.yml`, awaiting review:
-  the legacy single PR on `update/flake-lock`, or any of vbump's per-input PRs on
-  `update/flake-lock-<input>` (unauthenticated GitHub API, public repo: one
+- an **open lock-bump PR** from `.github/workflows/vbump.yml`, awaiting its merge:
+  any of vbump's per-input PRs on `update/flake-lock-<input>` (or the single PR on
+  `update/flake-lock` that the old, deleted whole-lock workflow opened) (unauthenticated GitHub API, public repo: one
   `GET /repos/{repo}/pulls?state=open&per_page=100`, filtered on `head.ref`, and only PRs whose
   head is this repository, not a fork). While one is open the local build below is skipped,
   since the PR body already carries the per-host diff;
