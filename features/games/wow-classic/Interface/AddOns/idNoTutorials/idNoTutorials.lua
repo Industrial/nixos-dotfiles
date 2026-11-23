@@ -1,0 +1,1 @@
+SetCVar("showTutorials",0)
