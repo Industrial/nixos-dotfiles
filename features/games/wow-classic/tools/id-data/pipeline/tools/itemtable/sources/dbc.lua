@@ -280,7 +280,12 @@ local AURA_NAME = {
   [20] = "OBS_MOD_HEALTH",
   [21] = "OBS_MOD_POWER",
   [34] = "MOD_INCREASE_HEALTH",
-  [69] = "SCHOOL_ABSORB"
+  [69] = "SCHOOL_ABSORB",
+  -- Forever renumbered these: 674 is the elixirs' exclusive resistance
+  -- (Elixir of Defense, misc 1), 418 the flask's max-power raise
+  -- (Distilled Wisdom, misc 0 = mana).
+  [674] = "MOD_RESISTANCE_EXCLUSIVE",
+  [418] = "MOD_MAX_POWER"
 }
 M.AURA_NAME = AURA_NAME
 local EFFECT_NAME = {
@@ -661,7 +666,7 @@ M.toModel = function(tables, opts)
     end
     -- Armor is a resistance in the client: MOD_RESISTANCE with the
     -- physical school (mask 1). Every other mask is a magic resistance.
-    if aura == "MOD_RESISTANCE" and misc == 1 then
+    if (aura == "MOD_RESISTANCE" or aura == "MOD_RESISTANCE_EXCLUSIVE") and misc == 1 then
       statType = "ARMOR"
     end
     local amount, kind = num(row.EffectBasePoints), nil

@@ -1,12 +1,17 @@
 local M = { }
 local FLASK_MIN_DURATION = 3600000 * 2
 M.FLASK_MIN_DURATION = FLASK_MIN_DURATION
+-- A buff outlasts a minute; a drink's or a sleep potion's 12-30 s regen is a
+-- restore, not a buff.
+local BUFF_MIN_DURATION = 60000
+M.BUFF_MIN_DURATION = BUFF_MIN_DURATION
 local STAT_AURAS = {
   APPLY_AURA = true,
   MOD_STAT = true,
   MOD_TOTAL_STAT_PERCENTAGE = true,
   -- Armor elixirs: the adapter names physical-school MOD_RESISTANCE as statType "ARMOR".
-  MOD_RESISTANCE = true
+  MOD_RESISTANCE = true,
+  MOD_RESISTANCE_EXCLUSIVE = true
 }
 local statAura
 statAura = function(ctx, item, stat)
@@ -18,15 +23,48 @@ statAura = function(ctx, item, stat)
   end
   return math.abs(pair.effect.amount or 1), pair.spell
 end
--- Food is what the client files as Food, or what shares food's cooldown
--- group (old fish and meat the client files as "Other").
-local isFood
-isFood = function(ctx, item)
-  if item.subclass == "Food" then
+-- Use spells some item of `subclass` casts, per classify context.
+local spellsOfCache = setmetatable({ }, { __mode = "k" })
+local spellsOf = function(ctx, subclass)
+  local byCtx = spellsOfCache[ctx] or { }
+  spellsOfCache[ctx] = byCtx
+  if byCtx[subclass] then
+    return byCtx[subclass]
+  end
+  local subclassOf, out = { }, { }
+  for _, it in ipairs(ctx.doc.items or { }) do
+    subclassOf[it.id] = it.class == "Consumable" and it.subclass or nil
+  end
+  for _, fx in ipairs(ctx.doc.itemEffects or { }) do
+    if fx.trigger == "use" and subclassOf[fx.itemId] == subclass then
+      out[fx.spellId] = true
+    end
+  end
+  byCtx[subclass] = out
+  return out
+end
+-- An item the client files elsewhere still belongs to `subclass` when it
+-- shares that subclass's cooldown group or casts the same spell one of its
+-- items casts (old fish filed "Other", a bandage filed "Other").
+local actsAs = function(ctx, item, subclass)
+  if item.subclass == subclass then
     return true
   end
   local cat = ctx.cooldownCategoryOf and ctx.cooldownCategoryOf(item)
-  return cat ~= nil and cat == ctx.dominantCategory("Food")
+  if cat ~= nil and cat == ctx.dominantCategory(subclass) then
+    return true
+  end
+  local spells = ctx.doc and spellsOf(ctx, subclass) or { }
+  for _, fx in ipairs(ctx.idx and ctx.idx.effectsByItem[item.id] or { }) do
+    if fx.trigger == "use" and spells[fx.spellId] then
+      return true
+    end
+  end
+  return false
+end
+local isFood
+isFood = function(ctx, item)
+  return actsAs(ctx, item, "Food")
 end
 local statBuff
 statBuff = function(stat, kind)
@@ -152,7 +190,7 @@ local auraBuff = function(auraType, kind, miscTest)
       return effect.auraType == auraType and (effect.index or 1) < 100
         and (miscTest == nil or miscTest(effect.miscValue))
     end)
-    if not pair then
+    if not pair or (pair.spell.duration or 0) < BUFF_MIN_DURATION then
       return nil
     end
     local isFlask = (pair.spell.duration or 0) >= FLASK_MIN_DURATION
@@ -189,7 +227,8 @@ M.UPKEEP_AURAS = {
   MOD_STAT = true, MOD_TOTAL_STAT_PERCENTAGE = true, APPLY_AURA = true,
   MOD_ATTACK_POWER = true, MOD_RANGED_ATTACK_POWER = true, MOD_DAMAGE_DONE = true,
   MOD_RESISTANCE = true, MOD_HEALTH_REGEN_IN_COMBAT = true, MOD_INCREASE_HEALTH = true,
-  OBS_MOD_HEALTH = true, OBS_MOD_POWER = true
+  OBS_MOD_HEALTH = true, OBS_MOD_POWER = true, MOD_RESISTANCE_EXCLUSIVE = true,
+  MOD_MAX_POWER = true
 }
 -- Named effects known to have no upkeep set. A raw client number is an aura
 -- the adapter deliberately leaves unnamed; a NAME outside both lists is new
@@ -198,6 +237,43 @@ M.OTHER_AURAS = {
   PERIODIC_DAMAGE = true, SCHOOL_ABSORB = true, CREATE_ITEM = true, SUMMON = true,
   ENCHANT_HELD_ITEM = true
 }
+-- Restores in the client's own units: instant, periodic, or a percentage.
+local RESTORES = {
+  HEAL = true, ENERGIZE = true, PERIODIC_HEAL = true, PERIODIC_ENERGIZE = true,
+  OBS_MOD_HEALTH = true, OBS_MOD_POWER = true
+}
+M.RESTORES = RESTORES
+local TRACKED_SCHOOL = { [4] = true, [16] = true, [32] = true, [126] = true, [127] = true }
+-- A buff whose kind no upkeep set holds: Spirit, every resistance but armor,
+-- max health outside a flask, in-combat health regen, Holy/Nature/physical
+-- damage, a stamina flask, or anything shorter than a buff (combat potions).
+local untrackedBuff
+untrackedBuff = function(effect, spell)
+  local aura, duration = effect.auraType, (spell and spell.duration) or 0
+  if RESTORES[aura or ""] then
+    return false
+  end
+  if duration < BUFF_MIN_DURATION and M.UPKEEP_AURAS[aura or ""] then
+    return true
+  end
+  local isFlask = duration >= FLASK_MIN_DURATION
+  if aura == "MOD_STAT" or aura == "MOD_TOTAL_STAT_PERCENTAGE" then
+    return effect.statType == "SPIRIT" or effect.statType == "ALL" or (effect.statType == "STAMINA" and isFlask)
+  end
+  if aura == "MOD_RESISTANCE" or aura == "MOD_RESISTANCE_EXCLUSIVE" then
+    return effect.statType ~= "ARMOR"
+  end
+  if aura == "MOD_INCREASE_HEALTH" then
+    return not isFlask
+  end
+  if aura == "MOD_HEALTH_REGEN_IN_COMBAT" then
+    return true
+  end
+  if aura == "MOD_DAMAGE_DONE" then
+    return not TRACKED_SCHOOL[effect.miscValue or -1]
+  end
+  return false
+end
 local knownIrrelevant
 knownIrrelevant = function(effect)
   local aura = effect.auraType
@@ -244,13 +320,16 @@ M.sets = {
     predicate = statBuff("STAMINA", "self")
   },
   ["Consumable.Buff.Health.Flask"] = {
-    predicate = statBuff("HEALTH", "flask")
+    predicate = auraBuff("MOD_INCREASE_HEALTH", "flask")
   },
   ["Consumable.Buff.Regen Mana.Flask"] = {
-    predicate = statBuff("MANA", "flask")
+    predicate = function(ctx, item)
+      return auraBuff("PERIODIC_ENERGIZE", "flask")(ctx, item)
+        or auraBuff("MOD_MAX_POWER", "flask", function(misc) return (misc or 0) == 0 end)(ctx, item)
+    end
   },
   ["Consumable.Buff.Regen Mana.Self"] = {
-    predicate = statBuff("MANA", "self")
+    predicate = auraBuff("PERIODIC_ENERGIZE", "self")
   },
   ["Consumable.Buff.Armor.Self"] = {
     predicate = statBuff("ARMOR", "self")
@@ -356,7 +435,7 @@ M.sets = {
   },
   ["Consumable.Bandage.Basic"] = {
     predicate = function(ctx, item)
-      if not (item.subclass == "Bandage") then
+      if not (actsAs(ctx, item, "Bandage")) then
         return nil
       end
       local amount = instantRestore("HEAL")(ctx, item)
@@ -413,7 +492,8 @@ M.exclusions = {
   -- bandages, stones, elixirs/flasks, weapon stones and oils). The categories
   -- below have no set because nothing consumes them; each is excluded by what
   -- the item DOES, never by its id. An item with any upkeep-relevant effect
-  -- is never excluded here, so a real miss still blocks the gate.
+  -- is never excluded by these, so a real miss still blocks the gate; the
+  -- last three name the upkeep-shaped kinds that have no set, one by one.
   {
     reason = "gear or weapon enchant with no upkeep set (engraving runes, proc oils)",
     match = function(ctx, item)
@@ -442,6 +522,54 @@ M.exclusions = {
       return ctx.findEffect(item, function(effect)
         return not knownIrrelevant(effect)
       end) == nil
+    end
+  },
+  {
+    reason = "buff of a kind no upkeep set holds (Spirit, resistances, Fortitude, Troll's Blood, Holy/Nature damage, stamina flasks, combat potions)",
+    match = function(ctx, item)
+      local sawBuff = false
+      local other = ctx.findEffect(item, function(effect, spell)
+        if untrackedBuff(effect, spell) then
+          sawBuff = true
+          return false
+        end
+        return not knownIrrelevant(effect)
+      end)
+      return sawBuff and other == nil
+    end
+  },
+  {
+    reason = "restores a percentage, which no amount-ranked set can hold (Harvest Festival food, candy)",
+    match = function(ctx, item)
+      local sawPercent = false
+      local other = ctx.findEffect(item, function(effect, spell)
+        if effect.auraType == "OBS_MOD_HEALTH" or effect.auraType == "OBS_MOD_POWER" then
+          sawPercent = true
+          return false
+        end
+        return not (knownIrrelevant(effect) or untrackedBuff(effect, spell))
+      end)
+      return sawPercent and other == nil
+    end
+  },
+  {
+    reason = "restore that is no food, drink, bandage, potion or conjured stone (Whipper Root, Night Dragon's Breath, Thistle Tea, Restoring Balm)",
+    match = function(ctx, item)
+      if isConjured(item) or item.subclass == "Potion" or actsAs(ctx, item, "Bandage") then
+        return false
+      end
+      local cat = ctx.cooldownCategoryOf(item)
+      if cat ~= nil and cat == ctx.potionCategory() then
+        return false
+      end
+      return ctx.findEffect(item, function(effect)
+        -- Eating and drinking are periodic: those stay the food sets' to
+        -- claim. An instant restore filed as Food is not a meal.
+        if effect.auraType == "PERIODIC_HEAL" or effect.auraType == "PERIODIC_ENERGIZE" then
+          return not isFood(ctx, item)
+        end
+        return RESTORES[effect.auraType or ""] == true
+      end) ~= nil
     end
   }
 }

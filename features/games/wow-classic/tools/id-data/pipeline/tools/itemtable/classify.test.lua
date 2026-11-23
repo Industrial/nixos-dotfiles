@@ -127,7 +127,9 @@ return describe("itemtable classifier", function()
       doc.items[#doc.items + 1] = { id = 90102, name = "FIXTURE Old Fish", class = "Consumable", subclass = "Other" }
       doc.items[#doc.items + 1] = { id = 90103, name = "FIXTURE Balm", class = "Consumable", subclass = "Other" }
       doc.itemEffects[#doc.itemEffects + 1] = { itemId = 90102, spellId = foodSpell, trigger = "use", cooldownCategory = 11 }
-      doc.itemEffects[#doc.itemEffects + 1] = { itemId = 90103, spellId = foodSpell, trigger = "use", cooldownCategory = 1153 }
+      doc.itemEffects[#doc.itemEffects + 1] = { itemId = 90103, spellId = 91017, trigger = "use", cooldownCategory = 1153 }
+      doc.spells[#doc.spells + 1] = { id = 91017, name = "FIXTURE Balm", duration = 10000 }
+      doc.spellEffects[#doc.spellEffects + 1] = { spellId = 91017, index = 1, auraType = "PERIODIC_HEAL", amount = 50 }
       local result = classify.run(doc, rules)
       assert.is_not_nil(result.sets["Consumable.Food.Edible.Basic.Non-Conjured"][90102])
       return assert.is_nil(result.sets["Consumable.Food.Edible.Basic.Non-Conjured"][90103])
@@ -137,6 +139,42 @@ return describe("itemtable classifier", function()
       assert.are.equal(8, result.sets["Consumable.Weapon Buff.Stone.Sharpening Stone"][90007])
       assert.are.equal(24, result.sets["Consumable.Weapon Buff.Oil.Wizard"][90008])
       return assert.is_nil((result.sets["Consumable.Weapon Buff.Stone.Weight Stone"] or { })[90008])
+    end)
+  end)
+  describe("out-of-scope kinds", function()
+    -- One consumable with a single use effect; returns the classify result.
+    local withItem = function(subclass, effect, duration, extra)
+      local doc = fixtures()
+      local item = { id = 90200, name = "FIXTURE Probe", class = "Consumable", subclass = subclass }
+      for k, v in pairs(extra or { }) do item[k] = v end
+      doc.items[#doc.items + 1] = item
+      doc.spells[#doc.spells + 1] = { id = 91200, name = "FIXTURE Probe", duration = duration }
+      doc.itemEffects[#doc.itemEffects + 1] = { itemId = 90200, spellId = 91200, trigger = "use" }
+      effect.spellId, effect.index = 91200, 1
+      doc.spellEffects[#doc.spellEffects + 1] = effect
+      return classify.run(doc, rules)
+    end
+    it("excludes a Spirit elixir by kind", function()
+      local r = withItem("Elixir", { auraType = "MOD_STAT", statType = "SPIRIT", amount = 8 }, 3600000)
+      return assert.is_truthy((r.excluded[90200] or ""):find("Spirit", 1, true))
+    end)
+    it("excludes a 15-second combat potion: shorter than a buff", function()
+      local r = withItem("Potion", { auraType = "MOD_ATTACK_POWER", amount = 40 }, 15000)
+      assert.is_nil((r.sets["Consumable.Buff.Attack Power.Self"] or { })[90200])
+      return assert.is_truthy((r.excluded[90200] or ""):find("combat potions", 1, true))
+    end)
+    it("excludes a percentage restore", function()
+      local r = withItem("Food", { auraType = "OBS_MOD_HEALTH", amount = 2 }, 30000)
+      return assert.is_truthy((r.excluded[90200] or ""):find("percentage", 1, true))
+    end)
+    it("excludes an instant restore that is no potion or stone (Whipper Root)", function()
+      local r = withItem("Food", { auraType = "HEAL", amount = 900 }, 0)
+      return assert.is_truthy((r.excluded[90200] or ""):find("no food, drink", 1, true))
+    end)
+    return it("keeps an Agility elixir in its set, never excluded", function()
+      local r = withItem("Elixir", { auraType = "MOD_STAT", statType = "AGILITY", amount = 8 }, 3600000)
+      assert.are.equal(8, r.sets["Consumable.Buff.Agility.Self"][90200])
+      return assert.is_nil(r.excluded[90200])
     end)
   end)
   describe("unclassified and excluded", function()
