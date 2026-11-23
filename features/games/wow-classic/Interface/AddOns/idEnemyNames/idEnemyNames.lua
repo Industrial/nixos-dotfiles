@@ -1,0 +1,1 @@
+SetCVar("UnitNameEnemyPlayerName",1)
