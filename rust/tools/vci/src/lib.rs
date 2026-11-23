@@ -46,3 +46,4 @@ voltaic!(caps);
 voltaic!(agent);
 voltaic!(cli);
 voltaic!(app);
+voltaic!(token);

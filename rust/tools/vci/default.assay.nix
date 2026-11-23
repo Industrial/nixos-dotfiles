@@ -45,6 +45,8 @@ in
     buildsTheVciCrate = assay.eq [pkg.cargoRoot pkg.buildAndTestSubdir] ["vci" "vci"];
 
     mainProgram = assay.eq pkg.meta.mainProgram "vci";
+    # GH-247: the token minter is the crate's second binary, from src/token.vlt.
+    twoBinaries = assay.eq [(map (b: b.name) manifest.bin) (builtins.pathExists "${pkg.src}/vci/src/token.vlt")] [["vci" "vci-token"] true];
     linuxOnly =
       assay.eq [(builtins.all (lib.hasSuffix "-linux") pkg.meta.platforms) (builtins.elem "x86_64-linux" pkg.meta.platforms)] [true true];
   }
