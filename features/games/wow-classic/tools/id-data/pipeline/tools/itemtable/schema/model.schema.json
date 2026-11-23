@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "properties": {
+    "build": {
+      "type": "string"
+    },
+    "itemEffects": {
+      "items": {
+        "properties": {
+          "charges": {
+            "type": "integer"
+          },
+          "itemId": {
+            "type": "integer"
+          },
+          "spellId": {
+            "type": "integer"
+          },
+          "trigger": {
+            "description": "use|equip|proc",
+            "type": "string"
+          }
+        },
+        "required": ["itemId", "spellId", "trigger"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "items": {
+      "items": {
+        "properties": {
+          "bind": {
+            "description": "none|pickup|equip|use|quest",
+            "type": "string"
+          },
+          "class": {
+            "description": "item class, e.g. Consumable",
+            "type": "string"
+          },
+          "id": {
+            "description": "item id",
+            "type": "integer"
+          },
+          "ilvl": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quality": {
+            "description": "0=poor .. 5=legendary",
+            "type": "integer"
+          },
+          "stackable": {
+            "type": "integer"
+          },
+          "subclass": {
+            "type": "string"
+          }
+        },
+        "required": ["class", "id", "name"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "type": "integer"
+    },
+    "source": {
+      "type": "string"
+    },
+    "spellEffects": {
+      "items": {
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "auraType": {
+            "description": "e.g. APPLY_AURA",
+            "type": "string"
+          },
+          "index": {
+            "description": "effect slot, 1-based",
+            "type": "integer"
+          },
+          "miscValue": {
+            "type": "integer"
+          },
+          "spellId": {
+            "type": "integer"
+          },
+          "statType": {
+            "description": "e.g. AGILITY, STAMINA",
+            "type": "string"
+          }
+        },
+        "required": ["index", "spellId"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "spells": {
+      "items": {
+        "properties": {
+          "duration": {
+            "description": "milliseconds; 0 or absent = instant/permanent",
+            "type": "number"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "name"],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "build",
+    "itemEffects",
+    "items",
+    "schemaVersion",
+    "source",
+    "spellEffects",
+    "spells"
+  ],
+  "title": "idAutomation item-table normalized model",
+  "type": "object"
+}
