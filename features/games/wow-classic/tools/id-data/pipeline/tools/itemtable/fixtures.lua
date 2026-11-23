@@ -314,6 +314,14 @@ return {
       statType = "STAMINA",
       amount = 6
     },
+    -- A stat food restores health too (Forever's Nutritious Food does both),
+    -- which is what puts it in two sets: basic food and Food.Buff.Stamina.
+    {
+      spellId = 91004,
+      index = 2,
+      auraType = "PERIODIC_HEAL",
+      amount = 60
+    },
     {
       spellId = 91005,
       index = 1,

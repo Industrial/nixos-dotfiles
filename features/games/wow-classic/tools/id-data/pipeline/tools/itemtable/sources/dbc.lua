@@ -274,7 +274,13 @@ local AURA_NAME = {
   [84] = "PERIODIC_HEAL",
   [85] = "PERIODIC_ENERGIZE",
   [99] = "MOD_ATTACK_POWER",
-  [137] = "MOD_TOTAL_STAT_PERCENTAGE"
+  [124] = "MOD_RANGED_ATTACK_POWER",
+  [137] = "MOD_TOTAL_STAT_PERCENTAGE",
+  [161] = "MOD_HEALTH_REGEN_IN_COMBAT",
+  [20] = "OBS_MOD_HEALTH",
+  [21] = "OBS_MOD_POWER",
+  [34] = "MOD_INCREASE_HEALTH",
+  [69] = "SCHOOL_ABSORB"
 }
 M.AURA_NAME = AURA_NAME
 local EFFECT_NAME = {
@@ -702,8 +708,12 @@ M.toModel = function(tables, opts)
       local trigger = num(row.EffectTriggerSpell)
       if trigger and trigger ~= 0 and trigger ~= spellId
          and (TRIGGERS_EFFECT[num(row.Effect) or -1] or TRIGGERS_AURA[num(row.EffectAura) or -1]) then
+        -- One-shot triggers (the restore) land at 101+, periodic ones (the
+        -- Well Fed stack) at 201+, so a rule can tell a drink's mana from a
+        -- mana-regen Well Fed buff even though both are aura 85.
+        local base = TRIGGERS_AURA[num(row.EffectAura) or -1] and 200 or 100
         for k, t in ipairs(effectsOf[trigger] or { }) do
-          local rec = effectRecord(t, spellId, 100 + (index * 10) + k)
+          local rec = effectRecord(t, spellId, base + (index * 10) + k)
           if rec.auraType then
             doc.spellEffects[#doc.spellEffects + 1] = rec
           end
