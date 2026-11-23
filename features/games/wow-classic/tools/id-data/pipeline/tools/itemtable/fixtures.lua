@@ -42,7 +42,8 @@ return {
       class = "Consumable",
       subclass = "Food",
       quality = 1,
-      stackable = 20
+      stackable = 20,
+      conjured = true
     },
     {
       id = 90006,
@@ -91,6 +92,24 @@ return {
       subclass = "Bandage",
       quality = 1,
       stackable = 20
+    },
+    {
+      id = 90015,
+      name = "FIXTURE Healthstone",
+      class = "Consumable",
+      subclass = "Other",
+      quality = 1,
+      stackable = 1,
+      conjured = true
+    },
+    {
+      id = 90016,
+      name = "FIXTURE Mana Jade",
+      class = "Consumable",
+      subclass = "Other",
+      quality = 2,
+      stackable = 1,
+      conjured = true
     },
     {
       id = 90009,
@@ -171,6 +190,16 @@ return {
       id = 91014,
       name = "FIXTURE Bandage Self",
       duration = 8000
+    },
+    {
+      id = 91015,
+      name = "FIXTURE Healthstone",
+      duration = 0
+    },
+    {
+      id = 91016,
+      name = "FIXTURE Restore Mana",
+      duration = 0
     },
     {
       id = 92001,
@@ -283,6 +312,16 @@ return {
       itemId = 90014,
       spellId = 91014,
       trigger = "use"
+    },
+    {
+      itemId = 90015,
+      spellId = 91015,
+      trigger = "use"
+    },
+    {
+      itemId = 90016,
+      spellId = 91016,
+      trigger = "use"
     }
   },
   spellEffects = {
@@ -364,6 +403,18 @@ return {
       spellId = 91014,
       index = 1,
       auraType = "PERIODIC_HEAL",
+      amount = 400
+    },
+    {
+      spellId = 91015,
+      index = 0,
+      auraType = "HEAL",
+      amount = 500
+    },
+    {
+      spellId = 91016,
+      index = 0,
+      auraType = "ENERGIZE",
       amount = 400
     },
     {

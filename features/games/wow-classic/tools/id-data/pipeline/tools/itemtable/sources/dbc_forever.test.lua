@@ -97,6 +97,15 @@ describe("itemtable dbc source on Forever's vocabulary", function()
                       ["Minor Mana Oil"] = "MANA_OIL", ["Shadow Oil"] = "OTHER" }, kinds)
   end)
 
+  it("reads the conjured flag (Flags_0 bit 2) that healthstones and conjured water carry", function()
+    local doc = model({ row(100, 0, 10, 0, 500) })
+    assert.is_false(doc.items[1].conjured)
+    doc = model({ row(100, 0, 10, 0, 500) }, {
+      itemSparse = { { ID = "1", Display_lang = "Healthstone", OverallQualityID = "1", ItemLevel = "5", Stackable = "1", Flags_0 = "66" } },
+    })
+    assert.is_true(doc.items[1].conjured)
+  end)
+
   it("produces a document the model validator accepts", function()
     local doc = model({ row(100, 0, 64, 0, 0, 0, 200), row(200, 0, 6, 84, 58), row(100, 1, 54, 0, 1800, 40) }, {
       spellItemEnchantment = { { ID = "40", Name_lang = "Sharpened +2", EffectPointsMin_0 = "2" } },

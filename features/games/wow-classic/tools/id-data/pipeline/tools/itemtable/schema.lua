@@ -20,6 +20,7 @@ M.records = {
       quality = field("int", false, "0=poor .. 5=legendary"),
       ilvl = field("int", false),
       stackable = field("int", false),
+      conjured = field("bool", false, "client flag: created by a spell, vanishes on logout"),
       bind = field("string", false, "none|pickup|equip|use|quest")
     }
   },

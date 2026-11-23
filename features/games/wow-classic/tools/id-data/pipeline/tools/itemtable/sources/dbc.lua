@@ -522,7 +522,8 @@ M.toModel = function(tables, opts)
         subclass = (classId == 0 and CONSUMABLE_SUBCLASS[num(row.SubclassID) or -1]) or ((row.SubclassID and row.SubclassID ~= "") and ("Subclass%s"):format(row.SubclassID) or nil),
         quality = num(s.OverallQualityID),
         ilvl = num(s.ItemLevel),
-        stackable = num(s.Stackable)
+        stackable = num(s.Stackable),
+        conjured = math.floor((num(s.Flags_0) or 0) / 2) % 2 == 1
       }
       _continue_0 = true
     until true

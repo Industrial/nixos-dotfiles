@@ -90,7 +90,18 @@ potion = function(auraType)
 end
 local isConjured
 isConjured = function(item)
-  return (item.name or ""):lower():find("conjured", 1, true) ~= nil
+  return item.conjured == true
+end
+-- A conjured item that restores instantly and is no potion: the warlock's
+-- healthstone (HEAL) or the mage's mana gem (ENERGIZE).
+local conjuredStone
+conjuredStone = function(auraType)
+  return function(ctx, item)
+    if not (isConjured(item) and item.subclass ~= "Potion" and item.subclass ~= "Food") then
+      return nil
+    end
+    return instantRestore(auraType)(ctx, item)
+  end
 end
 local weaponBuff
 weaponBuff = function(discriminator)
@@ -333,8 +344,12 @@ M.sets = {
   },
   ["Consumable.Cooldown.Potion.Health.Basic"] = unsupported("model has no spell cooldown-category field"),
   ["Consumable.Cooldown.Potion.Mana.Basic"] = unsupported("model has no spell cooldown-category field"),
-  ["Consumable.Cooldown.Stone.Health.Warlock"] = unsupported("model has no spell -> created-item link"),
-  ["Consumable.Cooldown.Stone.Mana.Mana Stone"] = unsupported("model has no spell -> created-item link"),
+  ["Consumable.Cooldown.Stone.Health.Warlock"] = {
+    predicate = conjuredStone("HEAL")
+  },
+  ["Consumable.Cooldown.Stone.Mana.Mana Stone"] = {
+    predicate = conjuredStone("ENERGIZE")
+  },
   ["Consumable.Weapon Buff.Stone.Sharpening Stone"] = {
     predicate = weaponBuff(function(effect)
       return effect.enchantKind == "SHARPEN"
