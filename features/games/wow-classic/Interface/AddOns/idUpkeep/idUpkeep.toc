@@ -1,0 +1,43 @@
+## Interface: 16001
+## Title: idUpkeep
+## Notes: Three buttons and macros: next missing buff, food / health, drink / mana. /idupkeep explains.
+## Dependencies: idLibItemTable, idLibSpellTable
+## SavedVariables: idUpkeepDB
+## LoadSavedVariablesFirst: 1
+
+Libs\LibStub\LibStub.lua
+Libs\LibPeriodicTable-3.1\LibPeriodicTable-3.1\LibPeriodicTable-3.1.lua
+Libs\LibPeriodicTable-3.1\LibPeriodicTable-3.1-Consumable\LibPeriodicTable-3.1-Consumable.lua
+core\Table.lua
+core\String.lua
+core\Color.lua
+core\Anchor.lua
+core\Logger.lua
+core\Frame.lua
+core\VersionInfo.lua
+core\Database.lua
+core\EventManager.lua
+core\Graph.lua
+core\HookManager.lua
+core\CombatLockdownCommand.lua
+core\Node.lua
+upkeep\Rules.lua
+upkeep\classes\WARRIOR.lua
+upkeep\classes\MAGE.lua
+upkeep\classes\ROGUE.lua
+upkeep\classes\PRIEST.lua
+upkeep\classes\DRUID.lua
+upkeep\classes\PALADIN.lua
+upkeep\classes\SHAMAN.lua
+upkeep\classes\HUNTER.lua
+upkeep\classes\WARLOCK.lua
+upkeep\Engine.lua
+upkeep\Consumables.lua
+upkeep\Snapshot.lua
+upkeep\Spells.lua
+upkeep\Button.lua
+upkeep\Sustain.lua
+upkeep\PetDeath.lua
+upkeep\Macros.lua
+Upkeep.lua
+idUpkeep.lua
