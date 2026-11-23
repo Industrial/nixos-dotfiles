@@ -235,6 +235,8 @@ M.UPKEEP_AURAS = {
 -- vocabulary the rules have never seen, so it is never excluded.
 M.OTHER_AURAS = {
   PERIODIC_DAMAGE = true, SCHOOL_ABSORB = true, CREATE_ITEM = true, SUMMON = true,
+  MOD_SHAPESHIFT = true, MOD_STEALTH = true, TRACK_CREATURES = true, TRACK_RESOURCES = true,
+  TRACK_STEALTHED = true, FEIGN_DEATH = true, MOUNTED = true,
   ENCHANT_HELD_ITEM = true
 }
 -- Restores in the client's own units: instant, periodic, or a percentage.

@@ -1,19 +1,114 @@
 local M = { }
 local MIN_BUFF_DURATION = 60000
 M.MIN_BUFF_DURATION = MIN_BUFF_DURATION
-local SELF_AURAS = {
+-- BUFFS, read from Forever 1.60.1.71037 (tools/id-data). A buff is an aura
+-- effect (APPLY_AURA, or an area aura a paladin or hunter radiates) that
+-- outlasts a minute or lasts until cancelled, on a spell that is not passive.
+-- Who it lands on is the effect's target: the caster alone (Self), one
+-- friendly unit (Party: Arcane Intellect, Blessings) or everyone in the
+-- caster's group around it (Raid: Gift of the Wild, Battle Shout).
+local BUFF_EFFECTS = {
   APPLY_AURA = true,
-  MOD_STAT = true,
-  MOD_TOTAL_STAT_PERCENTAGE = true
-}
-local PARTY_AURAS = {
-  APPLY_AURA_PARTY = true,
-  APPLY_AREA_AURA_PARTY = true
-}
-local RAID_AURAS = {
-  APPLY_AURA_RAID = true,
+  APPLY_AREA_AURA_PARTY = true,
   APPLY_AREA_AURA_RAID = true
 }
+local AREA_AURA = {
+  APPLY_AREA_AURA_PARTY = true,
+  APPLY_AREA_AURA_RAID = true
+}
+-- Auras that switch a mode rather than buff: forms and stances, stealth,
+-- tracking. They last until cancelled, so duration alone would call them buffs.
+local TOGGLE_AURAS = {
+  MOD_SHAPESHIFT = true,
+  MOD_STEALTH = true,
+  TRACK_CREATURES = true,
+  TRACK_RESOURCES = true,
+  TRACK_STEALTHED = true,
+  FEIGN_DEATH = true,
+  MOUNTED = true
+}
+M.TOGGLE_AURAS = TOGGLE_AURAS
+-- A form, stance, stealth or tracking spell: any effect switching a mode.
+M.isToggle = function(ctx, spell)
+  return ctx.findSpellEffect(spell, function(e)
+    return TOGGLE_AURAS[e.auraType or ""] == true
+  end) ~= nil
+end
+local lasting
+lasting = function(spell)
+  if spell.passive or spell.channeled then
+    return false
+  end
+  local d = spell.duration or 0
+  return d == -1 or d >= MIN_BUFF_DURATION
+end
+M.lasting = lasting
+-- The buff effect landing on `who` (SELF counts area auras: they radiate from
+-- the caster). nil when the spell has none.
+local buffEffect
+buffEffect = function(ctx, spell, who)
+  return ctx.findSpellEffect(spell, function(e)
+    if not (BUFF_EFFECTS[e.effect or ""] and not TOGGLE_AURAS[e.auraType or ""]) then
+      return false
+    end
+    if who == "SELF" then
+      return AREA_AURA[e.effect] or e.target == "SELF" or e.target == nil
+    end
+    return e.target == who
+  end)
+end
+local buffOn
+buffOn = function(who)
+  return function(ctx, spell)
+    if not (lasting(spell)) or M.isToggle(ctx, spell) then
+      return nil
+    end
+    local effect = buffEffect(ctx, spell, who)
+    if not (effect) then
+      return nil
+    end
+    if who == "SELF" and (buffEffect(ctx, spell, "FRIEND") or buffEffect(ctx, spell, "GROUP")) then
+      return nil
+    end
+    return math.abs(effect.amount or 1)
+  end
+end
+-- CONJURING: CREATE_ITEM, split by what the made item restores when used.
+local itemsById = setmetatable({ }, { __mode = "k" })
+local itemById
+itemById = function(ctx, id)
+  local byId = itemsById[ctx]
+  if not (byId) then
+    byId = { }
+    for _, it in ipairs(ctx.doc.items or { }) do
+      byId[it.id] = it
+    end
+    itemsById[ctx] = byId
+  end
+  return byId[id]
+end
+local createdItemOf
+createdItemOf = function(ctx, spell)
+  local e = ctx.findSpellEffect(spell, function(e)
+    return (e.effect == "CREATE_ITEM" or e.auraType == "CREATE_ITEM") and e.createdItem ~= nil
+  end)
+  return e and itemById(ctx, e.createdItem) or nil
+end
+local conjures
+conjures = function(restore)
+  return function(ctx, spell)
+    local item = createdItemOf(ctx, spell)
+    if not (item) then
+      return nil
+    end
+    for _, pair in ipairs(ctx.effectsOf(item)) do
+      if pair.effect.auraType == restore and (pair.effect.index or 1) < 200 then
+        return math.abs(pair.effect.amount or 1)
+      end
+    end
+    return nil
+  end
+end
 local unsupported
 unsupported = function(reason)
   return {
@@ -116,21 +211,6 @@ M.annotate = function(doc)
   end
   return doc
 end
-local lastingAura
-lastingAura = function(family)
-  return function(ctx, spell)
-    if not ((spell.duration or 0) >= MIN_BUFF_DURATION) then
-      return nil
-    end
-    local effect = ctx.findSpellEffect(spell, function(e)
-      return family[e.auraType or ""]
-    end)
-    if not (effect) then
-      return nil
-    end
-    return math.abs(effect.amount or 1)
-  end
-end
 local instant
 instant = function(auraType)
   return function(ctx, spell)
@@ -145,13 +225,13 @@ instant = function(auraType)
 end
 M.sets = {
   ["Spell.Buff.Self"] = {
-    predicate = lastingAura(SELF_AURAS)
+    predicate = buffOn("SELF")
   },
   ["Spell.Buff.Party"] = {
-    predicate = lastingAura(PARTY_AURAS)
+    predicate = buffOn("FRIEND")
   },
   ["Spell.Buff.Raid"] = {
-    predicate = lastingAura(RAID_AURAS)
+    predicate = buffOn("GROUP")
   },
   ["Spell.Heal.Direct"] = {
     predicate = instant("HEAL")
@@ -195,8 +275,12 @@ M.sets = {
       return p.school and SCHOOL_MASK[p.school] or nil
     end)
   },
-  ["Spell.Conjure.Food"] = unsupported("model has no spell -> created-item link"),
-  ["Spell.Conjure.Water"] = unsupported("model has no spell -> created-item link")
+  ["Spell.Conjure.Food"] = {
+    predicate = conjures("PERIODIC_HEAL")
+  },
+  ["Spell.Conjure.Water"] = {
+    predicate = conjures("PERIODIC_ENERGIZE")
+  }
 }
 M.exclusions = {
   {

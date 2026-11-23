@@ -40,7 +40,9 @@ M.records = {
     fields = {
       id = field("int", true),
       name = field("string", true),
-      duration = field("number", false, "milliseconds; 0 or absent = instant/permanent")
+      duration = field("number", false, "milliseconds; 0 or absent = instant/permanent, -1 = until cancelled"),
+      passive = field("bool", false, "always on: talent ranks, racials, stance riders"),
+      channeled = field("bool", false, "held for its duration: Mind Control, Eagle Eye")
     }
   },
   spellEffects = {
@@ -52,7 +54,10 @@ M.records = {
       statType = field("string", false, "e.g. AGILITY, STAMINA"),
       amount = field("number", false),
       miscValue = field("int", false),
-      enchantKind = field("string", false, "ENCHANT_HELD_ITEM only: SHARPEN, WEIGHT, WIZARD_OIL, MANA_OIL, OTHER")
+      enchantKind = field("string", false, "ENCHANT_HELD_ITEM only: SHARPEN, WEIGHT, WIZARD_OIL, MANA_OIL, OTHER"),
+      effect = field("string", false, "the effect itself, e.g. APPLY_AURA, APPLY_AREA_AURA_PARTY, CREATE_ITEM"),
+      target = field("string", false, "SELF, FRIEND, GROUP, ENEMY (or the raw client number)"),
+      createdItem = field("int", false, "CREATE_ITEM: the item it makes")
     }
   },
   spellClass = {

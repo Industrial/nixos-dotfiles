@@ -83,11 +83,44 @@ return describe("itemtable spell domain", function()
       return assert.are.equal(77, (run(doc)).sets["Spell.Buff.Self"][92001])
     end)
   end)
-  describe("declared gaps", function()
-    return it("declares the conjure food/water split unsupported", function()
+  describe("conjuring and targets", function()
+    local withEffect = function(patch)
+      local doc = fixtures()
+      for _, se in ipairs(doc.spellEffects) do
+        if se.spellId == 92001 then
+          for k, v in pairs(patch) do se[k] = v end
+        end
+      end
+      return run(doc)
+    end
+    it("splits conjure food from water by what the made item restores", function()
       local r = run()
-      assert.is_truthy(r.unsupported["Spell.Conjure.Food"]:find("created-item", 1, true))
-      return assert.is_truthy(r.unsupported["Spell.Conjure.Water"]:find("created-item", 1, true))
+      assert.is_not_nil(r.sets["Spell.Conjure.Water"][92003])
+      return assert.is_nil((r.sets["Spell.Conjure.Food"] or { })[92003])
+    end)
+    it("calls a buff on everyone around the caster a raid buff", function()
+      local r = withEffect({ target = "GROUP" })
+      assert.are.equal(10, r.sets["Spell.Buff.Raid"][92001])
+      return assert.is_nil((r.sets["Spell.Buff.Self"] or { })[92001])
+    end)
+    it("calls an area aura a self buff: it radiates from the caster", function()
+      local r = withEffect({ effect = "APPLY_AREA_AURA_PARTY", target = "SELF" })
+      return assert.are.equal(10, r.sets["Spell.Buff.Self"][92001])
+    end)
+    it("never calls a form, stance or stealth a buff", function()
+      local r = withEffect({ auraType = "MOD_SHAPESHIFT" })
+      return assert.is_nil((r.sets["Spell.Buff.Self"] or { })[92001])
+    end)
+    it("counts until-cancelled as lasting, but never a passive", function()
+      local doc = fixtures()
+      for _, sp in ipairs(doc.spells) do
+        if sp.id == 92001 then sp.duration = -1 end
+      end
+      assert.are.equal(10, run(doc).sets["Spell.Buff.Self"][92001])
+      for _, sp in ipairs(doc.spells) do
+        if sp.id == 92001 then sp.passive = true end
+      end
+      return assert.is_nil((run(doc).sets["Spell.Buff.Self"] or { })[92001])
     end)
   end)
   describe("spec-filtered sets", function()

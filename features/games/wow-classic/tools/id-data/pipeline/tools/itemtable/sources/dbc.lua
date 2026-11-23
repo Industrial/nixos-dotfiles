@@ -285,6 +285,13 @@ local AURA_NAME = {
   -- (Elixir of Defense, misc 1), 418 the flask's max-power raise
   -- (Distilled Wisdom, misc 0 = mana).
   [674] = "MOD_RESISTANCE_EXCLUSIVE",
+  [36] = "MOD_SHAPESHIFT",
+  [16] = "MOD_STEALTH",
+  [44] = "TRACK_CREATURES",
+  [45] = "TRACK_RESOURCES",
+  [151] = "TRACK_STEALTHED",
+  [66] = "FEIGN_DEATH",
+  [78] = "MOUNTED",
   [418] = "MOD_MAX_POWER"
 }
 M.AURA_NAME = AURA_NAME
@@ -295,9 +302,20 @@ local EFFECT_NAME = {
   [28] = "SUMMON",
   [30] = "ENERGIZE",
   [54] = "ENCHANT_HELD_ITEM",
-  [56] = "SUMMON"
+  [56] = "SUMMON",
+  [35] = "APPLY_AREA_AURA_PARTY",
+  [65] = "APPLY_AREA_AURA_RAID"
 }
 M.EFFECT_NAME = EFFECT_NAME
+-- ImplicitTarget_0, the ones a buff rule needs: the caster alone, one
+-- friendly unit, everyone in the caster's group around it, one enemy.
+local TARGET_NAME = {
+  [1] = "SELF",
+  [21] = "FRIEND",
+  [56] = "GROUP",
+  [6] = "ENEMY"
+}
+M.TARGET_NAME = TARGET_NAME
 -- ItemSubClass for class 0 (Consumable) in this client.
 local CONSUMABLE_SUBCLASS = {
   [0] = "Explosives",
@@ -545,7 +563,7 @@ M.toModel = function(tables, opts)
     local it = _list_2[_index_0]
     known[it.id] = true
   end
-  local durationById, schoolById = { }, { }
+  local durationById, schoolById, passiveById, channeledById = { }, { }, { }, { }
   if tables.spellMisc then
     local byIndex = { }
     local _list_3 = (tables.spellDuration or { })
@@ -567,6 +585,14 @@ M.toModel = function(tables, opts)
           break
         end
         schoolById[spellId] = M.schoolOf(num(row.SchoolMask))
+        -- Always on: SPELL_ATTR0_PASSIVE (0x40), or DO_NOT_DISPLAY (0x80),
+        -- which is how Forever marks a talent's hidden aura (Weaponmaster).
+        local a0, a1 = num(row.Attributes_0) or 0, num(row.Attributes_1) or 0
+        local bit = function(v, b) return math.floor(v / b) % 2 == 1 end
+        passiveById[spellId] = bit(a0, 64) or bit(a0, 128)
+        -- SPELL_ATTR1_CHANNELED_1 / _2: held for its duration (Mind Control,
+        -- Eagle Eye), never something to keep up.
+        channeledById[spellId] = bit(a1, 4) or bit(a1, 64)
         local durationIndex = num(row.DurationIndex)
         if not (durationIndex and durationIndex > 0) then
           _continue_0 = true
@@ -598,7 +624,9 @@ M.toModel = function(tables, opts)
       doc.spells[#doc.spells + 1] = {
         id = id,
         name = (row.Name_lang ~= "" and row.Name_lang) or ("Spell%d"):format(id),
-        duration = durationById[id]
+        duration = durationById[id],
+        passive = passiveById[id] or nil,
+        channeled = channeledById[id] or nil
       }
       _continue_0 = true
     until true
@@ -683,7 +711,10 @@ M.toModel = function(tables, opts)
       statType = statType,
       amount = amount,
       miscValue = misc,
-      enchantKind = kind
+      enchantKind = kind,
+      effect = EFFECT_NAME[num(row.Effect) or -1] or (row.Effect and row.Effect ~= "" and row.Effect) or nil,
+      target = TARGET_NAME[num(row.ImplicitTarget_0) or -1] or (num(row.ImplicitTarget_0) and num(row.ImplicitTarget_0) > 0 and row.ImplicitTarget_0) or nil,
+      createdItem = (num(row.EffectItemType) or 0) > 0 and num(row.EffectItemType) or nil
     }
   end
   -- FOLLOWING TRIGGERS. Forever's food is a spell that triggers others:
@@ -746,21 +777,31 @@ M.toModel = function(tables, opts)
           _continue_0 = true
           break
         end
-        local classFile = SKILL_LINE_CLASS[line]
-        if not (classFile) then
-          _continue_0 = true
-          break
+        -- The row's ClassMask (bit classId-1) names its classes; Forever
+        -- files Arcane Intellect under Arcane (237) and Mark of the Wild
+        -- under a druid line no fixed table lists. A row with no mask falls
+        -- back to the class skill line it sits on.
+        local classes = { }
+        local mask = num(row.ClassMask) or 0
+        if mask > 0 then
+          for classId, file in pairs(CHR_CLASS) do
+            if math.floor(mask / 2 ^ (classId - 1)) % 2 == 1 then
+              classes[#classes + 1] = file
+            end
+          end
+        elseif SKILL_LINE_CLASS[line] then
+          classes[1] = SKILL_LINE_CLASS[line]
         end
-        local key = tostring(spellId) .. "/" .. tostring(classFile)
-        if seen[key] then
-          _continue_0 = true
-          break
+        for _, classFile in ipairs(classes) do
+          local key = tostring(spellId) .. "/" .. tostring(classFile)
+          if not seen[key] then
+            seen[key] = true
+            doc.spellClass[#doc.spellClass + 1] = {
+              spellId = spellId,
+              classFile = classFile
+            }
+          end
         end
-        seen[key] = true
-        doc.spellClass[#doc.spellClass + 1] = {
-          spellId = spellId,
-          classFile = classFile
-        }
         _continue_0 = true
       until true
       if not _continue_0 then

@@ -441,20 +441,26 @@ return {
       index = 1,
       auraType = "APPLY_AURA",
       statType = "STAMINA",
-      amount = 10
+      amount = 10,
+      effect = "APPLY_AURA",
+      target = "SELF"
     },
     {
       spellId = 92002,
       index = 1,
-      auraType = "APPLY_AURA_PARTY",
+      auraType = "MOD_STAT",
       statType = "INTELLECT",
-      amount = 12
+      amount = 12,
+      effect = "APPLY_AURA",
+      target = "FRIEND"
     },
     {
       spellId = 92003,
       index = 1,
       auraType = "CREATE_ITEM",
-      amount = 1
+      amount = 1,
+      effect = "CREATE_ITEM",
+      createdItem = 90005
     },
     {
       spellId = 92004,
