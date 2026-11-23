@@ -1,0 +1,1 @@
+SetCVar("autoSelfCast",1)
