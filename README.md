@@ -150,7 +150,7 @@ CI evaluates it.
 ```bash
 bin/update/system          # nixos-rebuild switch --flake .#$(hostname), then feature link scripts
 bin/update/host            # same as bin/update/system, logged to logs/update-host
-bin/update/flake           # nix-channel --update, then nix flake update
+bin/update/flake           # vbump run --rev origin/main: one lock-bump PR per input
 bin/update/channels        # nix-channel --update
 bin/update/profiles        # nix profile upgrade --all
 

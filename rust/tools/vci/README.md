@@ -108,9 +108,29 @@ Actions'. With it, every host gets a `vci/<host>` status on every commit vci bui
 post, so whatever mints it can replace it. It is handed to curl on stdin as a header,
 never in argv or the environment. The NixOS feature passes the file with systemd's
 `LoadCredential` (option `statusTokenFile`, null by default). The intended token is an
-installation token of the GitHub App the user is creating for vbump (#189, #228), with
-**Commit statuses: Read and write** added. Minting and refreshing that token is not part
-of vci yet; see the PR.
+installation token of the vbump GitHub App (#189, #228), which has **Commit statuses:
+Read and write**.
+
+### vci-token (GH-247)
+
+The crate's second binary mints that token:
+
+```
+vci-token --app-id ID --key-file FILE --out FILE [--repo-slug OWNER/REPO]
+          [--every DURATION] [--once] [--api URL] [--curl PROG] [--openssl PROG]
+```
+
+Each refresh signs a JWT for the app (RS256, `openssl dgst -sha256 -sign` with the
+app's private key, valid nine minutes), looks up the app's installation on the
+repository, and asks for an installation token narrowed to that repository and to
+`statuses: write`. The token is written atomically to `--out`. The JWT goes to curl on
+stdin, never argv; the key is only ever a path. Refreshes repeat on a spaced id_effect
+Schedule (`--every`, default 30m; tokens last an hour) and a failed mint is retried on
+vci's bounded `transient` Schedule. The NixOS feature runs it as the `vci-token` unit
+when `features.nix.vci.statusApp.privateKeyFile` is set (null by default): the key comes
+from a root-only file through `LoadCredential`, and the token lands in
+`/run/vci-token/token` (vci-token:vci, 0440), which vci reads. Setup:
+`docs/runbooks/updates.md` §7.
 
 ## Tests
 

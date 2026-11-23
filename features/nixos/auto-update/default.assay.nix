@@ -26,5 +26,5 @@ in
     guardHoldsByDefault = assay.eq (guardFailures cfg) [];
     guardFiresOnAutoUpgrade = assay.eq (builtins.length (guardFailures withAutoUpgrade)) 1;
     guardNamesTheWorkflow =
-      assay.eq (builtins.match ".*update-flake-lock.*" (builtins.head (guardFailures withAutoUpgrade)).message != null) true;
+      assay.eq (builtins.match ".*vbump[.]yml.*" (builtins.head (guardFailures withAutoUpgrade)).message != null) true;
   }

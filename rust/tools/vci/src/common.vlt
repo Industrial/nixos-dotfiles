@@ -13,6 +13,7 @@ export errors VciError
   Eval String    "#{0}"
   Build String   "#{0}"
   Ledger String  "the ledger: #{0}"
+  Token String   "the status token: #{0}"
 
 -- An effect for a computed result: the planned failure stays typed.
 export lifted : given <A: Send + 'static> Result<A, VciError> -> Effect<A, VciError, HNil>

@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
 # Bump flake.lock by hand: one pull request per input, through vbump.
 #
-#   bin/update/flake [--dry-run] [--input NAME]...     (any `vbump run` option)
+#   bin/update/flake [--dry-run] [--input NAME]... [--auto-merge]   (any `vbump run` option)
 #
-# The scheduled path is .github/workflows/update-flake-lock.yml, which runs the same
-# `vbump run` weekly. vbump relocks each root input on its own against origin/main's
-# commit (never the work tree), evaluates and dry-builds every host, diffs each host's
-# closure and opens or refreshes that input's PR (docs/adr/0006-update-policy.md).
-# `--dry-run` does all of it but push and open.
+# The scheduled path is .github/workflows/vbump.yml, which runs the same `vbump run`
+# weekly with --auto-merge. vbump relocks each root input on its own against
+# origin/main's commit (never the work tree), evaluates and dry-builds every host, diffs
+# each host's closure and opens or refreshes that input's PR
+# (docs/adr/0006-update-policy.md). `--dry-run` does all of it but push and open.
 #
-# Rollback: without vbump on PATH (features.cli.vbump off), or with UPDATE_LEGACY=1,
-# this is the old all-inputs `nix flake update` in the current branch, which refuses to
-# bump on main; UPDATE_ALLOW_MAIN=1 overrides that, for an emergency that is still pushed
-# through a PR.
+# vbump is the only lock updater (GH-247): there is no whole-lock fallback here. The
+# rollback is restoring the old workflow and this script from git history
+# (docs/runbooks/updates.md §1).
 echo "> update > flake"
 dotfiles_root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$dotfiles_root"
@@ -20,24 +19,13 @@ mkdir -p ./logs
 exec > >(tee ./logs/update-flake) 2>&1
 set -e
 
-if [ "${UPDATE_LEGACY:-0}" != 1 ] && command -v vbump >/dev/null 2>&1; then
-  echo "> update > flake > git fetch origin main"
-  git fetch --quiet origin main
-  echo "> update > flake > vbump run --rev origin/main $*"
-  exec vbump run --rev origin/main "$@"
-fi
-
-branch="$(git symbolic-ref --quiet --short HEAD || true)"
-if [ "$branch" = main ] && [ "${UPDATE_ALLOW_MAIN:-0}" != 1 ]; then
-  echo "> update > flake > refusing to bump flake.lock on main."
-  echo "> update > flake >   git switch -c update/flake-lock-$(date +%F)   then re-run, or"
-  echo "> update > flake >   run the \"Update flake.lock\" workflow (Actions tab)."
+if ! command -v vbump >/dev/null 2>&1; then
+  echo "> update > flake > vbump is not on PATH (features.cli.vbump), and it is the only lock updater."
+  echo "> update > flake >   run the \"Update flake.lock (vbump)\" workflow: gh workflow run vbump.yml"
   exit 1
 fi
 
-echo "> update > flake > nix --experimental-features \"nix-command flakes\" flake update"
-nix --experimental-features "nix-command flakes" flake update
-
-echo "> update > flake > next: review what moved, then commit, push and open a PR:"
-echo "> update > flake >   git worktree add /tmp/main origin/main"
-echo "> update > flake >   bin/update/pkg-diff host /tmp/main . \"\$(hostname)\""
+echo "> update > flake > git fetch origin main"
+git fetch --quiet origin main
+echo "> update > flake > vbump run --rev origin/main $*"
+exec vbump run --rev origin/main "$@"

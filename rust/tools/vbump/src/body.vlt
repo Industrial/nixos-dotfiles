@@ -118,7 +118,7 @@ body_of b run_url =
   else
     names = b.moved.iter () |> .map ticked |> .collect : Vec<String>
     "\nLock nodes moved: #{names.join ", "}.\n"
-  mut head = "Lock bump of one input, `#{b.input}`, by `vbump` (`.github/workflows/update-flake-lock.yml`). #{refs}\n\n**Review and merge by hand**: nothing merges this automatically, and no host changes until it lands on `main` (comin then converges every host within ~5 minutes; see `docs/runbooks/updates.md`). Each input gets its own pull request, so this one can merge, wait or close without holding up the others.\n\n## `#{b.input}`\n\n| | lock |\n|---|---|\n| old | #{describe (&b.old)} |\n| new | #{describe (&b.new)} |\n#{compare}#{moved}\n## Hosts\n\nEvery `nixosConfigurations` host was evaluated and dry-built against this lock. The diff is of each host's toplevel **derivation** closure against the base (`vdiff --json`), so it names every package version move without building anything.\n\n| host | dry build | changed | added | removed | paths |\n|---|---|---|---|---|---|\n"
+  mut head = "Lock bump of one input, `#{b.input}`, by `vbump` (`.github/workflows/vbump.yml`). #{refs}\n\n**Merges itself when green**: the scheduled run arms auto-merge (squash) on this PR, so it lands on `main` once the required `ci / all-green` passes (a by-hand `vbump run` arms it only with `--auto-merge`). To hold the bump, disable auto-merge or close the PR. No host changes until it lands on `main` (comin then converges every host within ~5 minutes; see `docs/runbooks/updates.md`). Each input gets its own pull request, so this one can merge, wait or close without holding up the others.\n\n## `#{b.input}`\n\n| | lock |\n|---|---|\n| old | #{describe (&b.old)} |\n| new | #{describe (&b.new)} |\n#{compare}#{moved}\n## Hosts\n\nEvery `nixosConfigurations` host was evaluated and dry-built against this lock. The diff is of each host's toplevel **derivation** closure against the base (`vdiff --json`), so it names every package version move without building anything.\n\n| host | dry build | changed | added | removed | paths |\n|---|---|---|---|---|---|\n"
   for h in &b.hosts
     head.push_str (&host_row h)
     head.push '\n'
@@ -126,7 +126,7 @@ body_of b run_url =
   for h in &b.hosts
     head.push_str (&host_section h)
     head.push '\n'
-  checklist = "### Review checklist\n\n- [ ] `ci / all-green` passed. If no `PR` checks started, close and reopen this PR: it was opened without `FLAKE_LOCK_UPDATE_TOKEN`\n- [ ] the kernel and NixOS moves above are expected; a kernel move needs a reboot after convergence\n- [ ] no removed package that a host still needs\n"
+  checklist = "### Review checklist\n\nNothing here blocks the merge: `ci / all-green` is the gate. Hold the PR (disable auto-merge) if any of these is wrong.\n\n- [ ] the kernel and NixOS moves above are expected; a kernel move needs a reboot after convergence\n- [ ] no removed package that a host still needs\n"
   mut blocks = "".to_string ()
   for h in &b.hosts
     if !(h.json.is_empty ())
@@ -171,6 +171,9 @@ test "the body names the input, the run, every host and the checklist"
   assert! \-> body.contains "| mimir |" && body.contains "_No diff: the base does not evaluate_"
   assert! \-> body.contains "```json\n{\"schema\":1}\n```"
   assert! \-> body.contains "### Review checklist"
+  -- GH-247: the body says the PR merges itself, and how to hold it.
+  assert! \-> body.contains "**Merges itself when green**" && body.contains "`ci / all-green`" && body.contains "disable auto-merge"
+  assert! \-> !(body.contains "close and reopen") && !(body.contains "update-flake-lock.yml")
   assert! \-> body_of (&sample_bump ()) None |> .contains "local `vbump run`"
 
 test "an oversized body drops the JSON first, and is cut last"

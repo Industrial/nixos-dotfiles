@@ -20,9 +20,16 @@
 # Actions'. `statusTokenFile` (a root-only file, handed to the unit with LoadCredential,
 # so the vci user reads it only from its credentials directory) turns them on: context
 # `vci/<host>`, pending then success/failure. The file is read at every post, so whatever
-# mints the token can replace it: the intended source is the GitHub App the user is
-# creating for vbump (#189, #228), with "Commit statuses: read and write" added. No secret
-# is provisioned here.
+# mints the token can replace it.
+#
+# `statusApp.privateKeyFile` (GH-247, null by default) is the minted path: a second
+# unit, vci-token (rust/tools/vci's second binary), reads the vbump GitHub App's private
+# key from that root-only file through LoadCredential, mints an installation token
+# narrowed to this repository and "statuses: write" every `statusApp.every` (an
+# id_effect Schedule; tokens last an hour), and writes it to /run/vci-token/token
+# (vci-token:vci, 0440), which vci reads. vci never sees the key. No secret is
+# provisioned here: the user places the key (docs/runbooks/updates.md §7). The statuses
+# are not required checks.
 #
 # Runs as its own static user `vci`: allowed to use the Nix daemon (never trusted-users),
 # niced to idle CPU and I/O, memory-capped for the evaluations (`memoryMax`), file system
@@ -56,6 +63,26 @@
   textfileDir = "/var/lib/prometheus-node-exporter-text";
   state = "/var/lib/vci";
   restricted = lib.attrByPath ["features" "nixos" "users" "enable"] false config || cfg.restrictedNixUsers;
+  minted = cfg.statusApp.privateKeyFile != null;
+  tokenDir = "/run/vci-token";
+  mintedToken = "${tokenDir}/token";
+  minter = [
+    "${vci}/bin/vci-token"
+    "--app-id"
+    cfg.statusApp.appId
+    "--key-file"
+    "%d/app-key"
+    "--out"
+    mintedToken
+    "--repo-slug"
+    cfg.repoSlug
+    "--every"
+    cfg.statusApp.every
+    "--curl"
+    "${pkgs.curl}/bin/curl"
+    "--openssl"
+    (lib.getExe' pkgs.openssl "openssl")
+  ];
   args =
     ["${vci}/bin/vci"]
     ++ lib.concatMap (h: ["--host" h]) cfg.hosts
@@ -89,7 +116,8 @@
     ++ lib.optionals (cfg.maxLoad != null) ["--max-load" (toString cfg.maxLoad)]
     ++ lib.optional (!cfg.pulls) "--no-pulls"
     ++ lib.optionals (cfg.pullsUrl != null) ["--pulls-url" cfg.pullsUrl]
-    ++ lib.optionals (cfg.statusTokenFile != null) ["--status-token-file" "%d/status-token"];
+    ++ lib.optionals (cfg.statusTokenFile != null) ["--status-token-file" "%d/status-token"]
+    ++ lib.optionals minted ["--status-token-file" mintedToken];
 in {
   imports = [../../monitoring/textfile-collector.nix];
 
@@ -172,6 +200,30 @@ in {
         environment. Set, vci posts `vci/<host>` statuses on every commit it builds.
       '';
     };
+    statusApp = {
+      privateKeyFile = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "/var/lib/secrets/vbump-app.pem";
+        description = ''
+          Off (null) by default (GH-247). A root-only file holding a private key of the
+          GitHub App `appId` (a second key of the vbump app). Set, the vci-token unit gets it
+          through LoadCredential, mints an installation token for repoSlug with only
+          "statuses: write" every `every`, and vci posts `vci/<host>` statuses with it. The
+          statuses are informational, not required checks. Exclusive with statusTokenFile.
+        '';
+      };
+      appId = mkOption {
+        type = types.strMatching "[0-9]+|Iv[0-9A-Za-z.]+";
+        default = "5886494";
+        description = "The GitHub App's numeric App ID (or its Client ID): vbump-nixos-dotfiles.";
+      };
+      every = mkOption {
+        type = types.strMatching "[0-9]+[smhd]?";
+        default = "30m";
+        description = "How often a new token is minted (GitHub's installation tokens last an hour).";
+      };
+    };
     restrictedNixUsers = mkOption {
       type = types.bool;
       default = false;
@@ -180,7 +232,58 @@ in {
   };
 
   config = {
+    assertions = [
+      {
+        assertion = !(minted && cfg.statusTokenFile != null);
+        message = "features.nix.vci: set statusTokenFile or statusApp.privateKeyFile, not both.";
+      }
+    ];
+
     environment.systemPackages = [vci];
+
+    # The minter's own user (GH-247): its primary group is vci, so the token it writes
+    # (0440) is readable by vci and nobody else, and vci never reads the key.
+    users.users.vci-token = lib.mkIf minted {
+      isSystemUser = true;
+      group = "vci";
+      description = "vci-token, the GitHub App token vci posts statuses with";
+    };
+
+    systemd.services.vci-token = lib.mkIf minted {
+      description = "vci-token: the vbump GitHub App's installation token for vci's commit statuses";
+      wantedBy = ["multi-user.target"];
+      wants = ["network-online.target"];
+      after = ["network-online.target"];
+      serviceConfig = {
+        Type = "simple";
+        ExecStart = lib.escapeShellArgs minter;
+        Restart = "always";
+        RestartSec = "30s";
+        User = "vci-token";
+        Group = "vci";
+        # The key: root-only on disk, copied by systemd into this unit's credentials
+        # directory, readable by this unit's user alone.
+        LoadCredential = ["app-key:${cfg.statusApp.privateKeyFile}"];
+        RuntimeDirectory = "vci-token";
+        RuntimeDirectoryMode = "0750";
+        # A restart keeps the last token, so vci's posts keep working across it.
+        RuntimeDirectoryPreserve = "yes";
+        # The token file: 0440, vci-token:vci.
+        UMask = "0227";
+        ProtectSystem = "strict";
+        ProtectHome = true;
+        PrivateTmp = true;
+        PrivateDevices = true;
+        ProtectProc = "invisible";
+        ProtectKernelTunables = true;
+        ProtectKernelModules = true;
+        ProtectControlGroups = true;
+        NoNewPrivileges = true;
+        RestrictSUIDSGID = true;
+        LockPersonality = true;
+        CapabilityBoundingSet = "";
+      };
+    };
 
     users.users.vci = {
       isSystemUser = true;
@@ -195,8 +298,8 @@ in {
     systemd.services.vci = {
       description = "vci: every fleet host built for main and open PRs, into the cache's store";
       wantedBy = ["multi-user.target"];
-      wants = ["network-online.target"];
-      after = ["network-online.target" "nix-daemon.socket" "systemd-tmpfiles-setup.service"];
+      wants = ["network-online.target"] ++ lib.optional minted "vci-token.service";
+      after = ["network-online.target" "nix-daemon.socket" "systemd-tmpfiles-setup.service"] ++ lib.optional minted "vci-token.service";
       # `nix eval` of a git+file flake runs git itself, from PATH.
       path = [pkgs.git];
       environment = {

@@ -1,7 +1,8 @@
 # vbump
 
 vbump does per-input flake.lock updates and opens one pull request per input (GH-189).
-It replaced the single all-inputs bump in `.github/workflows/update-flake-lock.yml`.
+It replaced the single all-inputs bump of the old `.github/workflows/update-flake-lock.yml`,
+and since GH-247 it is the only lock updater (`.github/workflows/vbump.yml`).
 It is written in Voltaic 0.2.1 (`src/*.vlt`, compiled by `build.rs`) with
 id_effect 0.13.0. The name is `vbump`, not `vlock`, because nixpkgs already ships
 `vlock` (the console locker).
@@ -10,7 +11,7 @@ id_effect 0.13.0. The name is `vbump`, not `vlock`, because nixpkgs already ship
 vbump run [--input NAME]... [--dry-run] [--jobs N] [--repo DIR] [--rev REV]
           [--remote NAME] [--base-branch NAME] [--label NAME] [--gh-repo OWNER/NAME]
           [--run-url URL] [--summary FILE] [--out DIR] [--db FILE]
-          [--committer 'NAME <EMAIL>']
+          [--committer 'NAME <EMAIL>'] [--auto-merge]
 ```
 
 vbump runs these steps for each root input of the flake, one input at a time
@@ -35,7 +36,10 @@ vbump runs these steps for each root input of the flake, one input at a time
    base, and that branch's PR is opened or refreshed. The commit is built with git
    plumbing and dated by the base, so the same base and lock always give the same
    commit. That makes a retried or repeated publish a no-op. `--dry-run` publishes
-   nothing.
+   nothing. With `--auto-merge` (GH-247), vbump then arms GitHub's auto-merge
+   (`gh pr merge --auto --squash`) on the PR unless it is armed already, so the PR
+   merges itself once `main`'s required `ci / all-green` passes. Failing to arm it
+   fails the input.
 
 Concurrency: inputs run `--jobs` at a time (`for_each_par`, `Bounded`). The hosts of
 one input run sequentially, because one evaluation takes about 3 GB. Each input's
@@ -56,8 +60,9 @@ report (`<input>.<host>.json`).
 
 ## Where it runs
 
-- **Scheduled**: the `vbump` job of `update-flake-lock.yml`, weekly. The repository
-  variable `FLAKE_LOCK_UPDATER=legacy` rolls this back to the old single-PR jobs.
+- **Scheduled**: `.github/workflows/vbump.yml`, weekly, with `--auto-merge`. It is the
+  only lock updater; the rollback is restoring the old workflow from git history
+  (`docs/runbooks/updates.md` §1).
 - **By hand**: `bin/update/flake`, on hosts with `features.cli.vbump`.
 
 ## Tests

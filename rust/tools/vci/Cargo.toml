@@ -41,3 +41,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "vci"
 path = "src/main.rs"
+
+[[bin]]
+name = "vci-token"
+path = "src/token_main.rs"

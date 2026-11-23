@@ -36,8 +36,8 @@ let
       config.features.cli.nixos-update-notifier.differ = "vdiff";
     }).config.environment.systemPackages;
 
-  # The lock branch the bump workflow uses, read from the workflow so the two cannot drift.
-  workflow = builtins.readFile ./../../../.github/workflows/update-flake-lock.yml;
+  # The lock-bump workflow: vbump's, the only one (GH-247).
+  workflow = builtins.readFile ./../../../.github/workflows/vbump.yml;
   # vbump's branch name per input (`branch_of`), read from its source for the same reason.
   vbumpBody = builtins.readFile ./../../../rust/tools/vbump/src/body.vlt;
 in
@@ -75,9 +75,10 @@ in
     # Open lock-bump PRs are looked up on this (public) repo. The notifier matches head.ref by
     # prefix (src/lib/pending.rs is_lock_branch): the branch itself, or `<branch>-<input>`.
     reportsOpenLockPrs = assay.eq service.environment.NIXOS_UPDATE_GITHUB_REPO "Industrial/nixos-dotfiles";
-    # The branch itself is the workflow's single-PR LOCK_BRANCH (the legacy `lock` job) ...
+    # The PRs come from vbump's workflow, on `<branch>-<input>` (the legacy single-PR
+    # workflow was deleted in GH-247; the bare branch still matches, for its rollback) ...
     lockBranchMatchesTheWorkflow =
-      assay.eq (builtins.match ".*LOCK_BRANCH: ${service.environment.NIXOS_UPDATE_LOCK_BRANCH}\n.*" workflow != null) true;
+      assay.eq (lib.hasInfix "`${service.environment.NIXOS_UPDATE_LOCK_BRANCH}-<input>`" workflow) true;
     # ... and `<branch>-` is what vbump puts before each input's name (GH-200).
     lockBranchIsVbumpsPrefix =
       assay.eq (lib.hasInfix "\"${service.environment.NIXOS_UPDATE_LOCK_BRANCH}-#{safe}\"" vbumpBody) true;

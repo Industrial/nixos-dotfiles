@@ -38,7 +38,7 @@ if [ "${UPDATE_ALLOW_UNMERGED:-0}" != 1 ]; then
     echo "> update > system >   HEAD:        $head_rev"
     echo "> update > system >   origin/main: $main_rev"
     [ -n "$dirty" ] && echo "> update > system >   uncommitted tracked changes present"
-    echo "> update > system > Merge the change (lock bumps: the update-flake-lock PR) and"
+    echo "> update > system > Merge the change (lock bumps: the vbump PR, which merges itself when green) and"
     echo "> update > system > 'git switch main && git pull --ff-only', or push to"
     echo "> update > system > testing-$(hostname) for a one-host experiment."
     exit 1

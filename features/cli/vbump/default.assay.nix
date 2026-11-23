@@ -1,11 +1,11 @@
 # Colocated suite for features/cli/vbump: the package it installs is the
-# rust/tools/vbump crate, built from the pinned nixpkgs; and vbump's take-over of the
-# lock bumps (GH-189), with its one rollback switch.
+# rust/tools/vbump crate, built from the pinned nixpkgs; vbump is the only flake.lock
+# updater (GH-247), and every PR it opens arms auto-merge.
 #
-# The workflow's selector is not regex-matched as text and left there: each job's `if:`
-# is parsed into its selector expression and the job value it runs for, and the
-# expression is evaluated the way GitHub does (`a || b || 'c'`: the first non-empty
-# term), for each case a scheduled or a dispatched run can present.
+# "Only one lock updater" is checked over what exists, not over a list: every workflow
+# under .github/workflows and every script under bin/ is read, and the ones that update
+# flake.lock (vbump, `nix flake update`, the update-flake-lock action) are named. The
+# answer has to be vbump.yml (and bin/update/flake, which only runs vbump).
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
@@ -19,32 +19,33 @@ let
   cfg = nixos.eval {modules = [./default.nix];};
   vbumps = builtins.filter (p: (p.pname or "") == "vbump") cfg.environment.systemPackages;
 
-  # The update workflow's jobs gated on the updater: selector expression and the value
-  # each runs for.
-  workflow = builtins.readFile ./../../../.github/workflows/update-flake-lock.yml;
-  gate = "    if: github\\.ref == 'refs/heads/main' && \\((.*)\\) == '([a-z]+)'";
-  gated =
-    map (l: let
-      m = builtins.match gate l;
-    in {
-      selector = builtins.elemAt m 0;
-      runsFor = builtins.elemAt m 1;
-    })
-    (builtins.filter (l: builtins.match gate l != null) (lib.splitString "\n" workflow));
+  workflows = ./../../../.github/workflows;
+  workflow = builtins.readFile (workflows + "/vbump.yml");
+  bin = ./../../../bin;
 
-  # GitHub's `||`: the first term that is set and not empty; 'x' is a literal.
-  value = ctx: term: let
-    literal = builtins.match "'(.*)'" term;
-  in
-    if literal != null
-    then builtins.head literal
-    else ctx.${term} or "";
-  select = ctx: selector:
-    lib.findFirst (v: v != "") "" (map (value ctx) (lib.splitString " || " selector));
-  # The gated jobs a run with these inputs and variables starts.
-  runs = ctx: map (g: g.runsFor) (builtins.filter (g: select ctx g.selector == g.runsFor) gated);
+  # What updates flake.lock, as text: vbump's run, C++ Nix's whole-lock update, the
+  # DeterminateSystems action the legacy workflow used.
+  updatesTheLock = text:
+    builtins.any (m: lib.hasInfix m text) [
+      "vbump \"\${args[@]}\""
+      "exec vbump run"
+      "flake update\n"
+      "flake update;"
+      "flake update &&"
+      "update-flake-lock@"
+    ];
+  workflowFiles = builtins.filter (n: lib.hasSuffix ".yml" n || lib.hasSuffix ".yaml" n) (builtins.attrNames (builtins.readDir workflows));
+  updaterWorkflows = builtins.filter (n: updatesTheLock (builtins.readFile (workflows + "/${n}"))) workflowFiles;
+  binFiles = lib.filesystem.listFilesRecursive bin;
+  updaterScripts = map (p: lib.removePrefix (toString bin + "/") (toString p)) (builtins.filter (p: updatesTheLock (builtins.readFile p)) binFiles);
 
   byHand = builtins.readFile ./../../../bin/update/flake;
+  runbook = builtins.readFile ./../../../docs/runbooks/updates.md;
+  forge = builtins.readFile ./../../../rust/tools/vbump/src/forge.vlt;
+
+  # The rollback: the old workflow and script, restored from the last commit that had them.
+  rollback = "git checkout 056a7031988ab79b639c9d2c0b5fddadbadf22e0 -- .github/workflows/update-flake-lock.yml bin/update/flake";
+  appToken = "\${{ steps.app.outputs.token || github.token }}";
 in
   assay.suite "cli-vbump" {
     installsTheCrate = assay.eq (map (p: p.path) stubbed) [../../../rust/tools/vbump/default.nix];
@@ -53,43 +54,47 @@ in
     inSystemPackages = assay.eq (builtins.length vbumps) 1;
     providesTheBinary = assay.eq (map (p: p.meta.mainProgram) vbumps) ["vbump"];
 
-    # Two gated jobs (vbump and the legacy lock job), one selector between them.
-    oneSelectorTwoJobs =
-      assay.eq [(builtins.length gated) (lib.unique (map (g: g.selector) gated)) (lib.sort (a: b: a < b) (map (g: g.runsFor) gated))]
-      [2 ["inputs.updater || vars.FLAKE_LOCK_UPDATER || 'vbump'"] ["legacy" "vbump"]];
+    # Take-over (GH-247): the whole-lock workflow is gone, and exactly one workflow
+    # updates the lock: vbump's, on its schedule.
+    legacyWorkflowDeleted = assay.eq (builtins.pathExists (workflows + "/update-flake-lock.yml")) false;
+    exactlyOneLockUpdater = assay.eq updaterWorkflows ["vbump.yml"];
+    vbumpRunsOnASchedule = assay.eq [
+      (lib.hasInfix "on:\n  schedule:\n    # Mondays 03:23 UTC: off the hour, and a full week of upstream churn per bump.\n    - cron: '23 3 * * 1'\n" workflow)
+      (lib.hasInfix "    if: github.ref == 'refs/heads/main'\n" workflow)
+    ] [true true];
+    # No selector left: one job, and no legacy job, variable or token.
+    oneJob = assay.eq (builtins.filter (l: builtins.match "  [a-z-]+:" l != null) (lib.splitString "\n" (lib.last (lib.splitString "\njobs:\n" workflow)))) ["  vbump:"];
+    noLegacySwitch = assay.eq (map (m: lib.hasInfix m workflow) ["FLAKE_LOCK_UPDATER" "inputs.updater" "update-flake-lock@" "FLAKE_LOCK_UPDATE_TOKEN"]) [false false false false];
+    # No script under bin/ updates the lock on its own; bin/update/flake only runs vbump.
+    onlyTheByHandVbump = assay.eq updaterScripts ["update/flake"];
+    byHandRunsVbump = assay.eq (lib.hasInfix "\nexec vbump run --rev origin/main \"$@\"\n" byHand) true;
+    byHandHasNoFallback = assay.eq (map (m: lib.hasInfix m byHand) ["UPDATE_LEGACY" "flake update"]) [false false];
 
-    # Take-over: a scheduled run (no inputs, no variable) is vbump, and only vbump.
-    scheduledRunIsVbump = assay.eq (runs {}) ["vbump"];
-    emptyVariableIsVbump = assay.eq (runs {"vars.FLAKE_LOCK_UPDATER" = "";}) ["vbump"];
+    # Auto-merge (GH-247): the scheduled run passes --auto-merge, and vbump arms it as a
+    # squash merge; main's required `ci / all-green` is the gate it waits for.
+    scheduledRunArmsAutoMerge =
+      assay.eq (lib.hasInfix "--committer \"$COMMITTER\" --auto-merge)\n" workflow) true;
+    vbumpArmsSquashAutoMerge = assay.eq [
+      (lib.hasInfix "merge_args url = strings (.to_vec ([\"pr\", \"merge\", url, \"--auto\", \"--squash\"]))" forge)
+      (lib.hasInfix "  if l.auto_merge\n    (armed (&l) (&url))?\n" forge)
+    ] [true true];
 
-    # Rollback: the one variable restores the old single-PR job, and only it.
-    variableRollsBack = assay.eq (runs {"vars.FLAKE_LOCK_UPDATER" = "legacy";}) ["legacy"];
-    # A dispatch picks either, whatever the variable says.
-    dispatchPicksLegacy = assay.eq (runs {"inputs.updater" = "legacy";}) ["legacy"];
-    dispatchOverridesTheVariable = assay.eq (runs {
-      "inputs.updater" = "vbump";
-      "vars.FLAKE_LOCK_UPDATER" = "legacy";
-    }) ["vbump"];
-    dispatchDefaultIsVbump =
-      assay.eq (lib.hasInfix "        type: choice\n        options: [vbump, legacy]\n        default: vbump\n" workflow) true;
-
-    # By hand: bin/update/flake runs vbump against origin/main whenever vbump is
-    # installed; with this feature off (no vbump on PATH) or UPDATE_LEGACY=1 it is the
-    # old all-inputs `nix flake update`.
     # The token: minted per run from the vbump app, pinned by commit, only when both
-    # secrets exist; the push and gh use it first and fall back to today's tokens.
+    # secrets exist; the push and gh (and so the auto-merge) use it first.
     appTokenPinned = assay.eq (lib.hasInfix "uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0\n" workflow) true;
     appTokenOnlyWithBothSecrets = assay.eq [
       (lib.hasInfix "HAS_APP: \${{ secrets.VBUMP_APP_ID != '' && secrets.VBUMP_APP_PRIVATE_KEY != '' }}\n" workflow)
       (lib.hasInfix "        id: app\n        if: env.HAS_APP == 'true'\n" workflow)
       (lib.hasInfix "        if: env.HAS_APP != 'true'\n" workflow)
     ] [true true true];
-    appTokenFirstForPushAndGh =
-      assay.eq (builtins.length (lib.splitString "\${{ steps.app.outputs.token || secrets.FLAKE_LOCK_UPDATE_TOKEN || github.token }}" workflow)) 3;
-
-    byHandRunsVbump = assay.eq (lib.hasInfix "\n  exec vbump run --rev origin/main \"$@\"\n" byHand) true;
-    byHandFallsBack = assay.eq [
-      (lib.hasInfix "if [ \"\${UPDATE_LEGACY:-0}\" != 1 ] && command -v vbump >/dev/null 2>&1; then" byHand)
-      (lib.hasInfix "\nnix --experimental-features \"nix-command flakes\" flake update\n" byHand)
+    appTokenFirstForPushAndGh = assay.eq (builtins.length (lib.splitString appToken workflow)) 3;
+    # Enough for auto-merge: contents and pull requests write.
+    appTokenCanAutoMerge = assay.eq [
+      (lib.hasInfix "          permission-contents: write\n" workflow)
+      (lib.hasInfix "          permission-pull-requests: write\n" workflow)
     ] [true true];
+
+    # The one rollback, written where an operator looks (the runbook) and in the
+    # workflow's header, as the same command.
+    rollbackDocumented = assay.eq [(lib.hasInfix rollback runbook) (lib.hasInfix rollback workflow)] [true true];
   }

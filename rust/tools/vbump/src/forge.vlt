@@ -41,7 +41,9 @@ instance Clone Forge
 -- commit), pushed to `remote`, pull requests against `base_branch` with
 -- `label`. `gh_repo` (`owner/name`) is passed to gh when set; otherwise gh
 -- reads it from the remote. `committer` (name, email) authors the commits;
--- unset, git's own configuration does.
+-- unset, git's own configuration does. `auto_merge` (GH-247) arms GitHub's
+-- auto-merge (squash) on the pull request, so it merges itself once the base
+-- branch's required checks pass. `gh` is the gh program (tests: a script).
 export data Live
   { export repo String
   , export base String
@@ -50,6 +52,8 @@ export data Live
   , export label String
   , export gh_repo Option<String>
   , export committer Option<(String, String)>
+  , export auto_merge bool
+  , export gh String
   }
   deriving (Debug, Clone)
 
@@ -70,7 +74,7 @@ gh l args =
   if &l.gh_repo is Some r
     all.push (.to_string "--repo")
     all.push (r.clone ())
-  mut c = cmd "gh" all
+  mut c = cmd (l.gh.as_str ()) all
   c.cwd := Some (l.repo.clone ())
   run (&c) |> .map (\r -> r.stdout.trim () |> .to_string) |> .map_err Publish
 
@@ -119,7 +123,25 @@ publish_live l p =
     (gh (&l) (strings (.to_vec (["pr", "edit", open.as_str (), "--title", p.title.as_str (), "--body-file", body_file.as_str ()]))))?
     open
   labelled (&l) (&url)
+  if l.auto_merge
+    (armed (&l) (&url))?
   Ok url
+
+-- The gh command that arms auto-merge on `url`: squash, the only method main's
+-- linear history allows.
+export merge_args : &str -> Vec<String>
+merge_args url = strings (.to_vec (["pr", "merge", url, "--auto", "--squash"]))
+
+-- Auto-merge, armed once (GH-247). A pull request that has it already is left
+-- as it is, so a refresh is idempotent like the push. Unlike the label, this is
+-- the proposal's point: failing to arm it fails the input, and the run goes red.
+armed : &Live -> &str -> Result<(), VbumpError>
+armed l url =
+  on = (gh l (strings (.to_vec (["pr", "view", url, "--json", "autoMergeRequest", "--jq", ".autoMergeRequest != null"]))))?
+  if on == "true"
+    Ok ()
+  else
+    gh l (merge_args url) |> .map (\_ -> ()) |> .map_err (\e -> Publish ("arming auto-merge on #{url}: #{e}"))
 
 -- The label is a convenience for the reader, not part of the proposal: it is
 -- created when missing, and a token that may not label leaves the PR as it is.
@@ -192,7 +214,7 @@ test "a proposal is one commit on the base, the same commit every time, pushed t
   sh (&root) "git init -q --bare remote.git && git init -q repo && cd repo && echo old > flake.lock && echo x > flake.nix && git add . && git commit -qm base"
   base = run (&cmd "git" (.to_vec ([.to_string "-C", "#{root}/repo", .to_string "rev-parse", .to_string "HEAD"]))) |> .map (\r -> r.stdout) |> .expect "base" |> .trim |> .to_string
   std::fs::write ("#{root}/scratch/flake.lock") "new\n" |> .expect "lock"
-  l = Live { repo = "#{root}/repo", base = base.clone (), remote = "#{root}/remote.git", base_branch = .to_string "main", label = .to_string "flake-lock", gh_repo = None, committer = Some ((.to_string "vbump", .to_string "vbump@example.invalid")) }
+  l = Live { repo = "#{root}/repo", base = base.clone (), remote = "#{root}/remote.git", base_branch = .to_string "main", label = .to_string "flake-lock", gh_repo = None, committer = Some ((.to_string "vbump", .to_string "vbump@example.invalid")), auto_merge = false, gh = .to_string "gh" }
   p = Proposal { input = .to_string "a", branch = .to_string "update/flake-lock-a", title = .to_string "t", body = .to_string "b", message = .to_string "chore(flake): bump a\n", lock_path = "#{root}/scratch/flake.lock" }
   first = pushed (&l) (&p) |> .expect "first push"
   second = pushed (&l) (&p) |> .expect "second push"
@@ -206,3 +228,47 @@ test "a proposal is one commit on the base, the same commit every time, pushed t
 #[cfg(test)]
 git_show : &str -> &str -> String
 git_show root what = run (&cmd "git" (.to_vec ([.to_string "-C", "#{root}/remote.git", .to_string "show", what.to_string ()]))) |> .map (\r -> r.stdout) |> .expect "show"
+
+-- A repository, a remote and a scripted gh that logs its arguments; `view` is
+-- what `gh pr view` says about auto-merge (`true`: already armed).
+#[cfg(test)]
+gh_world : &str -> &str -> bool -> (String, Live, Proposal)
+gh_world name view auto =
+  root = std::env::temp_dir () |> .join ("vbump-gh-#{name}-#{std::process::id ()}") |> .to_string_lossy |> .to_string
+  std::fs::remove_dir_all (&root) |> .ok
+  std::fs::create_dir_all ("#{root}/scratch") |> .expect "dirs"
+  sh (&root) "git init -q --bare remote.git && git init -q repo && cd repo && echo old > flake.lock && git add . && git commit -qm base"
+  base = run (&cmd "git" (.to_vec ([.to_string "-C", "#{root}/repo", .to_string "rev-parse", .to_string "HEAD"]))) |> .map (\r -> r.stdout) |> .expect "base" |> .trim |> .to_string
+  std::fs::write ("#{root}/scratch/flake.lock") "new\n" |> .expect "lock"
+  script = "#!/bin/sh\necho \"$*\" >> #{root}/gh.log\ncase \"$1 $2\" in\n  'pr list') echo '' ;;\n  'pr create') echo https://github.com/o/r/pull/9 ;;\n  'pr view') echo #{view} ;;\nesac\n"
+  std::fs::write ("#{root}/gh") script |> .expect "gh"
+  sh (&root) "chmod +x gh"
+  l = Live { repo = "#{root}/repo", base, remote = "#{root}/remote.git", base_branch = .to_string "main", label = .to_string "flake-lock", gh_repo = Some (.to_string "o/r"), committer = Some ((.to_string "vbump", .to_string "vbump@example.invalid")), auto_merge = auto, gh = "#{root}/gh" }
+  p = Proposal { input = .to_string "a", branch = .to_string "update/flake-lock-a", title = .to_string "t", body = .to_string "b", message = .to_string "chore(flake): bump a\n", lock_path = "#{root}/scratch/flake.lock" }
+  (root, l, p)
+
+#[cfg(test)]
+gh_calls : &str -> Vec<String>
+gh_calls root = std::fs::read_to_string ("#{root}/gh.log") |> .unwrap_or_default |> .lines |> .map (\s -> s.to_string ()) |> .collect
+
+test "auto-merge is armed, squash, on the pull request vbump opened (GH-247)"
+  (root, l, p) = gh_world "arm" "false" true
+  url = publish_live l p |> .expect "published"
+  assert_eq! \-> url \-> "https://github.com/o/r/pull/9"
+  calls = gh_calls (&root)
+  assert! \-> calls.iter () |> .any (\c -> c.starts_with "pr create --base main --head update/flake-lock-a")
+  assert! \-> calls.contains (&(.to_string "pr merge https://github.com/o/r/pull/9 --auto --squash --repo o/r"))
+  std::fs::remove_dir_all (&root) |> .ok
+
+test "auto-merge already armed is left alone, and off without --auto-merge"
+  (root, l, p) = gh_world "armed" "true" true
+  publish_live l p |> .expect "published"
+  assert! \-> !(gh_calls (&root) |> .iter |> .any (\c -> c.starts_with "pr merge"))
+  std::fs::remove_dir_all (&root) |> .ok
+  (root2, l2, p2) = gh_world "off" "false" false
+  publish_live l2 p2 |> .expect "published"
+  assert! \-> !(gh_calls (&root2) |> .iter |> .any (\c -> c.starts_with "pr view" || c.starts_with "pr merge"))
+  std::fs::remove_dir_all (&root2) |> .ok
+
+test "the merge command is squash and auto"
+  assert_eq! \-> merge_args "u" \-> .to_vec ([.to_string "pr", .to_string "merge", .to_string "u", .to_string "--auto", .to_string "--squash"])

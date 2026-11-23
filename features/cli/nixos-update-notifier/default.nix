@@ -49,9 +49,9 @@ in {
         NIXOS_UPDATE_CURRENT = "/run/current-system";
         NIXOS_UPDATE_BOOTED = "/run/booted-system";
         # Public repo: the open-PR lookup needs no token. One GET of the open PRs,
-        # filtered on head.ref: the branch itself (the workflow's single PR,
-        # .github/workflows/update-flake-lock.yml LOCK_BRANCH) or vbump's per-input
-        # `<branch>-<input>` (rust/tools/vbump, GH-200), from this repo, not a fork.
+        # filtered on head.ref: vbump's per-input `<branch>-<input>` (rust/tools/vbump,
+        # .github/workflows/vbump.yml, GH-200) or the branch itself (the single PR of the
+        # old whole-lock workflow, deleted in GH-247), from this repo, not a fork.
         NIXOS_UPDATE_GITHUB_REPO = "Industrial/nixos-dotfiles";
         NIXOS_UPDATE_LOCK_BRANCH = "update/flake-lock";
         NIXOS_UPDATE_DIFFER = cfg.differ;

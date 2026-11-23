@@ -1,0 +1,343 @@
+-- vci-token (GH-247): the GitHub App installation token vci posts its
+-- `vci/<host>` commit statuses with, minted on the cache host and refreshed
+-- before it expires.
+--
+--   vci-token --app-id ID --key-file FILE --out FILE [--repo-slug OWNER/REPO]
+--             [--every DURATION] [--once] [--api URL] [--curl PROG] [--openssl PROG]
+--
+-- Each refresh: a JWT for the app (RS256, signed by `openssl dgst -sha256
+-- -sign` with the app's private key; valid nine minutes), the app's
+-- installation on the repository (`GET /repos/<slug>/installation`), and an
+-- installation token narrowed to that one repository and to
+-- `statuses: write` (`POST /app/installations/<id>/access_tokens`). GitHub's
+-- tokens last an hour; the default refresh is every 30 minutes. The token is
+-- written atomically to `--out`, which vci reads at every post.
+--
+-- The key is a file path, never a value: the NixOS feature hands it over with
+-- systemd's LoadCredential from a root-only file. The JWT goes to curl on
+-- stdin as a header, never in argv or the environment; the key and the token
+-- are never logged.
+--
+-- The refresh repeats on a spaced id_effect Schedule, and a failed mint is
+-- retried on vci's bounded `transient` Schedule, then logged; the next
+-- refresh tries again. No loops, threads, sleeps or timers of its own.
+
+import std::io::Write
+import std::path::Path
+import std::process::{Command, Stdio}
+import std::time::Duration
+import id_effect::{Effect, HNil, Never, Schedule, effect, fail, succeed, suspend}
+import vdeploy::cli::parse_duration
+import vdeploy::common::{now_secs, tail_lines}
+import vdeploy::report::write_atomic
+import crate::agent::transient
+import crate::cli::DEFAULT_SLUG
+import crate::common::{VciError, lifted}
+import crate::common::VciError::{Token, Usage}
+
+export const USAGE : &str = "usage: vci-token --app-id ID --key-file FILE --out FILE [--repo-slug OWNER/REPO] [--every DURATION] [--once] [--api URL] [--curl PROG] [--openssl PROG]"
+
+-- The JWT header: always RS256.
+export const HEADER : &str = "{\"alg\":\"RS256\",\"typ\":\"JWT\"}"
+
+-- The default refresh: half of a token's hour.
+export const DEFAULT_EVERY : u64 = 1800
+
+const ALPHABET : &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+-- Base64url without padding (RFC 7515's encoding of the JWT's parts).
+export b64url : &[u8] -> String
+b64url bytes =
+  table = ALPHABET.as_bytes ()
+  mut out = String::new ()
+  for chunk in bytes.chunks 3
+    b0 = chunk[0]
+    b1 = chunk.get 1 |> .copied |> .unwrap_or 0
+    b2 = chunk.get 2 |> .copied |> .unwrap_or 0
+    six = .to_vec ([b0 / 4, (b0 % 4) * 16 + b1 / 16, (b1 % 16) * 4 + b2 / 64, b2 % 64]) : Vec<u8>
+    shown = six.into_iter () |> .take (chunk.len () + 1) |> .collect : Vec<u8>
+    for i in shown
+      out.push (char::from (table[usize::from i]))
+  out
+
+-- The JWT's claims for `app` (the numeric App ID, or the Client ID), issued a
+-- minute in the past against clock drift and valid nine minutes (GitHub's
+-- limit is ten).
+export claims_of : &str -> u64 -> String
+claims_of app now =
+  digits = app.chars () |> .all (\c -> c.is_ascii_digit ())
+  iss = if digits && !(app.is_empty ())
+    app.to_string ()
+  else
+    serde_json::Value::from app |> .to_string
+  "{\"iat\":#{now.saturating_sub 60},\"exp\":#{now + 540},\"iss\":#{iss}}"
+
+-- `header.claims`, the part that is signed.
+export unsigned_of : &str -> u64 -> String
+unsigned_of app now =
+  claims = claims_of app now
+  "#{b64url (HEADER.as_bytes ())}.#{b64url (claims.as_bytes ())}"
+
+-- The token request: this one repository, commit statuses only.
+export request_body : &str -> String
+request_body slug =
+  name = slug.rsplit '/' |> .next |> .unwrap_or slug
+  mut perms = serde_json::Map::new ()
+  perms.insert (.to_string "statuses") (serde_json::Value::from "write")
+  mut m = serde_json::Map::new ()
+  m.insert (.to_string "repositories") (serde_json::Value::from (.to_vec ([name.to_string ()])))
+  m.insert (.to_string "permissions") (serde_json::Value::Object perms)
+  serde_json::Value::Object m |> .to_string
+
+-- What minting needs: the app, its key file, the repository, where the token
+-- goes, and the programs (tests: scripts).
+export data Minter
+  { export app_id String
+  , export key_file String
+  , export repo_slug String
+  , export api String
+  , export curl String
+  , export openssl String
+  , export out String
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- `input` to the program's stdin, its stdout back.
+fed : Option<std::process::ChildStdin> -> &[u8] -> Result<(), String>
+fed stdin input =
+  case stdin of
+    None -> Err (.to_string "no stdin")
+    Some p ->
+      mut pipe = p
+      pipe.write_all input |> .map_err (\e -> "stdin: #{e}")
+
+piped : &str -> Vec<String> -> &[u8] -> Result<Vec<u8>, String>
+piped prog args input =
+  mut child = (Command::new prog |> .args (&args) |> .stdin (Stdio::piped ()) |> .stdout (Stdio::piped ()) |> .stderr (Stdio::piped ()) |> .spawn () |> .map_err (\e -> "running #{prog}: #{e}"))?
+  (fed (child.stdin.take ()) input |> .map_err (\e -> "#{prog}: #{e}"))?
+  out = (child.wait_with_output () |> .map_err (\e -> "waiting for #{prog}: #{e}"))?
+  if out.status.success ()
+    Ok out.stdout
+  else
+    Err "#{prog} failed (#{out.status}): #{tail_lines (&String::from_utf8_lossy (&out.stderr)) 3}"
+
+-- The app's JWT, signed with its private key.
+export jwt_of : &Minter -> u64 -> Result<String, VciError>
+jwt_of m now =
+  unsigned = unsigned_of (&m.app_id) now
+  args = .to_vec ([.to_string "dgst", .to_string "-sha256", .to_string "-sign", m.key_file.clone (), .to_string "-binary"])
+  sig = (piped (&m.openssl) args (unsigned.as_bytes ()) |> .map_err (\e -> Token ("signing the JWT: #{e}")))?
+  if sig.is_empty ()
+    Err (Token (.to_string "signing the JWT: openssl printed no signature"))
+  else
+    Ok "#{unsigned}.#{b64url (&sig)}"
+
+-- One GitHub API call, the JWT as a header on curl's stdin.
+called : &Minter -> &str -> Option<String> -> &str -> Result<serde_json::Value, VciError>
+called m jwt body url =
+  mut args = .to_vec ([.to_string "--silent", .to_string "--show-error", .to_string "--fail", .to_string "--max-time", .to_string "30", .to_string "--header", .to_string "@-", .to_string "--header", .to_string "Accept: application/vnd.github+json", .to_string "--header", .to_string "X-GitHub-Api-Version: 2022-11-28", .to_string "--header", .to_string "User-Agent: vci-token"]) : Vec<String>
+  if body is Some b
+    args.push (.to_string "--data-binary")
+    args.push b
+  args.push (url.to_string ())
+  header = "Authorization: Bearer #{jwt}\n"
+  out = (piped (&m.curl) args (header.as_bytes ()) |> .map_err (\e -> Token ("#{url}: #{e}")))?
+  text = String::from_utf8_lossy (&out) |> .to_string
+  (serde_json::from_str (&text) : Result<serde_json::Value, serde_json::Error>) |> .map_err (\e -> Token ("#{url}: not JSON: #{e}"))
+
+-- The app's installation id on the repository.
+export installation_of : &Minter -> &str -> Result<u64, VciError>
+installation_of m jwt =
+  url = "#{m.api}/repos/#{m.repo_slug}/installation"
+  v = (called m jwt None (&url))?
+  v.get "id" |> .and_then (\x -> x.as_u64 ()) |> .ok_or (Token ("#{url}: no installation id"))
+
+-- A fresh installation token and when it expires.
+export token_of : &Minter -> &str -> u64 -> Result<(String, String), VciError>
+token_of m jwt id =
+  url = "#{m.api}/app/installations/#{id}/access_tokens"
+  v = (called m jwt (Some (request_body (&m.repo_slug))) (&url))?
+  token = (v.get "token" |> .and_then (\x -> x.as_str ()) |> .map (\s -> s.to_string ()) |> .ok_or (Token ("#{url}: no token")))?
+  expires = v.get "expires_at" |> .and_then (\x -> x.as_str ()) |> .map (\s -> s.to_string ()) |> .unwrap_or_default
+  Ok ((token, expires))
+
+-- Mint one token and write it to `out`. Returns when it expires.
+export minted_now : &Minter -> Result<String, VciError>
+minted_now m =
+  jwt = (jwt_of m (now_secs ()))?
+  id = (installation_of m (&jwt))?
+  (token, expires) = (token_of m (&jwt) id)?
+  (write_atomic (Path::new (&m.out)) (&"#{token}\n") |> .map_err (\e -> Token ("writing #{m.out}: #{e}")))?
+  eprintln! \-> "vci-token: wrote #{m.out} (installation #{id}, expires #{expires})"
+  Ok expires
+
+-- One mint, as an effect (a blocking step of its fiber).
+export mint_once : Minter -> Effect<String, VciError, HNil>
+mint_once m = suspend (move \-> lifted (minted_now (&m)))
+
+warned : VciError -> Effect<(), Never, HNil>
+warned e =
+  eprintln! \-> "vci-token: #{e}; the next refresh tries again"
+  succeed (())
+
+-- One refresh: the mint, retried on `transient`, its failure logged.
+export refreshed : Minter -> Effect<(), Never, HNil>
+refreshed m =
+  Effect::retry (move \-> mint_once (m.clone ())) (transient ()) |> .map (\_ -> ()) |> .catch warned
+
+-- The daemon: a refresh now, then every `every` seconds.
+export daemon : Minter -> u64 -> Effect<(), Never, HNil>
+daemon m every =
+  eprintln! \-> "vci-token: a token for #{m.repo_slug} into #{m.out}, every #{every}s"
+  Effect::repeat (move \-> refreshed (m.clone ())) (Schedule::spaced (Duration::from_secs every)) |> .map (\_ -> ())
+
+-- The command line.
+export data Options { export minter Minter, export every u64, export once bool, export help bool }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+export parse_args : &[String] -> Result<Options, String>
+parse_args args =
+  mut m = Minter { app_id = String::new (), key_file = String::new (), repo_slug = DEFAULT_SLUG.to_string (), api = .to_string "https://api.github.com", curl = .to_string "curl", openssl = .to_string "openssl", out = String::new () }
+  mut every = DEFAULT_EVERY
+  mut once = false
+  mut help = false
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "--app-id" ->
+        m.app_id := (value (it.next ()) "--app-id")?
+      "--key-file" ->
+        m.key_file := (value (it.next ()) "--key-file")?
+      "--out" ->
+        m.out := (value (it.next ()) "--out")?
+      "--repo-slug" ->
+        m.repo_slug := (value (it.next ()) "--repo-slug")?
+      "--api" ->
+        m.api := (value (it.next ()) "--api")?
+      "--curl" ->
+        m.curl := (value (it.next ()) "--curl")?
+      "--openssl" ->
+        m.openssl := (value (it.next ()) "--openssl")?
+      "--every" ->
+        v = (value (it.next ()) "--every")?
+        every := (parse_duration (&v) |> .filter (\n -> *n > 0) |> .ok_or ("--every: not a positive duration: #{v}"))?
+      "--once" ->
+        once := true
+      "-h" ->
+        help := true
+      "--help" ->
+        help := true
+      other ->
+        return Err "unknown argument: #{other}"
+  if !help && m.app_id.is_empty ()
+    return Err (.to_string "--app-id is required")
+  if !help && m.key_file.is_empty ()
+    return Err (.to_string "--key-file is required")
+  if !help && m.out.is_empty ()
+    return Err (.to_string "--out is required")
+  Ok (Options { minter = m, every, once, help })
+
+-- The program for parsed options (or the usage error).
+export program : Result<Options, String> -> Effect<(), VciError, HNil>
+program parsed =
+  case parsed of
+    Err why -> fail (Usage ("#{why}\n#{USAGE}"))
+    Ok o ->
+      if o.once
+        mint_once o.minter |> .map (\_ -> ())
+      else
+        daemon o.minter o.every |> .widen
+
+-- On a fiber of the runtime's executor, as app.vlt's `supervised`.
+supervised : Effect<(), VciError, HNil> -> Effect<(), VciError, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+-- The process: exit 0, 1 on a usage error or a failed `--once`.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  parsed = parse_args (&args)
+  if parsed |> .as_ref |> .map (\o -> o.help) |> .unwrap_or false
+    println! \-> "#{USAGE}"
+    std::process::ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (supervised (program parsed)) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+import vdeploy::common::{cmd, run, strs}
+
+test "base64url without padding, the JWT's encoding"
+  assert_eq! \-> (b64url ("".as_bytes ()), b64url ("f".as_bytes ()), b64url ("fo".as_bytes ()), b64url ("foo".as_bytes ()), b64url ("foob".as_bytes ())) \-> (.to_string "", .to_string "Zg", .to_string "Zm8", .to_string "Zm9v", .to_string "Zm9vYg")
+  -- `+/` in standard base64 are `-_` here.
+  high = .to_vec ([251, 255]) : Vec<u8>
+  assert_eq! \-> b64url (&high) \-> "-_8"
+  assert_eq! \-> b64url (HEADER.as_bytes ()) \-> "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9"
+
+test "the claims name the app, a minute back and nine minutes ahead"
+  -- Literals with braces are bound first: inside a macro argument Voltaic escapes them.
+  numeric = "{\"iat\":940,\"exp\":1540,\"iss\":5886494}"
+  client = "{\"iat\":940,\"exp\":1540,\"iss\":\"Iv23abc\"}"
+  assert_eq! \-> claims_of "5886494" 1000 \-> numeric
+  assert_eq! \-> claims_of "Iv23abc" 1000 \-> client
+  assert! \-> unsigned_of "1" 1000 |> .starts_with "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
+
+test "the token asked for is this repository's, commit statuses only"
+  want = "{\"permissions\":{\"statuses\":\"write\"},\"repositories\":[\"nixos-dotfiles\"]}"
+  assert_eq! \-> request_body "Industrial/nixos-dotfiles" \-> want
+
+test "the command line needs the app, the key and the output; the rest defaults"
+  o = parse_args (&strs (&["--app-id", "5886494", "--key-file", "/run/credentials/vci-token.service/app-key", "--out", "/run/vci-token/token"])) |> .expect "options"
+  assert_eq! \-> (o.every, o.once, o.minter.repo_slug.as_str (), o.minter.api.as_str ()) \-> (DEFAULT_EVERY, false, DEFAULT_SLUG, "https://api.github.com")
+  e = parse_args (&strs (&["--app-id", "1", "--key-file", "/k", "--out", "/o", "--every", "10m", "--once"])) |> .expect "options"
+  assert_eq! \-> (e.every, e.once) \-> (600, true)
+  assert_eq! \-> parse_args (&strs (&["--app-id", "1", "--out", "/o"])) \-> Err (.to_string "--key-file is required")
+  assert_eq! \-> parse_args (&strs (&["--frob"])) \-> Err (.to_string "unknown argument: --frob")
+  assert! \-> parse_args (&strs (&["--help"])) |> .map (\o -> o.help) |> .unwrap_or false
+
+-- A scratch directory with a scripted openssl (it signs with "sig") and curl
+-- (it logs its argv and its stdin, and answers GitHub's two calls).
+#[cfg(test)]
+world : &str -> &str -> Minter
+world name curl_exit =
+  root = std::env::temp_dir () |> .join ("vci-token-#{name}-#{std::process::id ()}") |> .to_string_lossy |> .to_string
+  std::fs::remove_dir_all (&root) |> .ok
+  std::fs::create_dir_all (&root) |> .expect "dir"
+  std::fs::write ("#{root}/openssl") "#!/bin/sh\ncat > /dev/null\nprintf sig\n" |> .expect "openssl"
+  curl = "#!/bin/sh\necho \"$*\" >> #{root}/argv.log\ncat >> #{root}/stdin.log\nfor a; do last=$a; done\ncase \"$last\" in\n  *access_tokens) echo '{\"token\":\"ghs_minted\",\"expires_at\":\"2026-11-23T13:00:00Z\"}' ;;\n  *installation) echo '{\"id\":42}' ;;\nesac\nexit #{curl_exit}\n"
+  std::fs::write ("#{root}/curl") curl |> .expect "curl"
+  run (&cmd "chmod" (strs (&["+x", "#{root}/openssl" |> .as_str, "#{root}/curl" |> .as_str]))) |> .expect "chmod"
+  Minter { app_id = .to_string "5886494", key_file = "#{root}/key.pem", repo_slug = .to_string "o/r", api = .to_string "https://api.example", curl = "#{root}/curl", openssl = "#{root}/openssl", out = "#{root}/token" }
+
+#[cfg(test)]
+dir_of : &Minter -> String
+dir_of m = Path::new (&m.out) |> .parent |> .map (\p -> p.to_string_lossy () |> .to_string) |> .unwrap_or_default
+
+test "a mint signs a JWT, finds the installation, writes the token, and keeps the JWT out of argv"
+  m = world "ok" "0"
+  root = dir_of (&m)
+  assert_eq! \-> minted_now (&m) |> .ok \-> Some (.to_string "2026-11-23T13:00:00Z")
+  assert_eq! \-> std::fs::read_to_string (&m.out) |> .ok \-> Some (.to_string "ghs_minted\n")
+  argv = std::fs::read_to_string ("#{root}/argv.log") |> .unwrap_or_default
+  assert! \-> argv.contains "https://api.example/repos/o/r/installation" && argv.contains "https://api.example/app/installations/42/access_tokens"
+  assert! \-> argv.contains "\"statuses\":\"write\"" && !(argv.contains "Bearer") && !(argv.contains "eyJ")
+  stdin = std::fs::read_to_string ("#{root}/stdin.log") |> .unwrap_or_default
+  -- Both calls carry the same JWT: header.claims.signature, "sig" signed.
+  assert_eq! \-> stdin.lines () |> .filter (\l -> l.starts_with "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." && l.ends_with ".c2ln") |> .count \-> 2
+  std::fs::remove_dir_all (&root) |> .ok
+
+test "a failed call writes nothing and says which call; the refresh survives it"
+  m = world "down" "22"
+  root = dir_of (&m)
+  err = minted_now (&m) |> .err |> .map (\e -> e.to_string ()) |> .unwrap_or_default
+  assert! \-> err.contains "/repos/o/r/installation" && err.contains "failed"
+  assert! \-> !(Path::new (&m.out) |> .exists)
+  std::fs::remove_dir_all (&root) |> .ok

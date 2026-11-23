@@ -1,0 +1,134 @@
+# Scheduled flake.lock bumps: vbump (rust/tools/vbump, GH-189), the only lock updater
+# (GH-247). One pull request per root input, and each merges itself once green.
+#
+# Policy: docs/adr/0006-update-policy.md. Procedure: docs/runbooks/updates.md.
+#
+#   vbump   for each root input on its own: `nix flake update <input>`, evaluate and
+#           dry-build every nixosConfigurations host against that lock, diff each host's
+#           derivation closure against main (vdiff --json, in the PR body), open or
+#           refresh the PR on `update/flake-lock-<input>`, and arm auto-merge (squash) on
+#           it (`--auto-merge`). One input failing (it does not evaluate, a host does not
+#           dry-build, auto-merge cannot be armed) fails only that input; the job goes
+#           red at the end.
+#
+# The gate is the merge gate, not this workflow: the bump PR runs the regular PR
+# workflow (pr.yml -> ci.yml), and main's ruleset requires `ci / all-green`. Auto-merge
+# waits for it. GitHub only starts that workflow for a PR a workflow opened when the PR
+# was opened with a token other than GITHUB_TOKEN, so the job mints one per run from the
+# vbump GitHub App (secrets VBUMP_APP_ID and VBUMP_APP_PRIVATE_KEY; docs/runbooks/updates.md
+# §6). Without them it falls back to GITHUB_TOKEN with a warning: the PRs then get no CI
+# until each is closed and reopened, and auto-merge waits until then.
+#
+# Rollback (exactly one, documented in docs/runbooks/updates.md §1): restore the old
+# whole-lock workflow from git history,
+#   git rm .github/workflows/vbump.yml
+#   git checkout 056a7031988ab79b639c9d2c0b5fddadbadf22e0 -- .github/workflows/update-flake-lock.yml bin/update/flake
+# in a PR. features/cli/vbump/default.assay.nix checks that exactly one lock updater
+# exists (this file) and that this rollback is the one documented.
+name: Update flake.lock (vbump)
+on:
+  schedule:
+    # Mondays 03:23 UTC: off the hour, and a full week of upstream churn per bump.
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      input:
+        description: 'Bump just this root input (empty: every input)'
+        type: string
+        default: ''
+permissions: {}
+concurrency:
+  group: vbump
+  cancel-in-progress: false
+jobs:
+  vbump:
+    name: Bump each input (vbump)
+    # Lock bumps are always against main: the PR base is whatever branch is checked out.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Every input evaluates every host (about 20 s and 3 GB each), two inputs at a time.
+    timeout-minutes: 240
+    permissions:
+      contents: write
+      pull-requests: write
+      # Labels are an issues API: vbump creates `flake-lock` when missing and adds it.
+      issues: write
+    env:
+      INPUT: ${{ inputs.input }}
+      # The vbump GitHub App (VBUMP_APP_ID: its Client ID or App ID; VBUMP_APP_PRIVATE_KEY:
+      # a private key it generated). Both set: each run mints a short-lived installation
+      # token scoped to this repository. Either missing: the job runs with GITHUB_TOKEN,
+      # and says so in the job summary.
+      HAS_APP: ${{ secrets.VBUMP_APP_ID != '' && secrets.VBUMP_APP_PRIVATE_KEY != '' }}
+    steps:
+      # Why a token other than GITHUB_TOKEN: GitHub starts no workflow for a PR that
+      # GITHUB_TOKEN opened, so `ci / all-green` (required on main) would never run on a
+      # bump PR until someone closed and reopened it. See ADR-0006.
+      - name: Mint the vbump app token
+        id: app
+        if: env.HAS_APP == 'true'
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ secrets.VBUMP_APP_ID }}
+          private-key: ${{ secrets.VBUMP_APP_PRIVATE_KEY }}
+          # No owner/repositories: the token is scoped to this repository alone. The
+          # permissions narrow it further, to what vbump uses. Contents and pull requests
+          # write are also what arming auto-merge needs.
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+      - name: Without the app, say so
+        if: env.HAS_APP != 'true'
+        run: |
+          msg='VBUMP_APP_ID / VBUMP_APP_PRIVATE_KEY are not set: the bump PRs are opened with GITHUB_TOKEN, so their CI (and with it auto-merge) does not start until each PR is closed and reopened (docs/runbooks/updates.md).'
+          echo "::warning title=vbump without its app token::$msg"
+          printf '> [!WARNING]\n> %s\n' "$msg" >> "$GITHUB_STEP_SUMMARY"
+      # vbump pushes each input's branch from this checkout, so it keeps the credentials
+      # (the same token the PRs are opened with).
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app.outputs.token || github.token }}
+          persist-credentials: true
+      # The commits are the app's bot user's when the app token is in use.
+      - name: Committer
+        id: committer
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SLUG" ]; then
+            id="$(gh api "/users/${SLUG}[bot]" --jq .id)"
+            echo "identity=${SLUG}[bot] <${id}+${SLUG}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
+          else
+            echo "identity=github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      # The crate's default.nix through the flake's nixpkgs, as the fleet builds it.
+      - name: Build vbump
+        run: |
+          set -euo pipefail
+          out="$(nix build --no-link --print-out-paths --impure --expr \
+            "(builtins.getFlake \"git+file://$PWD?shallow=1&rev=$GITHUB_SHA\").inputs.nixpkgs.legacyPackages.x86_64-linux.callPackage $PWD/rust/tools/vbump {}")"
+          echo "$out/bin" >> "$GITHUB_PATH"
+      - name: Bump each input
+        env:
+          # gh (PR create/edit, the label, auto-merge) uses the same token as the push.
+          GH_TOKEN: ${{ steps.app.outputs.token || github.token }}
+          COMMITTER: ${{ steps.committer.outputs.identity }}
+        run: |
+          set -euo pipefail
+          args=(run --rev "$GITHUB_SHA" --jobs 2 --out vbump-out --summary "$GITHUB_STEP_SUMMARY"
+            --committer "$COMMITTER" --auto-merge)
+          if [ -n "$INPUT" ]; then args+=(--input "$INPUT"); fi
+          vbump "${args[@]}"
+      - name: Upload proposals
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vbump-proposals
+          path: vbump-out
+          if-no-files-found: ignore
+          retention-days: 14
