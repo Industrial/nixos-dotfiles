@@ -6,6 +6,9 @@
 # Target: plain addon folders in the AddOns dir given as $2. idAutomation is not touched.
 #
 #   bin/extract-id-addons Interface/AddOns/idAutomation Interface/AddOns   (from features/games/wow-classic)
+#
+# A lib's data/ is generated here now (bin/generate-id-data), so an existing
+# data/ folder is kept rather than replaced by idAutomation's.
 set -euo pipefail
 SRC=$(cd "$1" && pwd)
 DST=$(cd "$2" && pwd)
@@ -21,9 +24,12 @@ for lib in Set Item Spell Talent; do
   name="idLib${lib}Table"
   from="$SRC/Libs/Lib${lib}Table-1.0"
   out="$DST/$name"
+  keep=""
+  if [ -d "$out/data" ]; then keep=$(mktemp -d); cp -r "$out/data" "$keep/data"; fi
   rm -rf "$out"; mkdir -p "$out"
   cp "$from/Lib${lib}Table-1.0.lua" "$out/$name.lua"
-  if [ -d "$from/data" ]; then cp -r "$from/data" "$out/data"; fi
+  if [ -n "$keep" ]; then mv "$keep/data" "$out/data"; rmdir "$keep"
+  elif [ -d "$from/data" ]; then cp -r "$from/data" "$out/data"; fi
   rename_libs "$out/$name.lua"
   {
     echo "## Interface: 16001"
@@ -72,7 +78,7 @@ for f in "${CORE[@]}"; do cp "$SRC/src/$f.lua" "$out/core/$(basename "$f").lua";
 for f in "${UPKEEP[@]}"; do cp "$SRC/src/modules/automation/upkeep/$f.lua" "$out/upkeep/$f.lua"; done
 cp "$SRC/src/modules/automation/Upkeep.lua" "$out/Upkeep.lua"
 
-# Bundled third-party fallback for consumables (idLibItemTable has no generated data yet).
+# Bundled third-party fallback for consumables, used only when idLibItemTable has no data.
 cp "$SRC/Libs/LibStub/LibStub.lua" "$out/Libs/LibStub/LibStub.lua"
 cp "$SRC/Libs/LibPeriodicTable-3.1/LibPeriodicTable-3.1/LibPeriodicTable-3.1.lua" "$out/Libs/LibPeriodicTable-3.1/LibPeriodicTable-3.1/"
 cp "$SRC/Libs/LibPeriodicTable-3.1/LibPeriodicTable-3.1-Consumable/LibPeriodicTable-3.1-Consumable.lua" "$out/Libs/LibPeriodicTable-3.1/LibPeriodicTable-3.1-Consumable/"
