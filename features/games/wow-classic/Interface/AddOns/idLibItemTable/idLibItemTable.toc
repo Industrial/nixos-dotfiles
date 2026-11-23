@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: idLibItemTable
+## Notes: Item -> set classification, a facade over idLibSetTable (LibStub: idLibItemTable-1.0).
+## X-Category: Library
+## X-License: LGPL v2.1
+## Dependencies: idLibSetTable
+
+idLibItemTable.lua
+data\data.xml

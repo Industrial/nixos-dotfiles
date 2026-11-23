@@ -1,0 +1,15 @@
+<Bindings>
+  <!-- The header attribute goes on the FIRST binding only; the ones after it
+       join that group. Repeating it logs "Binding header ... loaded more than once". -->
+  <!-- Upkeep module: three keys, one job each. Buffs performs the next
+       preparation step (out of combat); Health and Mana work in combat too,
+       through a baked [combat] macro.
+       Labels: BINDING_HEADER_IDUPKEEP / BINDING_NAME_CLICK ... set in
+       src/modules/automation/Upkeep.moon. -->
+  <Binding name="CLICK idUpkeepBuffsButton:LeftButton" header="IDUPKEEP">
+  </Binding>
+  <Binding name="CLICK idUpkeepHealthButton:LeftButton">
+  </Binding>
+  <Binding name="CLICK idUpkeepManaButton:LeftButton">
+  </Binding>
+</Bindings>

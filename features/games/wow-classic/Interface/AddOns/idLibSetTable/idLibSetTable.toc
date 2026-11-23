@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: idLibSetTable
+## Notes: The shared engine for id -> set membership libraries (LibStub: idLibSetTable-1.0).
+## X-Category: Library
+## X-License: LGPL v2.1
+
+LibStub.lua
+idLibSetTable.lua
