@@ -1,0 +1,1 @@
+SetCVar("screenshotQuality",10)
