@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# Extracts idAutomation's own LibStub libraries into idLib* addons, and its Upkeep
+# module (buff / health / mana buttons + macros) into the idUpkeep addon.
+#
+# Source: the live idAutomation checkout's COMPILED Lua (MoonScript output).
+# Target: plain addon folders in the AddOns dir given as $2. idAutomation is not touched.
+#
+#   bin/extract-id-addons Interface/AddOns/idAutomation Interface/AddOns   (from features/games/wow-classic)
+set -euo pipefail
+SRC=$(cd "$1" && pwd)
+DST=$(cd "$2" && pwd)
+
+# The library names every copied file is rewritten to.
+rename_libs() {
+  # Every reference not already prefixed (quoted names, and names in messages/comments).
+  sed -i -E 's/(^|[^d])Lib(Set|Item|Spell|Talent)Table-1\.0/\1idLib\2Table-1.0/g' "$@"
+}
+
+# ---- idLib*Table ---------------------------------------------------------------
+for lib in Set Item Spell Talent; do
+  name="idLib${lib}Table"
+  from="$SRC/Libs/Lib${lib}Table-1.0"
+  out="$DST/$name"
+  rm -rf "$out"; mkdir -p "$out"
+  cp "$from/Lib${lib}Table-1.0.lua" "$out/$name.lua"
+  if [ -d "$from/data" ]; then cp -r "$from/data" "$out/data"; fi
+  rename_libs "$out/$name.lua"
+  {
+    echo "## Interface: 16001"
+    echo "## Title: $name"
+    case $lib in
+      Set) echo "## Notes: The shared engine for id -> set membership libraries (LibStub: ${name}-1.0)." ;;
+      *)   echo "## Notes: ${lib} -> set classification, a facade over idLibSetTable (LibStub: ${name}-1.0)." ;;
+    esac
+    echo "## X-Category: Library"
+    echo "## X-License: LGPL v2.1"
+    [ "$lib" = Set ] || echo "## Dependencies: idLibSetTable"
+    echo
+    [ "$lib" = Set ] && echo "LibStub.lua"
+    echo "$name.lua"
+    [ -d "$out/data" ] && echo 'data\data.xml'
+  } > "$out/$name.toc"
+done
+cp "$SRC/Libs/LibStub/LibStub.lua" "$DST/idLibSetTable/LibStub.lua"
+
+# Library tests (not in the .toc): idAutomation's own, renamed. Each finds the library
+# file relative to itself, so `busted tests` runs from the addon folder.
+port_lib_test() { # <source test> <addon>
+  mkdir -p "$DST/$2/tests"
+  local dest="$DST/$2/tests/$(basename "$1" | sed -E 's/^Lib([A-Za-z]+)-1\.0/idLib\1/')"
+  cp "$1" "$dest"
+  sed -i -E 's#"Libs/Lib([A-Za-z]+)-1\.0/Lib[A-Za-z]+-1\.0\.lua"#(debug.getinfo(1, "S").source:sub(2):match("(.*/)") .. "../../idLib\1/idLib\1.lua")#g' "$dest"
+  rename_libs "$dest"
+}
+port_lib_test "$SRC/Libs/LibItemTable-1.0/LibItemTable-1.0.test.lua" idLibItemTable
+port_lib_test "$SRC/Libs/LibSpellTable-1.0/LibSpellTable-1.0.test.lua" idLibSpellTable
+port_lib_test "$SRC/Libs/conformance.test.lua" idLibSetTable
+
+# ---- idUpkeep ------------------------------------------------------------------
+out="$DST/idUpkeep"
+rm -rf "$out"; mkdir -p "$out/core" "$out/upkeep/classes" "$out/Libs/LibStub" \
+  "$out/Libs/LibPeriodicTable-3.1/LibPeriodicTable-3.1" "$out/Libs/LibPeriodicTable-3.1/LibPeriodicTable-3.1-Consumable"
+
+# The private copy of idAutomation's framework, in idAutomation.xml's own order.
+CORE=(lib/Table lib/String domain/Color domain/Anchor lib/Logger domain/Frame lib/VersionInfo
+      lib/Database lib/EventManager lib/Graph lib/HookManager lib/CombatLockdownCommand lib/Node)
+UPKEEP=(Rules classes/WARRIOR classes/MAGE classes/ROGUE classes/PRIEST classes/DRUID classes/PALADIN
+        classes/SHAMAN classes/HUNTER classes/WARLOCK Engine Consumables Snapshot Spells Button Sustain
+        PetDeath Macros)
+
+for f in "${CORE[@]}"; do cp "$SRC/src/$f.lua" "$out/core/$(basename "$f").lua"; done
+for f in "${UPKEEP[@]}"; do cp "$SRC/src/modules/automation/upkeep/$f.lua" "$out/upkeep/$f.lua"; done
+cp "$SRC/src/modules/automation/Upkeep.lua" "$out/Upkeep.lua"
+
+# Bundled third-party fallback for consumables (idLibItemTable has no generated data yet).
+cp "$SRC/Libs/LibStub/LibStub.lua" "$out/Libs/LibStub/LibStub.lua"
+cp "$SRC/Libs/LibPeriodicTable-3.1/LibPeriodicTable-3.1/LibPeriodicTable-3.1.lua" "$out/Libs/LibPeriodicTable-3.1/LibPeriodicTable-3.1/"
+cp "$SRC/Libs/LibPeriodicTable-3.1/LibPeriodicTable-3.1-Consumable/LibPeriodicTable-3.1-Consumable.lua" "$out/Libs/LibPeriodicTable-3.1/LibPeriodicTable-3.1-Consumable/"
+cp "$SRC/Libs/LibPeriodicTable-3.1/LGPLv2.1.txt" "$out/Libs/LibPeriodicTable-3.1/"
+
+# Own namespace, so idUpkeep and idAutomation can never overwrite each other's globals,
+# buttons, bindings or saved variables.
+mapfile -t OWN < <(find "$out/core" "$out/upkeep" "$out/Upkeep.lua" -name "*.lua")
+sed -i -e 's/idAddon_/idUpkeep_/g' -e 's/idAutomation/idUpkeep/g' -e 's/IDAUTOMATION/IDUPKEEP/g' \
+  -e 's/idUpkeepUpkeep/idUpkeep/g' "${OWN[@]}"
+rename_libs "${OWN[@]}"
+
+# The root: a plain Node named idUpkeep (saved variables: idUpkeepDB) with Upkeep as its child.
+cat > "$out/idUpkeep.lua" <<'EOF'
+-- Root of idUpkeep: a plain Node keyed "idUpkeep" (it creates idUpkeepDB and starts on
+-- PLAYER_LOGIN / PLAYER_ENTERING_WORLD) with the Upkeep module as its one child.
+local root=_G.idUpkeep_Node(nil,"idUpkeep")
+_G.idUpkeep=root
+root.Upkeep=_G.idUpkeep_Upkeep(root,"Upkeep")
+SLASH_IDUPKEEP1="/idupkeep"
+SlashCmdList.IDUPKEEP=function()for _,l in ipairs(root.Upkeep:explainLines())do print(l)end end
+EOF
+
+{
+  echo "## Interface: 16001"
+  echo "## Title: idUpkeep"
+  echo "## Notes: Three buttons and macros: next missing buff, food / health, drink / mana. /idupkeep explains."
+  echo "## Dependencies: idLibItemTable, idLibSpellTable"
+  echo "## SavedVariables: idUpkeepDB"
+  echo "## LoadSavedVariablesFirst: 1"
+  echo
+  echo 'Libs\LibStub\LibStub.lua'
+  echo 'Libs\LibPeriodicTable-3.1\LibPeriodicTable-3.1\LibPeriodicTable-3.1.lua'
+  echo 'Libs\LibPeriodicTable-3.1\LibPeriodicTable-3.1-Consumable\LibPeriodicTable-3.1-Consumable.lua'
+  for f in "${CORE[@]}"; do echo "core\\$(basename "$f").lua"; done
+  for f in "${UPKEEP[@]}"; do echo "upkeep\\${f//\//\\}.lua"; done
+  echo "Upkeep.lua"
+  echo "idUpkeep.lua"
+} > "$out/idUpkeep.toc"
+
+sed -e 's/idAutomation/idUpkeep/g' -e 's/IDAUTOMATION/IDUPKEEP/g' -e 's/idUpkeepUpkeep/idUpkeep/g' \
+  "$SRC/Bindings.xml" > "$out/Bindings.xml"
+
+# ---- idUpkeep tests: idAutomation's own Upkeep suite, renamed the same way -------
+# Not loaded by the game (not in the .toc). Run with tests/run.sh, which needs the
+# idAutomation checkout next to this addon for its WoW stubs (src/test_bootstrap).
+mkdir -p "$out/tests"
+for t in "$SRC"/src/modules/automation/upkeep/*.test.lua "$SRC"/src/modules/automation/upkeep/classes/*.test.lua \
+         "$SRC"/src/modules/automation/Upkeep.test.lua; do
+  rel=${t#"$SRC"/src/modules/automation/}
+  dest="$out/tests/${rel//\//_}"
+  cp "$t" "$dest"
+done
+mapfile -t TESTS < <(find "$out/tests" -name "*.test.lua")
+sed -i -e 's/idAddon_/idUpkeep_/g' -e 's/idAutomation/idUpkeep/g' -e 's/IDAUTOMATION/IDUPKEEP/g' \
+  -e 's/idUpkeepUpkeep/idUpkeep/g' "${TESTS[@]}"
+rename_libs "${TESTS[@]}"
+# Tests that load a library by idAutomation's file path load the new addon's file instead.
+sed -i -E 's#"Libs/idLib([A-Za-z]+)-1\.0/idLib[A-Za-z]+-1\.0\.lua"#(_G.IDUPKEEP_ADDONS .. "idLib\1/idLib\1.lua")#g' "${TESTS[@]}"
+
+cat > "$out/tests/helper.lua" <<'EOF'
+-- busted helper: runs idAutomation's Upkeep tests against idUpkeep's copy.
+-- * Module paths the tests require resolve to idUpkeep's files.
+-- * idUpkeep_<X> falls back to idAddon_<X>: the shared bootstrap defines the core
+--   framework (Logger, Frame, Node...) under idAutomation's names; idUpkeep's
+--   copies of those files are the same code renamed.
+local here = debug.getinfo(1, "S").source:sub(2):match("(.*/)")
+local addon = here .. "../"
+_G.IDUPKEEP_ADDONS = addon .. "../"   -- the AddOns folder: tests load idLib* from there
+local map ={ ["src.modules.automation.Upkeep"] = addon .. "Upkeep.lua" }
+for f in io.popen('ls "' .. addon .. 'upkeep"/*.lua "' .. addon .. 'upkeep/classes"/*.lua'):lines() do
+  local rel = f:sub(#addon + 1):gsub("%.lua$", ""):gsub("/", ".")
+  map["src.modules.automation." .. rel] = f
+end
+for mod, path in pairs(map) do
+  package.preload[mod] = function() return dofile(path) end
+end
+setmetatable(_G, { __index = function(t, k)
+  if type(k) == "string" and k:sub(1, 9) == "idUpkeep_" then return rawget(t, "idAddon_" .. k:sub(10)) end
+end })
+EOF
+
+cat > "$out/tests/run.sh" <<'EOF'
+#!/usr/bin/env bash
+# Runs idAutomation's Upkeep test suite against idUpkeep. Needs ../idAutomation (its
+# WoW stubs) and busted (idAutomation's devenv profile has it).
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+ida="$here/../../idAutomation"
+cd "$ida"
+PATH="$ida/.devenv/profile/bin:$PATH" busted --lpath='./?.lua;./?/init.lua' --helper="$here/helper.lua" -p '%.test%.lua' "$here"
+EOF
+chmod +x "$out/tests/run.sh"
+echo "built: idLibSetTable idLibItemTable idLibSpellTable idLibTalentTable idUpkeep"
