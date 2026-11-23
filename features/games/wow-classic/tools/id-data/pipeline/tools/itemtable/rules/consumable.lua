@@ -4,7 +4,9 @@ M.FLASK_MIN_DURATION = FLASK_MIN_DURATION
 local STAT_AURAS = {
   APPLY_AURA = true,
   MOD_STAT = true,
-  MOD_TOTAL_STAT_PERCENTAGE = true
+  MOD_TOTAL_STAT_PERCENTAGE = true,
+  -- Armor elixirs: the adapter names physical-school MOD_RESISTANCE as statType "ARMOR".
+  MOD_RESISTANCE = true
 }
 local statAura
 statAura = function(ctx, item, stat)

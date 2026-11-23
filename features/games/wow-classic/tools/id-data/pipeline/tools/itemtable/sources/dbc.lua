@@ -228,6 +228,71 @@ local PERIODIC_DAMAGE_AURAS = {
   SPELL_AURA_PERIODIC_DAMAGE = true
 }
 M.PERIODIC_DAMAGE_AURAS = PERIODIC_DAMAGE_AURAS
+-- FOREVER'S CLIENT TABLES CARRY NUMBERS. The rules speak names ("Food",
+-- "PERIODIC_HEAL", "HEAL"), the vocabulary the fixtures were written in, so the
+-- adapter names what it reads. Numbers are the client's own enums
+-- (SpellAuraNames / SpellEffectNames / ItemSubClass for class 0).
+--
+-- A spell effect is named by its AURA when it has one, else by its EFFECT:
+-- an instant potion is effect 10 (HEAL) with no aura, a drink is effect 6
+-- (APPLY_AURA) carrying aura 85.
+--
+-- Food and drink in this client restore through MOD_REGEN (84) and
+-- MOD_POWER_REGEN (85), not the PERIODIC_HEAL (8) / PERIODIC_ENERGIZE (24) the
+-- fixtures model. They are the same thing to a player -- a restore over time
+-- while seated -- so they carry the same names.
+local AURA_NAME = {
+  [3] = "PERIODIC_DAMAGE",
+  [8] = "PERIODIC_HEAL",
+  [13] = "MOD_DAMAGE_DONE",
+  [22] = "MOD_RESISTANCE",
+  [24] = "PERIODIC_ENERGIZE",
+  [29] = "MOD_STAT",
+  [84] = "PERIODIC_HEAL",
+  [85] = "PERIODIC_ENERGIZE",
+  [99] = "MOD_ATTACK_POWER",
+  [137] = "MOD_TOTAL_STAT_PERCENTAGE"
+}
+M.AURA_NAME = AURA_NAME
+local EFFECT_NAME = {
+  [6] = "APPLY_AURA",
+  [10] = "HEAL",
+  [24] = "CREATE_ITEM",
+  [28] = "SUMMON",
+  [30] = "ENERGIZE",
+  [54] = "ENCHANT_HELD_ITEM",
+  [56] = "SUMMON"
+}
+M.EFFECT_NAME = EFFECT_NAME
+-- ItemSubClass for class 0 (Consumable) in this client.
+local CONSUMABLE_SUBCLASS = {
+  [0] = "Explosives",
+  [1] = "Potion",
+  [2] = "Elixir",
+  [3] = "Flask",
+  [4] = "Scroll",
+  [5] = "Food",
+  [6] = "Item Enhancement",
+  [7] = "Bandage",
+  [8] = "Other"
+}
+M.CONSUMABLE_SUBCLASS = CONSUMABLE_SUBCLASS
+--- The name a spell effect row goes by: its aura's, else its effect's, else
+-- the raw value (an already-named CSV passes straight through).
+M.effectName = function(row)
+  local aura = tonumber(row.EffectAura)
+  if aura and aura ~= 0 then
+    return AURA_NAME[aura] or tostring(aura)
+  end
+  if row.EffectAura and row.EffectAura ~= "" and not aura then
+    return row.EffectAura
+  end
+  local effect = tonumber(row.Effect)
+  if effect and EFFECT_NAME[effect] then
+    return EFFECT_NAME[effect]
+  end
+  return nil
+end
 M.isPeriodicDamage = function(aura)
   if not (aura ~= nil and aura ~= "") then
     return false
@@ -425,7 +490,7 @@ M.toModel = function(tables, opts)
         id = id,
         name = s.Display_lang,
         class = ITEM_CLASS[classId] or ("Class%d"):format(classId),
-        subclass = (row.SubclassID and row.SubclassID ~= "") and ("Subclass%s"):format(row.SubclassID or nil),
+        subclass = (classId == 0 and CONSUMABLE_SUBCLASS[num(row.SubclassID) or -1]) or ((row.SubclassID and row.SubclassID ~= "") and ("Subclass%s"):format(row.SubclassID) or nil),
         quality = num(s.OverallQualityID),
         ilvl = num(s.ItemLevel),
         stackable = num(s.Stackable)
@@ -538,6 +603,42 @@ M.toModel = function(tables, opts)
     end
   end
   local _list_6 = (tables.spellEffect or { })
+  -- One effect row, named and with its stat resolved.
+  local function effectRecord(row, spellId, index)
+    local aura = M.effectName(row)
+    local misc = num(row.EffectMiscValue_0)
+    local statType = (aura and STAT_AURAS[aura] and misc) and STAT[misc] or nil
+    -- Armor is a resistance in the client: MOD_RESISTANCE with the
+    -- physical school (mask 1). Every other mask is a magic resistance.
+    if aura == "MOD_RESISTANCE" and misc == 1 then
+      statType = "ARMOR"
+    end
+    return {
+      spellId = spellId,
+      index = index,
+      auraType = aura,
+      statType = statType,
+      amount = num(row.EffectBasePoints),
+      miscValue = misc
+    }
+  end
+  -- FOLLOWING TRIGGERS. Forever's food is a spell that triggers others:
+  -- "Nutritious Food" fires the classic "Food" spell (Effect 64, TRIGGER_SPELL)
+  -- for the restore, and a "Well Fed" buff every tick (aura 227, a periodic
+  -- trigger) for the stats. Read on their own, its effects say nothing a rule
+  -- can match. So a trigger's target effects also count as effects of the
+  -- triggering spell, one level deep, numbered from 101 so they never collide
+  -- with the spell's own indexes.
+  local TRIGGERS_EFFECT = { [64] = true, [142] = true }
+  local TRIGGERS_AURA = { [23] = true, [226] = true, [227] = true, [42] = true }
+  local effectsOf = { }
+  for _, row in ipairs(_list_6) do
+    local sid = num(row.SpellID)
+    if sid then
+      effectsOf[sid] = effectsOf[sid] or { }
+      table.insert(effectsOf[sid], row)
+    end
+  end
   for _index_0 = 1, #_list_6 do
     local _continue_0 = false
     repeat
@@ -547,17 +648,17 @@ M.toModel = function(tables, opts)
         _continue_0 = true
         break
       end
-      local aura = (row.EffectAura and row.EffectAura ~= "") and row.EffectAura or nil
-      local misc = num(row.EffectMiscValue_0)
-      local statType = (aura and STAT_AURAS[aura] and misc) and STAT[misc] or nil
-      doc.spellEffects[#doc.spellEffects + 1] = {
-        spellId = spellId,
-        index = index + 1,
-        auraType = aura,
-        statType = statType,
-        amount = num(row.EffectBasePoints),
-        miscValue = misc
-      }
+      doc.spellEffects[#doc.spellEffects + 1] = effectRecord(row, spellId, index + 1)
+      local trigger = num(row.EffectTriggerSpell)
+      if trigger and trigger ~= 0 and trigger ~= spellId
+         and (TRIGGERS_EFFECT[num(row.Effect) or -1] or TRIGGERS_AURA[num(row.EffectAura) or -1]) then
+        for k, t in ipairs(effectsOf[trigger] or { }) do
+          local rec = effectRecord(t, spellId, 100 + (index * 10) + k)
+          if rec.auraType then
+            doc.spellEffects[#doc.spellEffects + 1] = rec
+          end
+        end
+      end
       _continue_0 = true
     until true
     if not _continue_0 then
