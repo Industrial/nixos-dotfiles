@@ -169,3 +169,41 @@ from before it.
 On the live host, the root-only part of the inventory that this could not see:
 
     sudo ls -la /etc/NetworkManager/system-connections
+
+## One gate per host (2026-11-23)
+
+The user decided to enable the feature on every host. Before that, the gate was made to run
+against each host's own configuration: `etc-overlay-live-switch` (drakkar) and
+`etc-overlay-live-switch-{mimir,huginn,muninn}`. The node is `node.nix { hostname; }`: that
+host's configuration minus its disko layout, with its own package set. What the gate follows
+is read off the evaluated config rather than listed by hand:
+
+| | drakkar | mimir | huginn | muninn |
+|---|---|---|---|---|
+| user database | userborn | update-users-groups.pl | update-users-groups.pl | update-users-groups.pl |
+| ssh host keys (`services.openssh.hostKeys`) | rsa, ed25519, mldsa44_ed25519 | same | same | same |
+| NetworkManager profiles | yes | yes | yes | yes |
+| `/etc` audit watches (STIG identity rules) | none | 6 | none | none |
+| vhealth, as the vhealth user | yes | yes | no | no |
+| units a VM cannot run | vcache | none | comin | comin |
+
+On top of the named state, every stateful file of /etc is now compared before and after each
+step: every regular file or symlink the running generation does not declare (the set
+carry-in works on), found in the VM. The comparison covers content, mode and owner, and
+skips what every activation rewrites (`NIXOS`, `.updated`, `resolv.conf`, the `*-` backups,
+`.pwd.lock`). The planted leftovers are the ones a read-only inventory found on drakkar and
+mimir: `adjtime`, `security/opasswd`, `wpa_supplicant/imperative.conf`, `mullvad-vpn/*`,
+and the `localtime` link where the host leaves the timezone to timedatectl.
+
+**What it found on mimir.** After a live switch into the overlay, a write to `/etc/passwd`
+was no longer audited. The kernel resolves an audit watch when the rules are loaded, so the
+watches still pointed at the hidden /etc. On a cold boot the rules load after /etc is in
+place, so they worked. Fix: with the feature on, `audit-rules-nixos` gets a
+`restartTriggers` entry. The unit then differs in both directions, and
+switch-to-configuration reloads the rules after the activation has mounted or unmounted the
+overlay. With `security.audit.enable = "lock"` the rules cannot be reloaded, so the module
+warns: switch with `boot` there.
+
+**What the VM needed on huginn.** Its `boot.resumeDevice` is the LUKS mapper device of
+its disko layout, which a VM does not have, so the initrd waited for it. The node clears it
+(a no-op on the other hosts). After that and the audit fix, all four gates pass.
