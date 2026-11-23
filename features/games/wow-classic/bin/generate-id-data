@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Generates Forever-correct data for idLibItemTable / idLibSpellTable /
+# idLibTalentTable from the client's own tables.
+#
+#   bin/generate-id-data [build]      (from features/games/wow-classic)
+#
+# 1. tools/id-data/fetch.sh       downloads the tables for <build> from wago.tools
+# 2. tools/id-data/normalize.lua  joins Forever's modern tables into the pipeline's columns
+# 3. tools/id-data/generate.lua   the item-table pipeline (tools/id-data/pipeline, taken
+#                                 over from idAutomation) -> idLib*/data
+#
+# Default build: the newest wowf build on wago.tools. Lua: $ID_LUA, else the
+# idAutomation devenv's, else `lua` on PATH.
+set -euo pipefail
+here=$(cd "$(dirname "$0")/.." && pwd)
+addons="$here/Interface/AddOns"
+pipeline="$here/tools/id-data/pipeline"
+
+lua="${ID_LUA:-}"
+if [ -z "$lua" ]; then
+  for candidate in "$addons/idAutomation/.devenv/profile/bin/lua" "$(command -v lua || true)"; do
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then lua="$candidate"; break; fi
+  done
+fi
+[ -n "$lua" ] || { echo "no Lua found; set ID_LUA" >&2; exit 1; }
+
+build="${1:-}"
+if [ -z "$build" ]; then
+  build=$(curl -sS -m 60 https://wago.tools/api/builds | grep -o '"wowf":\[[^]]*\]' \
+    | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4)
+fi
+[ -n "$build" ] || { echo "could not find a wowf build on wago.tools; pass one" >&2; exit 1; }
+echo "== build $build"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/id-data.XXXXXX")
+[ -n "${ID_DATA_KEEP:-}" ] || trap 'rm -rf "$work"' EXIT
+mkdir -p "$work/raw" "$work/csv"
+
+echo "== fetch"
+bash "$here/tools/id-data/fetch.sh" "$build" "$work/raw"
+echo "== normalize"
+"$lua" "$here/tools/id-data/normalize.lua" "$work/raw" "$work/csv"
+echo "== generate"
+(cd "$pipeline" && "$lua" "$here/tools/id-data/generate.lua" "$work/csv" "$build" "$addons")
+echo "== done: $build${ID_DATA_KEEP:+ (work dir kept: $work)}"
