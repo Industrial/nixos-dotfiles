@@ -144,15 +144,20 @@ conjuredStone = function(auraType)
     if not (isConjured(item) and item.subclass ~= "Potion" and item.subclass ~= "Food") then
       return nil
     end
+    -- Lily Root is flagged conjured too, but shares the potion cooldown.
+    local cat = ctx.cooldownCategoryOf(item)
+    if cat ~= nil and cat == ctx.potionCategory() then
+      return nil
+    end
     return instantRestore(auraType)(ctx, item)
   end
 end
 -- Not a potion, but shares the potion cooldown and restores instantly
--- (Whipper Root Tuber, Night Dragon's Breath, Combat Mana Potion).
+-- (Lily Root, Combat Mana Potion). Conjured or not: Lily Root is both.
 local onPotionCooldown
 onPotionCooldown = function(auraType)
   return function(ctx, item)
-    if item.subclass == "Potion" or isConjured(item) then
+    if item.subclass == "Potion" then
       return nil
     end
     local cat = ctx.cooldownCategoryOf(item)

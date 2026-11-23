@@ -105,6 +105,15 @@ return describe("itemtable classifier", function()
       assert.is_nil(result.sets["Consumable.Cooldown.Stone.Health.Warlock"][90012])
       return assert.is_nil((result.sets["Consumable.Potion.Recovery.Healing.Basic"] or { })[90015])
     end)
+    it("keeps a conjured item on the potion cooldown out of the stone set (Lily Root)", function()
+      local doc = fixtures()
+      for _, it in ipairs(doc.items) do
+        if it.id == 90017 then it.conjured = true end
+      end
+      local r = classify.run(doc, rules)
+      assert.is_nil(r.sets["Consumable.Cooldown.Stone.Health.Warlock"][90017])
+      return assert.are.equal(500, r.sets["Consumable.Cooldown.Potion.Health.Basic"][90017])
+    end)
     it("puts a non-potion on the potion cooldown in the cooldown set", function()
       local result = run()
       assert.are.equal(500, result.sets["Consumable.Cooldown.Potion.Health.Basic"][90017])
