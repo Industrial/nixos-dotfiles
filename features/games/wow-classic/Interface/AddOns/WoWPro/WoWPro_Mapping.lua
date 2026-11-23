@@ -369,6 +369,15 @@ function WoWPro:MapPoint(row)
     end
     WoWPro:RemoveMapPoint()
 
+    -- EasyFind: the whole remaining guide as one held trip (WoWPro_EasyFind.lua).
+    -- Before the coords check on purpose: a head step without coordinates must
+    -- still replace the old route, whose first stop may be the step just done.
+    if WoWPro.EasyFind and WoWPro.EasyFind.Active() then
+        WoWPro.EasyFind.Sync(stepIndex, row ~= nil)
+        LastMapPoint = stepIndex
+        return
+    end
+
     local coords
     if WoWPro.map then
         coords = WoWPro.map[stepIndex]
@@ -593,6 +602,10 @@ end
 
 function WoWPro:RemoveMapPoint()
     LastMapPoint = nil
+    -- EasyFind: clears only if no MapPoint follows straight away (see RequestClear).
+    if WoWPro.EasyFind and WoWPro.EasyFind.Active() then
+        WoWPro.EasyFind.RequestClear()
+    end
     if TomTom and not Nx then
         for i=1,#cache,1 do
             if cache[i].uid ~= nil then
