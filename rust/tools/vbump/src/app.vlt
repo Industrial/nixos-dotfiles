@@ -70,7 +70,7 @@ caps_of o b =
   forge = if o.dry_run
     crate::forge::dry_run ()
   else
-    crate::forge::live (Live { repo = b.top.clone (), base = b.sha.clone (), remote = o.remote.clone (), base_branch = o.base_branch.clone (), label = o.label.clone (), gh_repo = o.gh_repo.clone (), committer = o.committer.clone () })
+    crate::forge::live (Live { repo = b.top.clone (), base = b.sha.clone (), remote = o.remote.clone (), base_branch = o.base_branch.clone (), label = o.label.clone (), gh_repo = o.gh_repo.clone (), committer = o.committer.clone (), auto_merge = o.auto_merge, gh = .to_string "gh" })
   Caps { nix, differ, forge }
 
 -- The run's scratch root: one directory per input under it.

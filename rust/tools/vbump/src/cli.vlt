@@ -3,14 +3,16 @@
 --   vbump run [--input NAME]... [--dry-run] [--jobs N] [--repo DIR] [--rev REV]
 --             [--remote NAME] [--base-branch NAME] [--label NAME]
 --             [--gh-repo OWNER/NAME] [--run-url URL] [--summary FILE]
---             [--out DIR] [--db FILE]
+--             [--out DIR] [--db FILE] [--committer 'NAME <EMAIL>'] [--auto-merge]
 --
 -- No `--input` is every root input of the flake. `--dry-run` does all of the
 -- work (relock, evaluate, dry-build, diff) and publishes nothing.
+-- `--auto-merge` (GH-247; the scheduled workflow passes it) arms GitHub's
+-- auto-merge on every pull request it opens or refreshes.
 
 import nix_store_core::db
 
-export const USAGE : &str = "usage: vbump run [--input NAME]... [--dry-run] [--jobs N] [--repo DIR] [--rev REV] [--remote NAME] [--base-branch NAME] [--label NAME] [--gh-repo OWNER/NAME] [--run-url URL] [--summary FILE] [--out DIR] [--db FILE] [--committer 'NAME <EMAIL>']"
+export const USAGE : &str = "usage: vbump run [--input NAME]... [--dry-run] [--jobs N] [--repo DIR] [--rev REV] [--remote NAME] [--base-branch NAME] [--label NAME] [--gh-repo OWNER/NAME] [--run-url URL] [--summary FILE] [--out DIR] [--db FILE] [--committer 'NAME <EMAIL>'] [--auto-merge]"
 
 export data Options
   { export inputs Vec<String>
@@ -27,12 +29,13 @@ export data Options
   , export out Option<String>
   , export db String
   , export committer Option<(String, String)>
+  , export auto_merge bool
   , export help bool
   }
   deriving (Clone, Debug, PartialEq)
 
 export defaults : Options
-defaults = Options { inputs = Vec::new (), dry_run = false, jobs = 1, repo = .to_string ".", rev = .to_string "HEAD", remote = .to_string "origin", base_branch = .to_string "main", label = .to_string "flake-lock", gh_repo = None, run_url = None, summary = None, out = None, db = db::DEFAULT_DB.to_string (), committer = None, help = false }
+defaults = Options { inputs = Vec::new (), dry_run = false, jobs = 1, repo = .to_string ".", rev = .to_string "HEAD", remote = .to_string "origin", base_branch = .to_string "main", label = .to_string "flake-lock", gh_repo = None, run_url = None, summary = None, out = None, db = db::DEFAULT_DB.to_string (), committer = None, auto_merge = false, help = false }
 
 value : Option<&String> -> &str -> Result<String, String>
 value v flag =
@@ -90,6 +93,8 @@ parse_args args =
         o.committer := Some ((identity (&v) |> .ok_or ("--committer: not NAME <EMAIL>: #{v}"))?)
       "--db" ->
         o.db := (value (it.next ()) "--db")?
+      "--auto-merge" ->
+        o.auto_merge := true
       "-h" ->
         o.help := true
       "--help" ->
@@ -112,7 +117,10 @@ args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
 test "run with no options is every input, one at a time, for real"
   o = parse_args (&args (&["run"])) |> .expect "options"
   assert_eq! \-> o \-> defaults ()
-  assert! \-> o.inputs.is_empty () && !o.dry_run && o.jobs == 1
+  assert! \-> o.inputs.is_empty () && !o.dry_run && o.jobs == 1 && !o.auto_merge
+
+test "--auto-merge arms auto-merge (GH-247)"
+  assert! \-> parse_args (&args (&["run", "--auto-merge"])) |> .map (\o -> o.auto_merge) |> .unwrap_or false
 
 test "every option is read, and --input repeats"
   o = parse_args (&args (&["run", "--input", "nixpkgs", "--input", "disko", "--dry-run", "--jobs", "2", "--repo", "/r", "--rev", "abc", "--remote", "up", "--base-branch", "trunk", "--label", "l", "--gh-repo", "o/r", "--run-url", "https://x/1", "--summary", "/s.md", "--out", "/o", "--db", "/db"])) |> .expect "options"
