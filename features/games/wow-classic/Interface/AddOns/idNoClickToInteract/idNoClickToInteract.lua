@@ -1,0 +1,1 @@
+SetCVar("interactOnLeftClick",0)

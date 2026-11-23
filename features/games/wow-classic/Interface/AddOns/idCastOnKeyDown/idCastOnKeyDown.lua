@@ -1,0 +1,1 @@
+SetCVar("ActionButtonUseKeyDown",1)

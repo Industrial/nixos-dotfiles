@@ -1,0 +1,1 @@
+SetCVar("autoRangedCombat",1)

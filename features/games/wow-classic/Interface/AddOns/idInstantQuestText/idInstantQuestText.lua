@@ -1,0 +1,1 @@
+SetCVar("instantQuestText",1)
