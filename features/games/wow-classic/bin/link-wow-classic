@@ -98,3 +98,16 @@ ln -sfnT "${interfaceSourcePath}" "${interfaceTargetPath}"
 echo "WoW configuration linked successfully!"
 echo "  WTF:       ${wtfTargetPath} -> $(readlink "${wtfTargetPath}")"
 echo "  Interface: ${interfaceTargetPath} -> $(readlink "${interfaceTargetPath}")"
+
+# AutoHotkey v1, when installed in the same prefix (drive_c is two levels above
+# the WoW root): its Scripts folder comes from the repo too.
+ahkPath="${wowRootPath}/../../Program Files/AutoHotkey"
+if [ -d "${ahkPath}" ]; then
+  ahkTargetPath="${ahkPath}/Scripts"
+  if [ -e "${ahkTargetPath}" ] && [ ! -L "${ahkTargetPath}" ]; then
+    echo "Moving existing AutoHotkey Scripts aside -> ${ahkTargetPath}.pre-link-${timestamp}"
+    mv -- "${ahkTargetPath}" "${ahkTargetPath}.pre-link-${timestamp}"
+  fi
+  ln -sfnT "${featurePath}/ahk" "${ahkTargetPath}"
+  echo "  AutoHotkey Scripts: ${ahkTargetPath} -> $(readlink "${ahkTargetPath}")"
+fi
