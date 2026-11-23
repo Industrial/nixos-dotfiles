@@ -22,6 +22,9 @@ id_effect_cli = "=0.13.0"
 vdeploy = { path = "../vdeploy" }
 # The closure diff of a PR's generation against main's, per host.
 vdiff = { path = "../vdiff" }
+# The veval record (GH-243): its key, text and checks, shared with vcache,
+# vdeploy and vswitch.
+nix-store-core = { path = "../nix-store-core" }
 # The open-PR list (GitHub's REST API, read without a token) and the ledger.
 serde_json = "1"
 

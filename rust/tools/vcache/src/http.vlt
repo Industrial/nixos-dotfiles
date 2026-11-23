@@ -15,7 +15,8 @@ import nix_store_core::narinfo::{NarInfo, cache_info, fingerprint, render}
 import nix_store_core::signing::{SecretKey, sign}
 import crate::route::{Route, route}
 import crate::store::{PathInfoStore, StoreError}
-import crate::metrics::{Counters, nar_seen, narinfo_seen}
+import crate::metrics::{Counters, nar_seen, narinfo_seen, veval_seen}
+import nix_store_core::veval::served
 import std::sync::Arc
 
 -- What the routes read besides the store.
@@ -25,6 +26,7 @@ export data Settings
   , export priority i64
   , export sign_key_file Option<String>
   , export textfile_dir Option<String>
+  , export veval_dir Option<String>
   , export meter Arc<Counters>
   }
   deriving (Clone, Debug)
@@ -85,6 +87,31 @@ nar_body info =
   body = stream_body (nar::stream (PathBuf::from (&info.store_path)))
   (StatusCode::OK, [(header::CONTENT_TYPE, .to_string "application/x-nix-nar"), (header::CONTENT_LENGTH, info.nar_size.to_string ())], body).into_response ()
 
+-- A veval record (GH-243): the file `<dir>/<id>.veval` vci wrote, signed
+-- with this cache's key. None (a 404) without a key or a directory, when
+-- there is no such file, or when the file is not the record of `id`: an
+-- unsigned record is useless to a client, which refuses it as a miss.
+export veval_text : &Signer -> Option<&str> -> &str -> Option<String>
+veval_text signer dir id =
+  case &signer.0 of
+    None -> None
+    Some k -> dir |> .and_then (\d -> std::fs::read_to_string (PathBuf::from d |> .join ("#{id}.veval")) |> .ok) |> .and_then (\t -> served k id (&t))
+
+export veval_page : Option<String> -> Response
+veval_page found =
+  case found of
+    None -> not_found ()
+    Some t -> text "text/plain; charset=utf-8" t
+
+veval_effect : String -> Effect<Response, StoreError, AppEnv>
+veval_effect id =
+  effect!
+    let signer = ~Signer;
+    let settings = ~Settings;
+    let found = veval_text(signer, settings.veval_dir.as_deref(), &id);
+    veval_seen(&settings.meter, found.is_some());
+    veval_page(found)
+
 cache_info_effect : Effect<Response, StoreError, AppEnv>
 cache_info_effect =
   effect!
@@ -117,6 +144,7 @@ answer r =
     Route::CacheInfo -> cache_info_effect ()
     Route::NarInfo hash -> narinfo_effect hash
     Route::Nar hash -> nar_effect hash
+    Route::Veval id -> veval_effect id
     Route::Missing -> succeed (not_found ())
 
 handle : State<AppEnv> -> Uri -> impl std::future::Future<Output = Response> + Send
@@ -144,7 +172,7 @@ sample_info = NarInfo {
 #[cfg(test)]
 test_env : AppEnv
 test_env =
-  settings = Settings { db = String::new (), store_dir = .to_string "/nix/store", priority = 41, sign_key_file = None, textfile_dir = None, meter = Arc::new (Counters::default ()) }
+  settings = Settings { db = String::new (), store_dir = .to_string "/nix/store", priority = 41, sign_key_file = None, textfile_dir = None, veval_dir = None, meter = Arc::new (Counters::default ()) }
   HCons::new (crate::store::memory (.to_vec ([sample_info ()]))) (HCons::new settings (HCons::new (Signer None) HNil))
 
 -- The status a request's effect answers with, run on the test executor.
@@ -166,3 +194,47 @@ test "anything else is a 404, and cache info a 200"
 
 test "without a key the narinfo keeps only the store's signatures"
   assert! \-> !(render (&signed (&Signer None) (sample_info ())) |> .contains "Sig:")
+
+-- A key for the tests only (`nix key generate-secret --key-name test-vcache-1`);
+-- it signs nothing outside them.
+#[cfg(test)]
+const TEST_SECRET : &str = "test-vcache-1:2kDtNwcDPPeTWBkV+9ETrTMKazto/WkPmn96l6drwlg4JEOzCseS8/jfEJpvdqohsbpOPuVkamCK2c73bhibHg=="
+
+#[cfg(test)]
+const TEST_PUBLIC : &str = "test-vcache-1:OCRDswrHkvP43xCab3aqIbG6Tj7lZGpgitnO924Ymx4="
+
+#[cfg(test)]
+import nix_store_core::veval::{Key, Record, accept, key_id, render as render_record}
+
+#[cfg(test)]
+sample_key : Key
+sample_key = Key { commit = .to_string "20456cfc2d62540970eb9c40bc34a840da517ca7", tree = .to_string "4b825dc642cb6eb9a060e54bf8d69288fbee4904", lock = .to_string "8f2a1c0a51a0a2a9b4a3e5d1e7c1c0b8a7f6e5d4", host = .to_string "mimir", nix = .to_string "nix (Nix) 2.31.2" }
+
+#[cfg(test)]
+sample_record : Record
+sample_record = Record { key = sample_key (), drv = .to_string "/nix/store/vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir-nixos-system-mimir.drv", out = .to_string "/nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-nixos-system-mimir", eval_secs = 32, sigs = Vec::new () }
+
+test "a veval record is served signed with the cache's key, and verifies"
+  d = std::env::temp_dir () |> .join ("vcache-veval-#{std::process::id ()}")
+  std::fs::remove_dir_all (&d) |> .ok
+  std::fs::create_dir_all (&d) |> .ok
+  id = key_id (&sample_key ())
+  std::fs::write (d.join ("#{id}.veval")) (render_record (&sample_record ())) |> .ok
+  -- A file named for one key that holds another's record is never signed.
+  other = key_id (&Key { host = .to_string "drakkar", ...sample_key () })
+  std::fs::write (d.join ("#{other}.veval")) (render_record (&sample_record ())) |> .ok
+  dir = d.to_string_lossy () |> .to_string
+  key = Signer (nix_store_core::signing::parse_secret_key TEST_SECRET |> .ok)
+  trusted = nix_store_core::signing::parse_public_key TEST_PUBLIC |> .into_iter |> .collect : Vec<nix_store_core::signing::PublicKey>
+  served_text = veval_text (&key) (Some (dir.as_str ())) (&id)
+  assert! \-> served_text.as_ref () |> .map (\t -> accept (&trusted) (&sample_key ()) t |> .is_ok) |> .unwrap_or false
+  assert_eq! \-> veval_text (&key) (Some (dir.as_str ())) (&other) \-> None
+  -- No key, no directory, no file: not found.
+  assert_eq! \-> veval_text (&Signer None) (Some (dir.as_str ())) (&id) \-> None
+  assert_eq! \-> veval_text (&key) None (&id) \-> None
+  assert_eq! \-> veval_text (&key) (Some (dir.as_str ())) (&"0".repeat 64) \-> None
+  assert_eq! \-> veval_page None |> .status \-> StatusCode::NOT_FOUND
+  std::fs::remove_dir_all (&d) |> .ok
+
+test "without a veval directory a record route is a 404"
+  assert_eq! \-> status_of (Route::Veval ("0".repeat 64)) \-> Some StatusCode::NOT_FOUND

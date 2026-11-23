@@ -20,8 +20,19 @@ export data Counters
   , export nar_hit AtomicU64
   , export nar_miss AtomicU64
   , export nar_bytes AtomicU64
+  , export veval_hit AtomicU64
+  , export veval_miss AtomicU64
   }
   deriving (Debug, Default)
+
+-- A veval record request's outcome (GH-243): served signed, or not found.
+export veval_seen : &Counters -> bool -> ()
+veval_seen c served =
+  if served
+    c.veval_hit.fetch_add 1 Ordering::Relaxed
+  else
+    c.veval_miss.fetch_add 1 Ordering::Relaxed
+  ()
 
 export const FILE : &str = "vcache.prom"
 export const FLUSH_SECS : u64 = 30
@@ -61,6 +72,10 @@ text_of c =
   out.push_str "# HELP vcache_nar_requests_total NAR requests, by whether the store had the path.\n# TYPE vcache_nar_requests_total counter\n"
   out.push_str (&"vcache_nar_requests_total{result=\"hit\"} #{nar_hit}\nvcache_nar_requests_total{result=\"miss\"} #{nar_miss}\n")
   out.push_str (&counter "vcache_nar_bytes_served_total" "NAR bytes offered: the recorded narSize of every NAR served." (c.nar_bytes.load Ordering::Relaxed |> .to_string))
+  v_hit = c.veval_hit.load Ordering::Relaxed
+  v_miss = c.veval_miss.load Ordering::Relaxed
+  out.push_str "# HELP vcache_veval_requests_total veval record requests (GH-243), by whether a record was served signed.\n# TYPE vcache_veval_requests_total counter\n"
+  out.push_str (&"vcache_veval_requests_total{result=\"hit\"} #{v_hit}\nvcache_veval_requests_total{result=\"miss\"} #{v_miss}\n")
   out
 
 write_atomic : &Path -> &str -> std::io::Result<()>
@@ -109,8 +124,11 @@ test "hits, misses and bytes are counted, and rendered as counters"
   narinfo_seen (&c) (&None)
   nar_seen (&c) (&Some (sample ()))
   nar_seen (&c) (&None)
+  veval_seen (&c) true
+  veval_seen (&c) false
+  veval_seen (&c) false
   t = text_of (&c)
-  for line in ["vcache_narinfo_requests_total{result=\"hit\"} 1\n", "vcache_narinfo_requests_total{result=\"miss\"} 2\n", "vcache_nar_requests_total{result=\"hit\"} 1\n", "vcache_nar_requests_total{result=\"miss\"} 1\n", "vcache_nar_bytes_served_total 256\n"]
+  for line in ["vcache_veval_requests_total{result=\"hit\"} 1\n", "vcache_veval_requests_total{result=\"miss\"} 2\n", "vcache_narinfo_requests_total{result=\"hit\"} 1\n","vcache_narinfo_requests_total{result=\"miss\"} 2\n", "vcache_nar_requests_total{result=\"hit\"} 1\n", "vcache_nar_requests_total{result=\"miss\"} 1\n", "vcache_nar_bytes_served_total 256\n"]
     assert! \-> t.contains line
 
 test "the hot path's cost: a million counts in well under a second"

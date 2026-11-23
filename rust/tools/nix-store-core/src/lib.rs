@@ -92,3 +92,8 @@ mod golden {
 mod worker_live {
     include!(concat!(env!("OUT_DIR"), "/worker_live.rs"));
 }
+
+// veval (GH-243): the shared evaluation record, its key, signature and checks.
+pub mod veval {
+    include!(concat!(env!("OUT_DIR"), "/veval.rs"));
+}

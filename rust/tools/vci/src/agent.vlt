@@ -21,6 +21,7 @@ import crate::caps::Caps
 import crate::common::VciError
 import crate::refs::{Target, next_of, root_of, short, stale_roots}
 import crate::report::{Built, Summary, line_of, status_of}
+import nix_store_core::veval::{Key, Record}
 
 export data Settings { export hosts Vec<String>, export interval u64 }
   deriving (Debug, Clone, PartialEq, Eq)
@@ -83,6 +84,20 @@ against store main out =
     None -> succeed None
     Some m -> store.0.summary m out
 
+-- The veval record of a host that built (GH-243): written only once its out
+-- is in the store vcache serves, so a consumer's hit always substitutes.
+-- Without a key (no flake.lock, a git or nix that failed) there is no record.
+shared : Caps -> Built -> Effect<(), Never, HNil>
+shared caps b =
+  evals = caps.evals.clone ()
+  caps.evals.0.key (b.sha.clone ()) (b.host.clone ()) |> .flat_map (move \k -> recorded evals k b)
+
+recorded : crate::caps::EvalsTool -> Option<Key> -> Built -> Effect<(), Never, HNil>
+recorded evals k b =
+  case (k, b.drv.clone (), b.out.clone ()) of
+    (Some key, Some drv, Some out) -> evals.0.write (Record { key, drv, out, eval_secs = b.eval_secs, sigs = Vec::new () })
+    _ -> succeed (())
+
 built_out : Caps -> Target -> String -> Built -> Result<(String, u64), (String, u64)> -> Effect<(), VciError, HNil>
 built_out caps t host b r =
   case r of
@@ -90,7 +105,13 @@ built_out caps t host b r =
     Ok (out, secs) ->
       c = caps.clone ()
       done = Built { result = .to_string "built", out = Some (out.clone ()), build_secs = secs, ...b }
-      compared caps t host out |> .widen |> .flat_map (move \d -> concluded c (Built { diff = d, ...done }))
+      record = done.clone ()
+      shared caps record |> .widen |> .flat_map (move \_ -> summarised c t host out done)
+
+summarised : Caps -> Target -> String -> String -> Built -> Effect<(), VciError, HNil>
+summarised caps t host out done =
+  c = caps.clone ()
+  compared caps t host out |> .widen |> .flat_map (move \d -> concluded c (Built { diff = d, ...done }))
 
 evaluated : Caps -> Target -> String -> Result<(String, u64), (String, u64)> -> Effect<(), VciError, HNil>
 evaluated caps t host r =
@@ -153,7 +174,8 @@ pruned caps s targets =
   c = caps.clone ()
   hosts = s.hosts.clone ()
   t2 = targets.clone ()
-  caps.store.0.roots () |> .flat_map (move \existing -> dropped_all c (stale_roots (&existing) (&t2) (&hosts))) |> .widen |> .flat_map (move \_ -> done_then caps s targets)
+  evals = caps.evals.clone ()
+  caps.store.0.roots () |> .flat_map (move \existing -> dropped_all c (stale_roots (&existing) (&t2) (&hosts))) |> .flat_map (move \_ -> evals.0.prune ()) |> .widen |> .flat_map (move \_ -> done_then caps s targets)
 
 done_then : Caps -> Settings -> Vec<Target> -> Effect<(), VciError, HNil>
 done_then caps s targets =
@@ -304,3 +326,24 @@ test "pending counts distinct commits not built"
   ts = .to_vec ([(main_at 'a' |> .expect "main"), pull 3 'a', pull 4 'b']) : Vec<Target>
   assert_eq! \-> pending_of (&ts) (&[]) \-> 2
   assert_eq! \-> pending_of (&ts) (&[sha 'a']) \-> 1
+
+test "veval: a built host is recorded once built, with its eval seconds; a failed one never"
+  w = Scripted { main = main_at 'a', build_broken = .to_vec ([.to_string "mimir"]), ...Scripted::default () }
+  stepped (&w)
+  recs = snapshot (&w.evals)
+  assert_eq! \-> recs.len () \-> 1
+  r = &recs[0]
+  assert_eq! \-> (r.key.host.as_str (), r.key.commit.clone (), r.drv.as_str (), r.out.as_str (), r.eval_secs) \-> ("drakkar", sha 'a', "/nix/store/aaaaaaaaa-drakkar.drv", "/nix/store/aaaaaaaaa-drakkar", 3)
+  assert! \-> r.sigs.is_empty ()
+  -- The record is written after the build, never before it.
+  work = logged (&w) |> .into_iter |> .filter (\l -> l.starts_with "build " || l.starts_with "veval ") |> .map (\l -> l.split_whitespace () |> .next |> .unwrap_or "" |> .to_string) |> .collect : Vec<String>
+  assert_eq! \-> work \-> .to_vec ([.to_string "build", .to_string "veval", .to_string "build"])
+  e = Scripted { main = main_at 'b', eval_broken = .to_vec ([.to_string "drakkar", .to_string "mimir"]), ...Scripted::default () }
+  stepped (&e)
+  assert! \-> snapshot (&e.evals) |> .is_empty
+
+test "veval: without a key (no flake.lock, git or nix failing) there is no record, and the build stands"
+  w = Scripted { main = main_at 'a', no_key = true, ...Scripted::default () }
+  stepped (&w)
+  assert! \-> snapshot (&w.evals) |> .is_empty
+  assert_eq! \-> results (&w) \-> .to_vec ([(.to_string "main", .to_string "drakkar", .to_string "built"), (.to_string "main", .to_string "mimir", .to_string "built")])

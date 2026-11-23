@@ -11,7 +11,9 @@
 --   Ledger  which commits are built, one record per (commit, host), the
 --           metrics;
 --   Status  a GitHub commit status per host: a no-op unless a token file is
---           configured (off by default).
+--           configured (off by default);
+--   Evals   the veval key of a (commit, host), and the record of a built
+--           host, for vcache to serve signed (GH-243).
 --
 -- The long steps (eval, build, fetch) are tokio child processes through
 -- vdeploy's `exec`, so an hour-long build holds no executor thread.
@@ -34,6 +36,7 @@ import crate::common::lifted
 import crate::refs::{Target, main_of, pulls_of, refspecs}
 import crate::report::{Built, Summary, metrics, record_json, record_of}
 import crate::gate::{Limits, available_of, busy_of, load_of}
+import nix_store_core::veval::{Key, Record, file_name, key_of, lock_spec, render, tree_spec}
 
 export class Forge_
   main : &self -> Effect<Option<Target>, VciError, HNil>
@@ -90,7 +93,7 @@ instance Clone GateTool
   clone : &self -> Self
   clone self = GateTool (Arc::clone (&self.0))
 -- Everything vci needs, wired once at the edge.
-export data Caps { export forge ForgeTool, export nix NixTool, export store StoreTool, export ledger LedgerTool, export status StatusTool, export gate GateTool }
+export data Caps { export forge ForgeTool, export nix NixTool, export store StoreTool, export ledger LedgerTool, export status StatusTool, export gate GateTool, export evals EvalsTool }
   deriving (Clone)
 
 -- ---------------------------------------------------------------- live
@@ -354,6 +357,103 @@ instance Gate LiveGate
     g = self.clone ()
     suspend (move \-> succeed (checked g))
 
+
+-- ---------------------------------------------------------------- veval
+
+-- Shared evaluation records (GH-243): the key of a (commit, host) vci
+-- evaluated, and the record of a host built at it, for vcache to serve
+-- signed. Writing one is best effort: a record that is not there is a
+-- consumer's miss, never vci's failure, so these never fail.
+export class Evals
+  key : &self -> String -> String -> Effect<Option<Key>, Never, HNil>
+  write : &self -> Record -> Effect<(), Never, HNil>
+  prune : &self -> Effect<(), Never, HNil>
+
+export newtype EvalsTool = EvalsTool (export Arc<dyn Evals + Send + Sync>)
+
+instance Clone EvalsTool
+  clone : &self -> Self
+  clone self = EvalsTool (Arc::clone (&self.0))
+
+-- How long a record is kept: a consumer asks for the commit it plans, which
+-- is main's head of minutes ago, so two weeks is generous.
+export const RETAIN_SECS : u64 = 1209600
+
+-- Live Evals: `git rev-parse` in vci's clone (the one evaluated), the
+-- evaluating `nix --version`, and the records in `dir` (`<state>/veval`).
+export data LiveEvals { export git String, export nix String, export repo String, export dir String }
+  deriving (Debug, Clone)
+
+rev_parse : &LiveEvals -> String -> Result<String, String>
+rev_parse e spec =
+  r = (run (&cmd (&e.git) (strs (&["-C", e.repo.as_str (), "rev-parse", "--verify", "--quiet", spec.as_str ()]))))?
+  Ok (r.stdout)
+
+key_now : &LiveEvals -> &str -> &str -> Result<Key, String>
+key_now e sha host =
+  tree = (rev_parse e (tree_spec sha))?
+  lock = (rev_parse e (lock_spec sha))?
+  version = (run (&cmd (&e.nix) (strs (&["--version"]))))?
+  key_of sha (&tree) (&lock) host (&version.stdout)
+
+keyed : LiveEvals -> String -> String -> Effect<Option<Key>, Never, HNil>
+keyed e sha host =
+  case key_now (&e) (&sha) (&host) of
+    Ok k -> succeed (Some k)
+    Err why ->
+      eprintln! \-> "vci: veval: no key for #{host} at #{crate::refs::short (&sha)}: #{why}"
+      succeed None
+
+-- The record, atomically and world-readable (vcache, another user, reads it).
+written : &str -> &Record -> std::io::Result<()>
+written dir r =
+  (fs::create_dir_all dir)?
+  file = Path::new dir |> .join (file_name (&r.key))
+  (write_atomic (&file) (&render (r)))?
+  fs::set_permissions (&file) (std::os::unix::fs::PermissionsExt::from_mode 0o644)
+
+-- Whether a file in the records directory is older than RETAIN_SECS.
+expired : &fs::DirEntry -> u64 -> bool
+expired entry now =
+  modified = entry.metadata () |> .ok |> .and_then (\m -> m.modified () |> .ok) |> .and_then (\t -> t.duration_since std::time::UNIX_EPOCH |> .ok) |> .map (\d -> d.as_secs ()) |> .unwrap_or now
+  now.saturating_sub modified > RETAIN_SECS
+
+pruned_records : &str -> u64 -> usize
+pruned_records dir now =
+  case fs::read_dir dir of
+    Err _ -> 0
+    Ok entries ->
+      old = entries |> .filter_map (\e -> e.ok ()) |> .filter (\e -> expired e now) |> .collect : Vec<fs::DirEntry>
+      old |> .iter |> .filter (\e -> fs::remove_file (e.path ()) |> .is_ok) |> .count
+
+instance Evals LiveEvals
+  key : &self -> String -> String -> Effect<Option<Key>, Never, HNil>
+  key self sha host =
+    e = self.clone ()
+    suspend (move \-> keyed e sha host)
+  write : &self -> Record -> Effect<(), Never, HNil>
+  write self r =
+    dir = self.dir.clone ()
+    suspend (move \-> wrote dir r)
+  prune : &self -> Effect<(), Never, HNil>
+  prune self =
+    dir = self.dir.clone ()
+    suspend (move \-> pruned_now dir)
+
+wrote : String -> Record -> Effect<(), Never, HNil>
+wrote dir r =
+  case written (&dir) (&r) of
+    Ok _ -> eprintln! \-> "vci: veval: recorded #{r.key.host} at #{crate::refs::short (&r.key.commit)}: #{r.drv}"
+    Err e -> eprintln! \-> "vci: veval: writing the record of #{r.key.host} at #{crate::refs::short (&r.key.commit)} into #{dir}: #{e}"
+  succeed (())
+
+pruned_now : String -> Effect<(), Never, HNil>
+pruned_now dir =
+  n = pruned_records (&dir) (now_secs ())
+  if n > 0
+    eprintln! \-> "vci: veval: dropped #{n} record(s) older than #{RETAIN_SECS / 86400} days"
+  succeed (())
+
 -- The live capabilities.
 export data Wiring
   { export git String
@@ -377,6 +477,10 @@ export data Wiring
 export roots_dir : &str -> String
 roots_dir state = Path::new state |> .join "roots" |> .to_string_lossy () |> .to_string
 
+-- Where vci writes its veval records (GH-243), and vcache reads them.
+export veval_dir : &str -> String
+veval_dir state = Path::new state |> .join "veval" |> .to_string_lossy () |> .to_string
+
 export live : Wiring -> Caps
 live w =
   forge = ForgeTool (Arc::new (LiveForge { git = w.git.clone (), curl = w.curl.clone (), repo = w.repo.clone (), url = w.url.clone (), branch = w.branch.clone (), pulls_url = w.pulls_url.clone (), repo_slug = w.repo_slug.clone () }))
@@ -385,7 +489,8 @@ live w =
   ledger = LedgerTool (Arc::new (LiveLedger { state = w.state.clone (), textfile_dir = w.textfile_dir.clone () }))
   status = StatusTool (Arc::new (LiveStatus { curl = w.curl.clone (), api = w.api.clone (), repo_slug = w.repo_slug.clone (), token_file = w.token_file.clone () }))
   gate = GateTool (Arc::new (LiveGate { systemctl = w.systemctl.clone (), limits = w.limits.clone () }))
-  Caps { forge, nix, store, ledger, status, gate }
+  evals = EvalsTool (Arc::new (LiveEvals { git = w.git.clone (), nix = w.nix.clone (), repo = w.repo.clone (), dir = veval_dir (&w.state) }))
+  Caps { forge, nix, store, ledger, status, gate, evals }
 
 -- ---------------------------------------------------------------- scripted
 
@@ -405,6 +510,8 @@ export data Scripted
   , export records Arc<Mutex<Vec<Built>>>
   , export busy Option<String>
   , export log Arc<Mutex<Vec<String>>>
+  , export evals Arc<Mutex<Vec<Record>>>
+  , export no_key bool
   }
   deriving (Clone, Default)
 
@@ -500,6 +607,25 @@ instance Gate Scripted
   busy : &self -> Effect<Option<String>, Never, HNil>
   busy self = succeed (self.busy.clone ())
 
+-- A scripted key: the commit, a tree and lock derived from it, the host and
+-- a fixed Nix; none at all with `no_key`.
+instance Evals Scripted
+  key : &self -> String -> String -> Effect<Option<Key>, Never, HNil>
+  key self sha host =
+    if self.no_key
+      succeed None
+    else
+      succeed (Some (Key { commit = sha.clone (), tree = "e".repeat 40, lock = "f".repeat 40, host, nix = .to_string "nix (Nix) 2.31.2" }))
+  write : &self -> Record -> Effect<(), Never, HNil>
+  write self r =
+    noted (&self.log) ("veval #{crate::refs::short (&r.key.commit)} #{r.key.host} #{r.drv} #{r.out}")
+    if self.evals.lock () is Ok held
+      mut v = held
+      v.push r
+    succeed (())
+  prune : &self -> Effect<(), Never, HNil>
+  prune self = succeed (())
+
 instance Status Scripted
   post : &self -> String -> String -> String -> String -> Effect<(), Never, HNil>
   post self sha host state description =
@@ -509,7 +635,7 @@ instance Status Scripted
 export scripted_caps : Scripted -> Caps
 scripted_caps w =
   a = Arc::new w
-  Caps { forge = ForgeTool (a.clone ()), nix = NixTool (a.clone ()), store = StoreTool (a.clone ()), ledger = LedgerTool (a.clone ()), status = StatusTool (a.clone ()), gate = GateTool a }
+  Caps { forge = ForgeTool (a.clone ()), nix = NixTool (a.clone ()), store = StoreTool (a.clone ()), ledger = LedgerTool (a.clone ()), status = StatusTool (a.clone ()), gate = GateTool (a.clone ()), evals = EvalsTool a }
 
 test "a status body is GitHub's, and posting without a token file does nothing"
   body = status_body "success" "built in 3s" "vci/drakkar"
@@ -541,4 +667,21 @@ test "the ledger: records appended and read back, done markers, the metrics file
   prom = Path::new (&text) |> .join METRICS_FILE
   m = fs::read_to_string (&prom) |> .unwrap_or_default
   assert! \-> m.contains "vci_build_seconds{host=\"h\",ref=\"main\"} 9\n" && m.contains "vci_commits_built_total 1\n"
+  fs::remove_dir_all (&dir) |> .ok
+
+test "veval records: written world-readable under their key id, parsed back, and pruned when old"
+  dir = std::env::temp_dir () |> .join ("vci-veval-#{std::process::id ()}")
+  fs::remove_dir_all (&dir) |> .ok
+  d = dir.to_string_lossy () |> .to_string
+  key = Key { commit = "a".repeat 40, tree = "b".repeat 40, lock = "c".repeat 40, host = .to_string "mimir", nix = .to_string "nix (Nix) 2.31.2" }
+  r = Record { key, drv = .to_string "/nix/store/vpxys7j0hfbnlqw3nwmxmjrbpw7rlcir-nixos-system-mimir.drv", out = .to_string "/nix/store/znv01c9nzn3ydv9bvr33vanzcdff8bc3-nixos-system-mimir", eval_secs = 31, sigs = Vec::new () }
+  written (&d) (&r) |> .expect "write"
+  file = dir.join (file_name (&r.key))
+  assert_eq! \-> fs::read_to_string (&file) |> .ok |> .and_then (\t -> nix_store_core::veval::parse (&t) |> .ok) \-> Some (r.clone ())
+  mode = fs::metadata (&file) |> .map (\m -> std::os::unix::fs::PermissionsExt::mode (&m.permissions ()) % 0o1000) |> .unwrap_or 0
+  assert_eq! \-> mode \-> 0o644
+  -- Fresh: kept. Two weeks and a second on: dropped.
+  assert_eq! \-> pruned_records (&d) (now_secs ()) \-> 0
+  assert_eq! \-> pruned_records (&d) (now_secs () + RETAIN_SECS + 60) \-> 1
+  assert! \-> !(file.exists ())
   fs::remove_dir_all (&dir) |> .ok

@@ -22,4 +22,6 @@ in
     # The forge is local: no network.
     localForge = assay.eq [on.features.nix.vci.url on.features.nix.vci.pullsUrl] ["file:///srv/repo.git" "file:///srv/pulls.json"];
     statusesOff = assay.eq on.features.nix.vci.statusTokenFile null;
+    # veval (GH-243): the cache serves vci's records from vci's state directory.
+    servesVevalRecords = assay.eq (on.systemd.services.vcache.environment.VCACHE_VEVAL_DIR or null) "/var/lib/vci/veval";
   }

@@ -37,7 +37,7 @@ Every `--interval` (2 minutes in the feature), on a spaced id_effect Schedule:
    an indirect GC root. For a PR, vdiff's summary against main's generation for the same
    host (packages changed, added, removed, closure size delta). One host failing is its
    own result, never the commit's: the others are still built, and the commit is done.
-6. **Record** one line per (commit, host) in `/var/lib/vci/builds.jsonl` (schema 1:
+6. **Record** (and, for a built host, its veval record: below) one line per (commit, host) in `/var/lib/vci/builds.jsonl` (schema 1:
    `sha`, `ref`, `host`, `result` built / eval-failed / build-failed, `drv`, `out`,
    `evalSeconds`, `buildSeconds`, `error`, `diff`, `at`), a marker in `done/<sha>`, and
    `vci.prom` in the textfile directory.
@@ -50,6 +50,36 @@ A step builds one commit to its end. A build in flight is never cancelled becaus
 moved; the next step lists again and takes the newest heads then (latest-wins). The long
 steps are tokio child processes (vdeploy's `exec`), so an hour-long build holds no
 executor thread. Ctrl-C or a systemd stop kills the child with its fiber.
+
+## Shared evaluations (veval, GH-243)
+
+vdeploy and vswitch evaluate the same (commit, host) vci already evaluated: the drv is
+identical (34 of 34 plans checked on drakkar and mimir, #243). So every host vci **builds**
+also gets a record, `/var/lib/vci/veval/<key id>.veval` (nix-store-core's `veval`), written
+after the build so that a consumer's hit always finds the out in the cache:
+
+```
+Version: veval-1
+Key: <sha256 of the fields below>
+Form: git+file?rev
+Commit: <sha>
+Tree: <git rev-parse sha^{tree}>
+Lock: <git rev-parse sha:flake.lock>
+Host: mimir
+Nix: nix (Nix) 2.31.2
+Drv: /nix/store/…-nixos-system-mimir-….drv
+Out: /nix/store/…-nixos-system-mimir-…
+EvalSeconds: 32
+```
+
+The key is the commit, not the tree: `self.rev` is an evaluation input
+(`system.configurationRevision`), so one tree at two commits evaluates to two toplevels.
+`Nix` is the evaluating `nix --version`, so two Nix versions never share a record. The
+record is unsigned; vcache serves it at `GET /veval/<key id>.veval` signed at serve time with
+the key it signs narinfos with, so vci never holds a key. An eval-failed or build-failed
+host, or a commit without a `flake.lock`, has no record. Records older than two weeks are
+removed at the start of a step. Nothing here can fail a step: a record that is missing is
+a consumer's miss.
 
 ## Metrics
 
