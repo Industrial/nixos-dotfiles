@@ -5,11 +5,17 @@
 --       [--state-dir DIR] [--textfile-dir DIR] [--interval DURATION]
 --       [--status-token-file FILE] [--api URL] [--git PROG] [--curl PROG]
 --       [--nix PROG] [--db FILE] [--systemctl PROG] [--max-load N] [--min-free-memory SIZE]
+--       [--own-host NAME]
+--
+-- `--own-host` names the host vci runs on (GH-287). When it is one of the
+-- `--host`s, it is evaluated and built first, then the rest in the order
+-- given: the cache host's own vdeploy plans at once (no debounce), so its
+-- veval record has to be the first one written.
 
 import vdeploy::cli::parse_duration
 import crate::gate::{DEFAULT_MIN_FREE, size_parsed}
 
-export const USAGE : &str = "usage: vci --host NAME [--host NAME...] [--once] [--url URL] [--branch NAME] [--pulls-url URL | --no-pulls] [--repo-slug OWNER/REPO] [--repo DIR] [--state-dir DIR] [--textfile-dir DIR] [--interval DURATION] [--status-token-file FILE] [--api URL] [--git PROG] [--curl PROG] [--nix PROG] [--db FILE] [--systemctl PROG] [--max-load N] [--min-free-memory SIZE]"
+export const USAGE : &str = "usage: vci --host NAME [--host NAME...] [--once] [--url URL] [--branch NAME] [--pulls-url URL | --no-pulls] [--repo-slug OWNER/REPO] [--repo DIR] [--state-dir DIR] [--textfile-dir DIR] [--interval DURATION] [--status-token-file FILE] [--api URL] [--git PROG] [--curl PROG] [--nix PROG] [--db FILE] [--systemctl PROG] [--max-load N] [--min-free-memory SIZE] [--own-host NAME]"
 
 export const DEFAULT_SLUG : &str = "Industrial/nixos-dotfiles"
 
@@ -33,6 +39,7 @@ export data Options
   , export systemctl String
   , export max_load Option<f64>
   , export min_free u64
+  , export own_host Option<String>
   , export help bool
   }
   deriving (Debug, Clone, PartialEq)
@@ -42,7 +49,7 @@ export pulls_url_of : &str -> &str -> String
 pulls_url_of api slug = "#{api}/repos/#{slug}/pulls?state=open&per_page=100"
 
 export defaults : Options
-defaults = Options { hosts = Vec::new (), once = false, url = "https://github.com/#{DEFAULT_SLUG}.git", branch = .to_string "main", pulls_url = Some (pulls_url_of "https://api.github.com" DEFAULT_SLUG), repo_slug = DEFAULT_SLUG.to_string (), repo = .to_string "/var/lib/vci/repo", state_dir = .to_string "/var/lib/vci", textfile_dir = None, interval = 120, token_file = None, api = .to_string "https://api.github.com", git = .to_string "git", curl = .to_string "curl", nix = .to_string "nix", db = (vdeploy::cli::defaults ()).db, systemctl = .to_string "systemctl", max_load = None, min_free = DEFAULT_MIN_FREE, help = false }
+defaults = Options { hosts = Vec::new (), once = false, url = "https://github.com/#{DEFAULT_SLUG}.git", branch = .to_string "main", pulls_url = Some (pulls_url_of "https://api.github.com" DEFAULT_SLUG), repo_slug = DEFAULT_SLUG.to_string (), repo = .to_string "/var/lib/vci/repo", state_dir = .to_string "/var/lib/vci", textfile_dir = None, interval = 120, token_file = None, api = .to_string "https://api.github.com", git = .to_string "git", curl = .to_string "curl", nix = .to_string "nix", db = (vdeploy::cli::defaults ()).db, systemctl = .to_string "systemctl", max_load = None, min_free = DEFAULT_MIN_FREE, own_host = None, help = false }
 
 value : Option<&String> -> &str -> Result<String, String>
 value v flag =
@@ -103,6 +110,8 @@ parse_args args =
         o.min_free := (size_parsed (&v) |> .ok_or ("--min-free-memory: not a size (like 10G): #{v}"))?
       "--systemctl" ->
         o.systemctl := (value (it.next ()) "--systemctl")?
+      "--own-host" ->
+        o.own_host := Some ((value (it.next ()) "--own-host")?)
       "--db" ->
         o.db := (value (it.next ()) "--db")?
       "-h" ->
@@ -127,6 +136,14 @@ test "hosts are all it needs; the rest builds this repository's main and open PR
   assert_eq! \-> o.hosts \-> args (&["drakkar", "mimir"])
   assert_eq! \-> (o.url.as_str (), o.branch.as_str (), o.interval, o.token_file.clone ()) \-> ("https://github.com/Industrial/nixos-dotfiles.git", "main", 120, None)
   assert_eq! \-> o.pulls_url \-> Some (.to_string "https://api.github.com/repos/Industrial/nixos-dotfiles/pulls?state=open&per_page=100")
+  assert_eq! \-> o.own_host \-> None
+
+test "--own-host is read (GH-287)"
+  o = parse_args (&args (&["--host", "mimir", "--host", "drakkar", "--own-host", "drakkar"])) |> .expect "options"
+  assert_eq! \-> o.own_host \-> Some (.to_string "drakkar")
+  -- The hosts stay as given; the agent orders them (agent.vlt `own_first`).
+  assert_eq! \-> o.hosts \-> args (&["mimir", "drakkar"])
+  assert_eq! \-> parse_args (&args (&["--host", "h", "--own-host"])) \-> Err (.to_string "--own-host needs a value")
 
 test "every option is read; a slug moves the PR list with it, unless one is given"
   o = parse_args (&args (&["--host", "h", "--once", "--url", "file:///srv/r.git", "--branch", "b", "--repo-slug", "o/r", "--repo", "/r", "--state-dir", "/s", "--textfile-dir", "/t", "--interval", "5m", "--status-token-file", "/run/credentials/vci.service/status-token", "--api", "http://api", "--git", "/g", "--curl", "/c", "--nix", "/n", "--db", "/db"])) |> .expect "options"
