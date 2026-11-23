@@ -48,7 +48,8 @@ M.records = {
       auraType = field("string", false, "e.g. APPLY_AURA"),
       statType = field("string", false, "e.g. AGILITY, STAMINA"),
       amount = field("number", false),
-      miscValue = field("int", false)
+      miscValue = field("int", false),
+      enchantKind = field("string", false, "ENCHANT_HELD_ITEM only: SHARPEN, WEIGHT, WIZARD_OIL, MANA_OIL, OTHER")
     }
   },
   spellClass = {

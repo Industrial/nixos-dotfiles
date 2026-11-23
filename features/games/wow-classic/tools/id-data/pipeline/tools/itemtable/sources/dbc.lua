@@ -74,6 +74,15 @@ local REQUIRED = {
     }
   },
   {
+    file = "SpellItemEnchantment.csv",
+    key = "spellItemEnchantment",
+    optional = true,
+    columns = {
+      "ID",
+      "Name_lang"
+    }
+  },
+  {
     file = "SpellDuration.csv",
     key = "spellDuration",
     optional = true,
@@ -214,6 +223,20 @@ local STAT = {
   [7] = "STAMINA"
 }
 M.STAT = STAT
+-- MOD_STAT (aura 29) and MOD_TOTAL_STAT_PERCENTAGE (137) number stats by the
+-- UNIT-stat enum, not the item-stat one above: 0 Strength, 1 Agility,
+-- 2 Stamina, 3 Intellect, 4 Spirit, -1 all of them. Reading an Elixir of
+-- Agility (misc 1) through STAT made it a HEALTH elixir.
+local UNIT_STAT = {
+  [-1] = "ALL",
+  [0] = "STRENGTH",
+  [1] = "AGILITY",
+  [2] = "STAMINA",
+  [3] = "INTELLECT",
+  [4] = "SPIRIT"
+}
+M.UNIT_STAT = UNIT_STAT
+local UNIT_STAT_AURAS = { [29] = true, [137] = true }
 local STAT_AURAS = {
   APPLY_AURA = true,
   MOD_STAT = true,
@@ -603,23 +626,50 @@ M.toModel = function(tables, opts)
     end
   end
   local _list_6 = (tables.spellEffect or { })
+  -- WEAPON BUFFS. An ENCHANT_HELD_ITEM effect's misc value is the enchantment's
+  -- id; its kind and strength live in SpellItemEnchantment, named by the client
+  -- itself ("Sharpened +2", "Weighted +3", "Lesser Wizard Oil", "Minor Mana Oil").
+  local enchants = { }
+  for _, row in ipairs(tables.spellItemEnchantment or { }) do
+    local id = num(row.ID)
+    if id then enchants[id] = row end
+  end
+  local function enchantKind(name)
+    name = name or ""
+    if name:match("^Sharpened") then return "SHARPEN" end
+    if name:match("^Weighted") then return "WEIGHT" end
+    if name:match("Wizard Oil$") then return "WIZARD_OIL" end
+    if name:match("Mana Oil$") then return "MANA_OIL" end
+    return "OTHER"
+  end
   -- One effect row, named and with its stat resolved.
   local function effectRecord(row, spellId, index)
     local aura = M.effectName(row)
     local misc = num(row.EffectMiscValue_0)
     local statType = (aura and STAT_AURAS[aura] and misc) and STAT[misc] or nil
+    if UNIT_STAT_AURAS[num(row.EffectAura) or -1] and misc then
+      statType = UNIT_STAT[misc]
+    end
     -- Armor is a resistance in the client: MOD_RESISTANCE with the
     -- physical school (mask 1). Every other mask is a magic resistance.
     if aura == "MOD_RESISTANCE" and misc == 1 then
       statType = "ARMOR"
+    end
+    local amount, kind = num(row.EffectBasePoints), nil
+    if aura == "ENCHANT_HELD_ITEM" and misc and enchants[misc] then
+      kind = enchantKind(enchants[misc].Name_lang)
+      -- The effect's own base points are the enchant's DURATION here; its
+      -- strength is the enchantment's first effect value.
+      amount = num(enchants[misc].EffectPointsMin_0) or amount
     end
     return {
       spellId = spellId,
       index = index,
       auraType = aura,
       statType = statType,
-      amount = num(row.EffectBasePoints),
-      miscValue = misc
+      amount = amount,
+      miscValue = misc,
+      enchantKind = kind
     }
   end
   -- FOLLOWING TRIGGERS. Forever's food is a spell that triggers others:

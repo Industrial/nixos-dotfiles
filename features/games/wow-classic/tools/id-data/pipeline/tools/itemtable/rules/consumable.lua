@@ -235,22 +235,22 @@ M.sets = {
   ["Consumable.Cooldown.Stone.Mana.Mana Stone"] = unsupported("model has no spell -> created-item link"),
   ["Consumable.Weapon Buff.Stone.Sharpening Stone"] = {
     predicate = weaponBuff(function(effect)
-      return effect.miscValue == 1
+      return effect.enchantKind == "SHARPEN"
     end)
   },
   ["Consumable.Weapon Buff.Stone.Weight Stone"] = {
     predicate = weaponBuff(function(effect)
-      return effect.miscValue == 2
+      return effect.enchantKind == "WEIGHT"
     end)
   },
   ["Consumable.Weapon Buff.Oil.Wizard"] = {
     predicate = weaponBuff(function(effect)
-      return effect.miscValue == 3
+      return effect.enchantKind == "WIZARD_OIL"
     end)
   },
   ["Consumable.Weapon Buff.Oil.Mana"] = {
     predicate = weaponBuff(function(effect)
-      return effect.miscValue == 4
+      return effect.enchantKind == "MANA_OIL"
     end)
   }
 }

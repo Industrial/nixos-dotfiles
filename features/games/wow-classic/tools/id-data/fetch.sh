@@ -15,7 +15,7 @@ mkdir -p "$out"
 
 # What tools/dbc/tables.conf declares, plus the two link tables Forever's
 # modern client uses instead of the old columns (see normalize.lua).
-TABLES=(Item ItemSparse ItemEffect ItemXItemEffect Spell SpellName SkillLineAbility SpellLevels
+TABLES=(Item ItemSparse ItemEffect ItemXItemEffect Spell SpellName SpellItemEnchantment SkillLineAbility SpellLevels
         SpellReagents SpellEffect SpellMisc SpellDuration ChrSpecialization TraitTree TraitTreeLoadout
         TraitSubTree TraitNode TraitNodeEntry TraitNodeXTraitNodeEntry TraitDefinition)
 

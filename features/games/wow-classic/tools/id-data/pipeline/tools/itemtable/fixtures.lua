@@ -331,14 +331,14 @@ return {
       index = 1,
       auraType = "ENCHANT_HELD_ITEM",
       amount = 8,
-      miscValue = 1
+      enchantKind = "SHARPEN"
     },
     {
       spellId = 91008,
       index = 1,
       auraType = "ENCHANT_HELD_ITEM",
       amount = 24,
-      miscValue = 3
+      enchantKind = "WIZARD_OIL"
     },
     {
       spellId = 91012,

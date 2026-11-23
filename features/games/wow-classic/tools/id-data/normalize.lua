@@ -129,7 +129,7 @@ end
 
 -- Everything else, unchanged (optional tables only if this build has them).
 for _, name in ipairs({ "Item", "ItemSparse", "SkillLineAbility", "SpellLevels", "SpellReagents", "SpellMisc",
-                        "SpellDuration", "ChrSpecialization", "TraitTree", "TraitTreeLoadout", "TraitSubTree",
+                        "SpellDuration", "SpellItemEnchantment", "ChrSpecialization", "TraitTree", "TraitTreeLoadout", "TraitSubTree",
                         "TraitNode", "TraitNodeEntry", "TraitNodeXTraitNodeEntry", "TraitDefinition" }) do
   local rows, header = read(name, true)
   if rows then write(name, header, rows) end
