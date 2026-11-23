@@ -72,6 +72,23 @@ in {
   system.activationScripts.etcOverlayCarryIn = lib.stringAfter ["users" "groups" "specialfs"] liveEntry;
   system.activationScripts.etc.deps = ["etcOverlayCarryIn"];
 
+  # The kernel resolves an audit watch (`-w /etc/passwd …`, mimir's STIG identity rules)
+  # when the rules are loaded. After a live switch the watches still point into the /etc
+  # the overlay now hides (in) or the overlay that is gone (out), and writes to the
+  # watched files go unaudited (measured: etc-overlay-live-switch-mimir). This trigger
+  # changes the unit in both directions, so switch-to-configuration reloads the rules
+  # after the activation has mounted or unmounted the overlay. A cold boot loads them
+  # once /etc is in place anyway. With `security.audit.enable = "lock"` (`-e 2`) the
+  # rules cannot be reloaded before a reboot: switch with `boot` there.
+  systemd.services.audit-rules-nixos = lib.mkIf config.security.audit.enable {
+    restartTriggers = ["etc-overlay"];
+  };
+  warnings = lib.optional (config.security.audit.enable == "lock") ''
+    features.nixos.etc-overlay: the audit rules are locked (security.audit.enable = "lock"),
+    so a live switch into or out of the /etc overlay leaves the /etc watches on the old
+    /etc until a reboot. Switch with `boot` and reboot.
+  '';
+
   boot.initrd.systemd = {
     storePaths = [coldEntry carry.carryIn] ++ carry.tools;
     services.etc-overlay-carry-in = {

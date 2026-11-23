@@ -20,6 +20,12 @@ let
   on = eval {features.nixos.etc-overlay.enable = true;};
   # The rollback, as a host would write it.
   rolledBack = eval {features.nixos.etc-overlay.enable = lib.mkForce false;};
+  # With audit rules loaded (mimir's STIG identity watches on /etc).
+  auditOn = eval {
+    features.nixos.etc-overlay.enable = true;
+    security.audit.enable = true;
+  };
+  auditOff = eval {security.audit.enable = true;};
 
   scripts = cfg: cfg.system.activationScripts;
   unit = on.boot.initrd.systemd.services.etc-overlay-carry-in;
@@ -45,4 +51,10 @@ in
     rollbackCarriesOut = assay.eq [rolledBack.system.etc.overlay.enable (builtins.elem "etcOverlayCarryOut" (scripts rolledBack).etc.deps)] [false true];
     # The exit half is inert until an overlay period left an upperdir to carry out.
     carryOutGuarded = assay.eq (lib.hasInfix "if [ -d /.rw-etc/upper ] && [ ! -e /.rw-etc/.exited ]" (scripts off).etcOverlayCarryOut.text) true;
+
+    # A live switch reloads the audit rules, so the /etc watches follow the mount both ways:
+    # the trigger is in the overlay generation only, and no audit unit appears without audit.
+    auditRulesReloadOnTheSwitch =
+      assay.eq [auditOn.systemd.services.audit-rules-nixos.restartTriggers auditOff.systemd.services.audit-rules-nixos.restartTriggers] [["etc-overlay"] []];
+    noAuditUnitWithoutAudit = assay.eq (on.systemd.services ? audit-rules-nixos) false;
   }
