@@ -12,7 +12,9 @@ local SPELL = {
   BLESSING_OF_KINGS = 20217,
   GREATER_BLESSING_OF_MIGHT = 25782,
   GREATER_BLESSING_OF_WISDOM = 25894,
-  GREATER_BLESSING_OF_KINGS = 25898
+  GREATER_BLESSING_OF_KINGS = 25898,
+  RIGHTEOUS_FURY = 25780,
+  HORN_OF_LORDAERON = 425600
 }
 local OTHER_AURAS = {
   SPELL.RETRIBUTION_AURA,
@@ -49,6 +51,13 @@ local wantsWisdom
 wantsWisdom = function(cls, ud)
   return blessingFor(cls, ud) == "wisdom"
 end
+-- Righteous Fury only when tanking, which for a paladin means a shield in the
+-- off hand. A healer with a shield can cancel it; a two-hander never gets it.
+local holdsShield
+holdsShield = function(snap)
+  local oh = snap and snap.weapon and snap.weapon.oh
+  return (oh and oh.isShield) == true
+end
 local withoutKings
 withoutKings = function(snap)
   return not knowsKings(snap)
@@ -59,6 +68,13 @@ R.register("PALADIN", R.classRules({
     R.selfBuff(SPELL.DEVOTION_AURA, {
       label = "Aura",
       satisfiedBy = OTHER_AURAS
+    }),
+    R.selfBuff(SPELL.RIGHTEOUS_FURY, {
+      when = holdsShield
+    }),
+    R.selfBuff(SPELL.HORN_OF_LORDAERON, {
+      short = true,
+      refresh = 30
     }),
     R.groupBuff(SPELL.BLESSING_OF_KINGS, {
       targets = "all",
@@ -85,6 +101,7 @@ R.register("PALADIN", R.classRules({
 }))
 _G.idUpkeep_UpkeepClassPALADIN = {
   SPELL = SPELL,
-  blessingFor = blessingFor
+  blessingFor = blessingFor,
+  holdsShield = holdsShield
 }
 return SPELL

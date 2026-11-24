@@ -8,6 +8,8 @@
 # 2. tools/id-data/normalize.lua  joins Forever's modern tables into the pipeline's columns
 # 3. tools/id-data/generate.lua   the item-table pipeline (tools/id-data/pipeline, taken
 #                                 over from idAutomation) -> idLib*/data
+# 4. tools/id-data/upkeep-coverage.lua  every class buff in the data is kept up by
+#                                 idUpkeep or skipped for a stated reason
 #
 # Default build: the newest wowf build on wago.tools. Lua: $ID_LUA, else the
 # idAutomation devenv's, else `lua` on PATH.
@@ -42,4 +44,6 @@ echo "== normalize"
 "$lua" "$here/tools/id-data/normalize.lua" "$work/raw" "$work/csv"
 echo "== generate"
 (cd "$pipeline" && "$lua" "$here/tools/id-data/generate.lua" "$work/csv" "$build" "$addons")
+echo "== upkeep coverage"
+"$lua" "$here/tools/id-data/upkeep-coverage.lua" "$work/csv" "$addons"
 echo "== done: $build${ID_DATA_KEEP:+ (work dir kept: $work)}"

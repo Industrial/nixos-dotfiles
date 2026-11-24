@@ -18,6 +18,8 @@ local SLOTS = {
   oh = 17
 }
 local WEAPON_CLASS = 2
+-- Armor class 4, subclass 6: a shield (what Righteous Fury keys on).
+local ARMOR_CLASS, SHIELD_SUBCLASS = 4, 6
 local RANGED_SUBCLASS = {
   [2] = true,
   [3] = true,
@@ -291,6 +293,15 @@ Snapshot.itemUsable = function(itemId, level)
   end
   return usable
 end
+Snapshot.itemName = function(itemId)
+  local C = _G.C_Item
+  local fn = (C and C.GetItemInfo) or _G.GetItemInfo
+  if not (fn) then
+    return nil
+  end
+  local name = safe(fn, itemId)
+  return lua_type(name) == "string" and name or nil
+end
 Snapshot.itemSpell = function(itemId)
   local C = _G.C_Item
   local fn = (C and C.GetItemSpell) or _G.GetItemSpell
@@ -323,6 +334,7 @@ Snapshot.readWeapons = function()
       local _, classID, subclassID = itemInstant(itemId)
       w.isWeapon = classID == WEAPON_CLASS and not RANGED_SUBCLASS[subclassID]
       w.blunt = BLUNT_SUBCLASS[subclassID] == true
+      w.isShield = classID == ARMOR_CLASS and subclassID == SHIELD_SUBCLASS
     end
     w.hasEnchant = readable(state[key].has) and true or false
     local exp = readable(state[key].exp)
@@ -492,6 +504,7 @@ Snapshot.build = function(classRules, opts)
         return snap.itemInfo[id] and snap.itemInfo[id].usable
       end,
       itemSpell = Snapshot.itemSpell,
+      itemName = Snapshot.itemName,
       consumables = classRules and classRules.consumables,
       foodBuffs = classRules and classRules.foodBuffs
     })

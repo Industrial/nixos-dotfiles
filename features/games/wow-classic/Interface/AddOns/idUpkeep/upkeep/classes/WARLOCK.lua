@@ -6,6 +6,7 @@ local SPELL = {
   SUMMON_FELHUNTER = 691,
   DEMON_SKIN = 687,
   DEMON_ARMOR = 706,
+  FEL_ARMOR = 403619,
   CREATE_HEALTHSTONE = {
     11730,
     11729,
@@ -86,6 +87,7 @@ R.register("WARLOCK", R.classRules({
       label = "Create Soulstone"
     }),
     R.selfBuff({
+      SPELL.FEL_ARMOR,
       SPELL.DEMON_ARMOR,
       SPELL.DEMON_SKIN
     }, {

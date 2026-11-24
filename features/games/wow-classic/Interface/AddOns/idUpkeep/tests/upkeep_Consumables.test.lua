@@ -333,7 +333,7 @@ describe("Upkeep Snapshot", function()
     return assert.is_false(Snapshot.readUnit("party1").inRange)
   end)
 end)
-return describe("Upkeep Consumables library preference (empty-data shadowing)", function()
+describe("Upkeep Consumables library preference (empty-data shadowing)", function()
   local saved
   local withLibs
   withLibs = function(libs)
@@ -429,5 +429,56 @@ return describe("Upkeep Consumables library preference (empty-data shadowing)", 
     assert.is_nil(C.lib())
     _G.LibStub = nil
     return assert.is_nil(C.lib())
+  end)
+end)
+return describe("Upkeep conjured food and water", function()
+  local Consumables, Rules
+  before_each(function()
+    Consumables = load()
+    Rules = _G.idUpkeep_UpkeepRules
+  end)
+  local NAMES = {
+    [5349] = "Conjured Muffin", [8076] = "Conjured Sweet Roll", [4599] = "Cured Ham Steak",
+    [13935] = "Baked Salmon", [5350] = "Conjured Water", [8766] = "Morning Glory Dew"
+  }
+  local build = function(sets, bags)
+    return Consumables.build(bags, {
+      lib = fakeLib(sets),
+      itemName = function(id) return NAMES[id] end
+    })
+  end
+  local best = function(list)
+    table.sort(list, Rules.betterRestore)
+    return list[1] and list[1].itemId
+  end
+  it("ranks the weakest conjured food above the strongest real food", function()
+    local out = build({
+      ["Consumable.Food.Edible.Basic.Conjured"] = { [5349] = 61 },
+      ["Consumable.Food.Edible.Basic.Non-Conjured"] = { [13935] = 2148, [4599] = 874 }
+    }, { [5349] = 2, [13935] = 20, [4599] = 20 })
+    return assert.are.equal(5349, best(out.food))
+  end)
+  it("knows mage bread and water by name when the library files them as Basic (LibPeriodicTable does)", function()
+    local out = build({
+      ["Consumable.Food.Edible.Basic.Non-Conjured"] = { [5349] = 61, [13935] = 2148 },
+      ["Consumable.Water.Basic"] = { [5350] = 151, [8766] = 2934 }
+    }, { [5349] = 2, [13935] = 20, [5350] = 2, [8766] = 20 })
+    assert.are.equal(5349, best(out.food))
+    return assert.are.equal(5350, best(out.water))
+  end)
+  it("keeps an item conjured when a plain set lists it with a bigger value", function()
+    local out = Consumables.build({ [5349] = 2, [13935] = 1 }, {
+      lib = fakeLib({
+        ["Consumable.Food.Edible.Basic.Conjured"] = { [5349] = 61 },
+        ["Consumable.Food.Edible.Basic.Non-Conjured"] = { [5349] = 999, [13935] = 2148 }
+      })
+    })
+    return assert.are.equal(5349, best(out.food))
+  end)
+  return it("still prefers the bigger restore among conjured items", function()
+    local out = build({
+      ["Consumable.Food.Edible.Basic.Conjured"] = { [5349] = 61, [8076] = 358 }
+    }, { [5349] = 2, [8076] = 2 })
+    return assert.are.equal(8076, best(out.food))
   end)
 end)
