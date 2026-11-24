@@ -1,0 +1,45 @@
+{
+  "build": "0.0.0.fixture",
+  "domains": {
+    "Consumable": {
+      "classified": 11,
+      "excluded": 0,
+      "gate": "zero",
+      "inScope": 11,
+      "sets": 12,
+      "status": "active",
+      "unclassifiedCount": 0,
+      "unsupported": 20
+    },
+    "Spell": {
+      "classified": 10,
+      "excluded": 0,
+      "gate": "ratchet",
+      "inScope": 10,
+      "sets": 21,
+      "status": "active",
+      "unclassifiedCount": 0,
+      "unsupported": 2
+    },
+    "Talent": {
+      "classified": 6,
+      "excluded": 0,
+      "gate": "zero",
+      "inScope": 6,
+      "sets": 8,
+      "status": "active",
+      "unclassifiedCount": 0,
+      "unsupported": 2
+    },
+    "Tradeskill": {
+      "classified": 2,
+      "excluded": 1,
+      "gate": "zero",
+      "inScope": 3,
+      "sets": 2,
+      "status": "active",
+      "unclassifiedCount": 0,
+      "unsupported": 1
+    }
+  }
+}
