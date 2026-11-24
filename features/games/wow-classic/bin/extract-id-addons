@@ -9,6 +9,10 @@
 #
 # A lib's data/ is generated here now (bin/generate-id-data), so an existing
 # data/ folder is kept rather than replaced by idAutomation's.
+#
+# idUpkeep has since moved on from idAutomation (Righteous Fury and the other
+# class buffs, conjured-first food/water). Re-running this overwrites idUpkeep
+# with idAutomation's older copy; it was a one-time takeover.
 set -euo pipefail
 SRC=$(cd "$1" && pwd)
 DST=$(cd "$2" && pwd)

@@ -7,7 +7,9 @@ local SPELL = {
   PRAYER_OF_SPIRIT = 27681,
   SHADOW_PROTECTION = 976,
   PRAYER_OF_SHADOW_PROTECTION = 27683,
-  FEAR_WARD = 6346
+  FEAR_WARD = 6346,
+  SHADOWGUARD = 18137,
+  TOUCH_OF_WEAKNESS = 2652
 }
 R.register("PRIEST", R.classRules({
   role = "caster",
@@ -31,7 +33,9 @@ R.register("PRIEST", R.classRules({
         SPELL.PRAYER_OF_SHADOW_PROTECTION
       }
     }),
-    R.selfBuff(SPELL.FEAR_WARD)
+    R.selfBuff(SPELL.FEAR_WARD),
+    R.selfBuff(SPELL.SHADOWGUARD),
+    R.selfBuff(SPELL.TOUCH_OF_WEAKNESS)
   }
 }))
 _G.idUpkeep_UpkeepClassPRIEST = SPELL

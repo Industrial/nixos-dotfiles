@@ -296,7 +296,7 @@ return describe("Upkeep Engine", function()
         local _list_0 = Engine.explain(snap, Rules.forClass("WARRIOR"))
         for _index_0 = 1, #_list_0 do
           local e = _list_0[_index_0]
-          if e.phase == "selfShort" then
+          if e.phase == "selfShort" and e.label == "Battle Shout" then
             _accum_0[_len_0] = e.reason
             _len_0 = _len_0 + 1
           end

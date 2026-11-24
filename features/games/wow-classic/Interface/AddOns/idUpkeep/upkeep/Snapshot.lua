@@ -18,6 +18,8 @@ local SLOTS = {
   oh = 17
 }
 local WEAPON_CLASS = 2
+-- Armor class 4, subclass 6: a shield (what Righteous Fury keys on).
+local ARMOR_CLASS, SHIELD_SUBCLASS = 4, 6
 local RANGED_SUBCLASS = {
   [2] = true,
   [3] = true,
@@ -323,6 +325,7 @@ Snapshot.readWeapons = function()
       local _, classID, subclassID = itemInstant(itemId)
       w.isWeapon = classID == WEAPON_CLASS and not RANGED_SUBCLASS[subclassID]
       w.blunt = BLUNT_SUBCLASS[subclassID] == true
+      w.isShield = classID == ARMOR_CLASS and subclassID == SHIELD_SUBCLASS
     end
     w.hasEnchant = readable(state[key].has) and true or false
     local exp = readable(state[key].exp)

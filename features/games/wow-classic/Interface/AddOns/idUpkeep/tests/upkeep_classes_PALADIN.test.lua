@@ -227,7 +227,7 @@ return describe("Upkeep PALADIN", function()
       end
     end)
   end)
-  return describe("blessings", function()
+  describe("blessings", function()
     it("orders aura -> own blessing -> party blessings by class", function()
       local snap = paladinSnap()
       snap.units.party1 = party("WARRIOR", false)
@@ -297,6 +297,40 @@ return describe("Upkeep PALADIN", function()
       return assert.are.same({
         "Blessing of Might@party2"
       }, doSteps(Engine, snap, Rules.forClass("PALADIN")))
+    end)
+  end)
+  return describe("Righteous Fury", function()
+    local RF = 25780
+    local withRF = function(isShield)
+      local snap = paladinSnap({
+        weapon = {
+          mh = { isWeapon = true },
+          oh = { isWeapon = false, isShield = isShield }
+        }
+      })
+      snap.spells[RF] = known("Righteous Fury")
+      snap.units.player.auras = { aura("Devotion Aura") }
+      return snap
+    end
+    local fury = function(snap)
+      for _, e in ipairs(Engine.explain(snap, Rules.forClass("PALADIN"))) do
+        if e.status == "do" and e.step.spell == "Righteous Fury" then
+          return true
+        end
+      end
+      return false
+    end
+    it("keeps Righteous Fury up while a shield is in the off hand", function()
+      return assert.is_true(fury(withRF(true)))
+    end)
+    it("leaves Righteous Fury off without a shield (two-hander, off-hand frill)", function()
+      assert.is_false(fury(withRF(false)))
+      return assert.is_false(fury(withRF(nil)))
+    end)
+    return it("is satisfied once Righteous Fury is up", function()
+      local snap = withRF(true)
+      snap.units.player.auras[#snap.units.player.auras + 1] = aura("Righteous Fury", { remaining = 1500 })
+      return assert.is_false(fury(snap))
     end)
   end)
 end)
