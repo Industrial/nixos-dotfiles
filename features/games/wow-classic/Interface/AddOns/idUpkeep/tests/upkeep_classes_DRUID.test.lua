@@ -132,7 +132,7 @@ return describe("Upkeep DRUID", function()
   it("registers as a hybrid", function()
     return assert.are.equal("hybrid", Rules.forClass("DRUID").role)
   end)
-  it("orders Mark of the Wild -> Thorns -> Omen of Clarity on self, then Mark on party and pet", function()
+  it("orders Mark of the Wild -> Thorns -> Omen of Clarity on self, then Mark on the party, never the pet", function()
     local snap = druidSnap()
     snap.spells[ID.OMEN_OF_CLARITY] = known("Omen of Clarity")
     snap.units.party1 = {
@@ -150,8 +150,7 @@ return describe("Upkeep DRUID", function()
       "Mark of the Wild@player",
       "Thorns@player",
       "Omen of Clarity@player",
-      "Mark of the Wild@party1",
-      "Mark of the Wild@pet"
+      "Mark of the Wild@party1"
     }, doSteps(Engine, snap, Rules.forClass("DRUID")))
   end)
   it("gives Mark of the Wild to non-mana party members too, Thorns stays self only", function()

@@ -15,6 +15,10 @@ R.register("DRUID", R.classRules({
       }
     }),
     R.selfBuff(SPELL.THORNS),
+    R.groupBuff(SPELL.THORNS, {
+      targets = "tank",
+      label = "Thorns (tanks)"
+    }),
     R.selfBuff(SPELL.OMEN_OF_CLARITY)
   }
 }))

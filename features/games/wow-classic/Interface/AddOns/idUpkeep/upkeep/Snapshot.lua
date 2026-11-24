@@ -236,7 +236,52 @@ Snapshot.readUnit = function(unit)
     end
   end
   ud.usesMana = unitUsesMana(unit)
+  -- A tank: the raid's Main Tank assignment, or the Tank group role.
+  local mainTank = _G.GetPartyAssignment and readable(safe(_G.GetPartyAssignment, "MAINTANK", unit))
+  local role = _G.UnitGroupRolesAssigned and readable(safe(_G.UnitGroupRolesAssigned, unit))
+  ud.tank = mainTank == true or role == "TANK"
   return ud
+end
+-- Who the group buffs go to after the player, in order: the player's own
+-- party (party1-4), then the rest of the raid by subgroup. The player's own
+-- party also has raid tokens; those are skipped so nobody is listed twice.
+Snapshot.groupUnits = function()
+  local out = { }
+  for _index_0 = 1, #PARTY_UNITS do
+    out[#out + 1] = PARTY_UNITS[_index_0]
+  end
+  if not (safe(_G.IsInRaid) == true) then
+    return out
+  end
+  local n = tonumber(safe(_G.GetNumGroupMembers)) or 0
+  local raid = { }
+  for i = 1, math.min(n, 40) do
+    local unit = "raid" .. tostring(i)
+    local own = readable(safe(_G.UnitIsUnit, unit, "player")) == true
+    for _index_0 = 1, #PARTY_UNITS do
+      if not own and readable(safe(_G.UnitIsUnit, unit, PARTY_UNITS[_index_0])) == true then
+        own = true
+      end
+    end
+    if not own then
+      local _, _, subgroup = safe(_G.GetRaidRosterInfo, i)
+      raid[#raid + 1] = {
+        unit = unit,
+        group = tonumber(readable(subgroup)) or 9,
+        index = i
+      }
+    end
+  end
+  table.sort(raid, function(a, b)
+    if a.group ~= b.group then
+      return a.group < b.group
+    end
+    return a.index < b.index
+  end)
+  for _index_0 = 1, #raid do
+    out[#out + 1] = raid[_index_0].unit
+  end
+  return out
 end
 Snapshot.readBags = function()
   local counts = { }
@@ -430,13 +475,13 @@ Snapshot.build = function(classRules, opts)
     dead = readable(safe(_G.UnitIsDeadOrGhost, "player")) == true
   }
   if not (snap.inCombat) then
+    snap.groupOrder = Snapshot.groupUnits()
     local units = {
       "player",
       "pet"
     }
-    for _index_0 = 1, #PARTY_UNITS do
-      local u = PARTY_UNITS[_index_0]
-      units[#units + 1] = u
+    for _index_0 = 1, #snap.groupOrder do
+      units[#units + 1] = snap.groupOrder[_index_0]
     end
     for _index_0 = 1, #units do
       local unit = units[_index_0]
