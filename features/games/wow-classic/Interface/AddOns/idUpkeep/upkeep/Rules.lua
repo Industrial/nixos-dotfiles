@@ -304,6 +304,41 @@ Rules.FOOD_BUFFS = {
     set = "Consumable.Food.Buff.HP Regen"
   }
 }
+-- Conjured is a property of the ITEM, not of the set an item library happens
+-- to file it in: LibPeriodicTable files mage bread and water under its Basic
+-- sets. Every mage item is named "Conjured ...", so the name decides too.
+Rules.isConjuredName = function(name)
+  if not (lua_type(name) == "string") then
+    return false
+  end
+  return (name:lower():find("conjured", 1, true)) ~= nil
+end
+Rules.isConjured = function(fromSet, name)
+  return fromSet == true or Rules.isConjuredName(name)
+end
+-- THE restore ranking, shared by every food/water/health/mana pick: any
+-- conjured item before any other (free, and gone on logout anyway), then the
+-- caller's tier, then the bigger restore, then the smaller stack (use it up),
+-- then the lower id. True when `a` ranks before `b`.
+Rules.betterRestore = function(a, b)
+  local aConjured, bConjured = a.conjured == true, b.conjured == true
+  if aConjured ~= bConjured then
+    return aConjured
+  end
+  local at, bt = (a.tier or 1), (b.tier or 1)
+  if at ~= bt then
+    return at < bt
+  end
+  local av, bv = (a.value or 0), (b.value or 0)
+  if av ~= bv then
+    return av > bv
+  end
+  local ac, bc = (a.count or 0), (b.count or 0)
+  if ac ~= bc then
+    return ac < bc
+  end
+  return (a.itemId or 0) < (b.itemId or 0)
+end
 Rules.FOOD_SETS = {
   {
     set = "Consumable.Food.Edible.Basic.Conjured",

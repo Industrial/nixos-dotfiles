@@ -55,10 +55,7 @@ Sustain.SETS = {
 }
 local Restock_isConjuredName
 Restock_isConjuredName = function(name)
-  if not (lua_type(name) == "string") then
-    return false
-  end
-  return (name:lower():find("conjured", 1, true)) ~= nil
+  return _G.idUpkeep_UpkeepRules.isConjuredName(name)
 end
 Sustain.isConjuredName = Restock_isConjuredName
 local candidatesFor
@@ -113,25 +110,7 @@ candidatesFor = function(ctx, counts, def)
   return out
 end
 Sustain.sortCandidates = function(list)
-  table.sort(list, function(a, b)
-    local aConjured, bConjured = a.conjured == true, b.conjured == true
-    if aConjured ~= bConjured then
-      return aConjured
-    end
-    local at, bt = (a.tier or 1), (b.tier or 1)
-    if at ~= bt then
-      return at < bt
-    end
-    local av, bv = (a.value or 0), (b.value or 0)
-    if av ~= bv then
-      return av > bv
-    end
-    local ac, bc = (a.count or 0), (b.count or 0)
-    if ac ~= bc then
-      return ac < bc
-    end
-    return a.itemId < b.itemId
-  end)
+  table.sort(list, _G.idUpkeep_UpkeepRules.betterRestore)
   return list
 end
 Sustain.pick = function(job, branch, counts, ctx)

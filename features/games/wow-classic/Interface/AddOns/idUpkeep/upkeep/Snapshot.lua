@@ -293,6 +293,15 @@ Snapshot.itemUsable = function(itemId, level)
   end
   return usable
 end
+Snapshot.itemName = function(itemId)
+  local C = _G.C_Item
+  local fn = (C and C.GetItemInfo) or _G.GetItemInfo
+  if not (fn) then
+    return nil
+  end
+  local name = safe(fn, itemId)
+  return lua_type(name) == "string" and name or nil
+end
 Snapshot.itemSpell = function(itemId)
   local C = _G.C_Item
   local fn = (C and C.GetItemSpell) or _G.GetItemSpell
@@ -495,6 +504,7 @@ Snapshot.build = function(classRules, opts)
         return snap.itemInfo[id] and snap.itemInfo[id].usable
       end,
       itemSpell = Snapshot.itemSpell,
+      itemName = Snapshot.itemName,
       consumables = classRules and classRules.consumables,
       foodBuffs = classRules and classRules.foodBuffs
     })

@@ -141,6 +141,16 @@ candidate = function(ctx, itemId, count, value, extra)
       c[k] = v
     end
   end
+  if c.conjured ~= nil then
+    local name = nil
+    if ctx.itemName then
+      local okName, n = pcall(ctx.itemName, itemId)
+      if okName then
+        name = n
+      end
+    end
+    c.conjured = _G.idUpkeep_UpkeepRules.isConjured(c.conjured, name)
+  end
   return c
 end
 local bagCandidates
@@ -169,7 +179,11 @@ mergedCandidates = function(ctx, counts, sets)
       local c = _list_0[_index_1]
       local prev = byId[c.itemId]
       if not prev or (c.value or 0) > (prev.value or 0) then
+        -- An item filed in a conjured set AND a plain one stays conjured.
+        c.conjured = c.conjured or (prev and prev.conjured) or false
         byId[c.itemId] = c
+      elseif c.conjured then
+        prev.conjured = true
       end
     end
   end

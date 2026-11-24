@@ -527,22 +527,7 @@ bestCandidate = function(list)
   local best = nil
   local better
   better = function(c, than)
-    if not (than) then
-      return true
-    end
-    local cConjured, tConjured = c.conjured == true, than.conjured == true
-    if cConjured ~= tConjured then
-      return cConjured
-    end
-    local cValue, tValue = (c.value or 0), (than.value or 0)
-    if cValue ~= tValue then
-      return cValue > tValue
-    end
-    local cCount, tCount = (c.count or 0), (than.count or 0)
-    if cCount ~= tCount then
-      return cCount < tCount
-    end
-    return (c.itemId or 0) < (than.itemId or 0)
+    return not than or _G.idUpkeep_UpkeepRules.betterRestore(c, than)
   end
   local _list_0 = (list or { })
   for _index_0 = 1, #_list_0 do
