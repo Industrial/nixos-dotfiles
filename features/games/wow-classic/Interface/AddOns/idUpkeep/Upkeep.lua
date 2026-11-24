@@ -36,6 +36,10 @@ local WATCHED_UNITS = {
   party3 = true,
   party4 = true
 }
+-- Raid members are buffed too (out of combat), so their aura changes count.
+for i = 1, 40 do
+  WATCHED_UNITS["raid" .. tostring(i)] = true
+end
 local MIGRATED_SETTINGS = {
   enable = "enable",
   rest_threshold = "rest_threshold",

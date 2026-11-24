@@ -56,7 +56,8 @@ Rules.groupBuff = function(spell, opts)
     auraNames = asList(opts.auraNames),
     refresh = opts.refresh or 60,
     targets = opts.targets or "all",
-    includePet = opts.includePet ~= false,
+    includePet = opts.includePet == true,
+    scope = opts.scope,
     when = opts.when,
     label = opts.label
   }

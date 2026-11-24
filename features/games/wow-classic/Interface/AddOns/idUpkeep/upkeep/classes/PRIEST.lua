@@ -23,12 +23,14 @@ R.register("PRIEST", R.classRules({
     }),
     R.groupBuff(SPELL.DIVINE_SPIRIT, {
       targets = "mana",
+      scope = "party",
       satisfiedBy = {
         SPELL.PRAYER_OF_SPIRIT
       }
     }),
     R.groupBuff(SPELL.SHADOW_PROTECTION, {
       targets = "all",
+      scope = "party",
       satisfiedBy = {
         SPELL.PRAYER_OF_SHADOW_PROTECTION
       }

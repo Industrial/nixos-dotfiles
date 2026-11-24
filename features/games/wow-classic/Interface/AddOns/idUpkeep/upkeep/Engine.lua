@@ -202,6 +202,9 @@ wantsBuff = function(targets, ud)
   if targets == "mana" then
     return ud.usesMana == true
   end
+  if targets == "tank" then
+    return ud.tank == true
+  end
   if lua_type(targets) == "function" then
     return (targets(ud.class, ud)) == true
   end
@@ -350,9 +353,14 @@ EVAL.groupBuff = function(ctx, rule, phase)
   local out = { }
   local units = { }
   if ctx.opts.includeParty then
-    for _index_0 = 1, #PARTY_UNITS do
-      local u = PARTY_UNITS[_index_0]
-      units[#units + 1] = u
+    -- Party first, then the raid by subgroup (Snapshot.groupUnits); a rule
+    -- scoped to the party stops before the raid.
+    local order = snap.groupOrder or PARTY_UNITS
+    for _index_0 = 1, #order do
+      local u = order[_index_0]
+      if not (rule.scope == "party" and u:find("^raid")) then
+        units[#units + 1] = u
+      end
     end
   end
   if rule.includePet then

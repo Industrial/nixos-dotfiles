@@ -458,7 +458,7 @@ return describe("Upkeep Engine", function()
       }
       return assert.is_nil((Engine.nextStep(snap, Rules.forClass("MAGE"))))
     end)
-    it("buffs a mana-using pet, and ignores the party when include_party is off", function()
+    it("never buffs a pet, and ignores the party when include_party is off", function()
       local snap = mageSnap()
       snap.units.player.auras = {
         aura("Ice Armor"),
@@ -478,7 +478,7 @@ return describe("Upkeep Engine", function()
       local step = Engine.nextStep(snap, Rules.forClass("MAGE"), {
         includeParty = false
       })
-      return assert.are.equal("pet", step.unit)
+      return assert.is_true(step == nil or (step.unit ~= "pet" and step.unit ~= "party1"))
     end)
     it("skips buffs without mana and drinks instead", function()
       local snap = mageSnap({

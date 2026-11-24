@@ -237,7 +237,7 @@ return describe("Upkeep PRIEST", function()
       "Fear Ward@player"
     }, doSteps(Engine, snap, Rules.forClass("PRIEST")))
   end)
-  return it("buffs a mana-using pet with Divine Spirit", function()
+  it("never buffs a pet, even a mana-using one", function()
     local snap = priestSnap()
     snap.units.player.auras = ALL_SELF()
     snap.units.pet = {
@@ -249,8 +249,20 @@ return describe("Upkeep PRIEST", function()
       }
     }
     local step = Engine.nextStep(snap, Rules.forClass("PRIEST"))
-    assert.are.equal("Divine Spirit", step.spell)
-    assert.are.equal("pet", step.unit)
-    return assert.are.equal("group", step.phase)
+    return assert.is_true(step == nil or step.unit ~= "pet")
+  end)
+  return it("keeps Divine Spirit and Shadow Protection to the party, Fortitude to the whole raid", function()
+    local snap = priestSnap()
+    snap.units.player.auras = ALL_SELF()
+    snap.groupOrder = { "party1", "raid7" }
+    snap.units.party1 = { exists = true, class = "MAGE", usesMana = true, auras = { } }
+    snap.units.raid7 = { exists = true, class = "MAGE", usesMana = true, auras = { } }
+    local steps = doSteps(Engine, snap, Rules.forClass("PRIEST"))
+    local has = { }
+    for _, s in ipairs(steps) do has[s] = true end
+    assert.is_true(has["Power Word: Fortitude@raid7"])
+    assert.is_true(has["Divine Spirit@party1"])
+    assert.is_nil(has["Divine Spirit@raid7"])
+    return assert.is_nil(has["Shadow Protection@raid7"])
   end)
 end)
