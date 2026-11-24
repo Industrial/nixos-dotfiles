@@ -16,24 +16,24 @@ mkdir -p "$out"
 # What tools/dbc/tables.conf declares, plus the two link tables Forever's
 # modern client uses instead of the old columns (see normalize.lua).
 TABLES=(Item ItemSparse ItemEffect ItemXItemEffect Spell SpellName SpellItemEnchantment SkillLineAbility SpellLevels
-        SpellReagents SpellEffect SpellMisc SpellDuration ChrSpecialization TraitTree TraitTreeLoadout
-        TraitSubTree TraitNode TraitNodeEntry TraitNodeXTraitNodeEntry TraitDefinition)
+    SpellReagents SpellEffect SpellMisc SpellDuration ChrSpecialization TraitTree TraitTreeLoadout
+TraitSubTree TraitNode TraitNodeEntry TraitNodeXTraitNodeEntry TraitDefinition)
 
 got=0
 missing=()
 for t in "${TABLES[@]}"; do
-  code=$(curl -sS -m 180 -L "https://wago.tools/db2/$t/csv?build=$build" -o "$out/$t.csv" -w "%{http_code}")
-  if [ "$code" = 200 ]; then
-    got=$((got + 1))
-  else
-    rm -f "$out/$t.csv"
-    missing+=("$t")
-  fi
+    code=$(curl -sS -m 180 -L "https://wago.tools/db2/$t/csv?build=$build" -o "$out/$t.csv" -w "%{http_code}")
+    if [ "$code" = 200 ]; then
+        got=$((got + 1))
+    else
+        rm -f "$out/$t.csv"
+        missing+=("$t")
+    fi
 done
 
 {
-  echo "$build fetched $(date -u +%Y-%m-%dT%H:%M:%SZ) from wago.tools (product wowf)"
-  echo "tables: $got"
-  echo "not in this build: ${missing[*]:-none}"
+    echo "$build fetched $(date -u +%Y-%m-%dT%H:%M:%SZ) from wago.tools (product wowf)"
+    echo "tables: $got"
+    echo "not in this build: ${missing[*]:-none}"
 } > "$out/manifest.txt"
 cat "$out/manifest.txt"
