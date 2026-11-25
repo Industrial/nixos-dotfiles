@@ -78,6 +78,13 @@ gh l args =
   c.cwd := Some (l.repo.clone ())
   run (&c) |> .map (\r -> r.stdout.trim () |> .to_string) |> .map_err Publish
 
+-- gh without `--repo`: `gh api` takes none (a node id names the pull request).
+gh_api : &Live -> Vec<String> -> Result<String, VbumpError>
+gh_api l args =
+  mut c = cmd (l.gh.as_str ()) args
+  c.cwd := Some (l.repo.clone ())
+  run (&c) |> .map (\r -> r.stdout.trim () |> .to_string) |> .map_err Publish
+
 dir_of : &str -> String
 dir_of path = std::path::Path::new path |> .parent |> .map (\p -> p.to_string_lossy () |> .to_string) |> .unwrap_or (.to_string ".")
 
@@ -127,21 +134,51 @@ publish_live l p =
     (armed (&l) (&url))?
   Ok url
 
--- The gh command that arms auto-merge on `url`: squash, the only method main's
--- linear history allows.
-export merge_args : &str -> Vec<String>
-merge_args url = strings (.to_vec (["pr", "merge", url, "--auto", "--squash"]))
+-- GitHub's auto-merge, armed by GraphQL (GH-314): squash, the only method
+-- main's linear history allows. Never `gh pr merge --auto`: on a pull request
+-- that is already mergeable (CLEAN) that merges on the spot (#308). This
+-- mutation refuses a clean pull request instead, so nothing merges outside
+-- auto-merge and its required checks.
+export const ARM : &str = "mutation($id: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: SQUASH}) { clientMutationId } }"
+
+-- The gh command that arms auto-merge on the pull request with node id `node`.
+export arm_args : &str -> Vec<String>
+arm_args node = .to_vec ([.to_string "api", .to_string "graphql", .to_string "-f", "query=#{ARM}", .to_string "-f", "id=#{node}"])
+
+-- `gh pr view --json id,autoMergeRequest` as `<node id> <armed>`.
+export view_of : &str -> Option<(String, bool)>
+view_of text =
+  (id, on) = (text.trim ().split_once ' ')?
+  if id.is_empty ()
+    None
+  else
+    Some ((id.to_string (), on == "true"))
+
+-- GitHub's refusal to arm a pull request that could merge right now.
+export clean_refusal : &str -> bool
+clean_refusal why = why.contains "clean status"
 
 -- Auto-merge, armed once (GH-247). A pull request that has it already is left
 -- as it is, so a refresh is idempotent like the push. Unlike the label, this is
 -- the proposal's point: failing to arm it fails the input, and the run goes red.
+-- The one exception is a pull request GitHub calls clean (green and mergeable
+-- already): it is left open with a warning, and never merged from here.
 armed : &Live -> &str -> Result<(), VbumpError>
 armed l url =
-  on = (gh l (strings (.to_vec (["pr", "view", url, "--json", "autoMergeRequest", "--jq", ".autoMergeRequest != null"]))))?
-  if on == "true"
+  seen = (gh l (strings (.to_vec (["pr", "view", url, "--json", "id,autoMergeRequest", "--jq", "[.id, (.autoMergeRequest != null | tostring)] | join(\" \")"]))))?
+  (node, on) = (view_of (&seen) |> .ok_or (Publish ("arming auto-merge on #{url}: gh pr view said: #{seen}")))?
+  if on
     Ok ()
   else
-    gh l (merge_args url) |> .map (\_ -> ()) |> .map_err (\e -> Publish ("arming auto-merge on #{url}: #{e}"))
+    case gh_api l (arm_args (&node)) of
+      Ok _ -> Ok ()
+      Err e ->
+        why = e.to_string ()
+        if clean_refusal (&why)
+          eprintln! \-> "vbump: #{url} is mergeable already, and auto-merge refuses a clean pull request: left open, not merged"
+          Ok ()
+        else
+          Err (Publish ("arming auto-merge on #{url}: #{why}"))
 
 -- The label is a convenience for the reader, not part of the proposal: it is
 -- created when missing, and a token that may not label leaves the PR as it is.
@@ -230,17 +267,18 @@ git_show : &str -> &str -> String
 git_show root what = run (&cmd "git" (.to_vec ([.to_string "-C", "#{root}/remote.git", .to_string "show", what.to_string ()]))) |> .map (\r -> r.stdout) |> .expect "show"
 
 -- A repository, a remote and a scripted gh that logs its arguments; `view` is
--- what `gh pr view` says about auto-merge (`true`: already armed).
+-- what `gh pr view` says about auto-merge (`true`: already armed), and `api`
+-- is the shell `gh api graphql` runs (its answer to the arming mutation).
 #[cfg(test)]
-gh_world : &str -> &str -> bool -> (String, Live, Proposal)
-gh_world name view auto =
+gh_world : &str -> &str -> &str -> bool -> (String, Live, Proposal)
+gh_world name view api auto =
   root = std::env::temp_dir () |> .join ("vbump-gh-#{name}-#{std::process::id ()}") |> .to_string_lossy |> .to_string
   std::fs::remove_dir_all (&root) |> .ok
   std::fs::create_dir_all ("#{root}/scratch") |> .expect "dirs"
   sh (&root) "git init -q --bare remote.git && git init -q repo && cd repo && echo old > flake.lock && git add . && git commit -qm base"
   base = run (&cmd "git" (.to_vec ([.to_string "-C", "#{root}/repo", .to_string "rev-parse", .to_string "HEAD"]))) |> .map (\r -> r.stdout) |> .expect "base" |> .trim |> .to_string
   std::fs::write ("#{root}/scratch/flake.lock") "new\n" |> .expect "lock"
-  script = "#!/bin/sh\necho \"$*\" >> #{root}/gh.log\ncase \"$1 $2\" in\n  'pr list') echo '' ;;\n  'pr create') echo https://github.com/o/r/pull/9 ;;\n  'pr view') echo #{view} ;;\nesac\n"
+  script = "#!/bin/sh\necho \"$*\" >> #{root}/gh.log\ncase \"$1 $2\" in\n  'pr list') echo '' ;;\n  'pr create') echo https://github.com/o/r/pull/9 ;;\n  'pr view') echo 'PR_node9 #{view}' ;;\n  'api graphql') #{api} ;;\nesac\n"
   std::fs::write ("#{root}/gh") script |> .expect "gh"
   sh (&root) "chmod +x gh"
   l = Live { repo = "#{root}/repo", base, remote = "#{root}/remote.git", base_branch = .to_string "main", label = .to_string "flake-lock", gh_repo = Some (.to_string "o/r"), committer = Some ((.to_string "vbump", .to_string "vbump@example.invalid")), auto_merge = auto, gh = "#{root}/gh" }
@@ -251,24 +289,63 @@ gh_world name view auto =
 gh_calls : &str -> Vec<String>
 gh_calls root = std::fs::read_to_string ("#{root}/gh.log") |> .unwrap_or_default |> .lines |> .map (\s -> s.to_string ()) |> .collect
 
-test "auto-merge is armed, squash, on the pull request vbump opened (GH-247)"
-  (root, l, p) = gh_world "arm" "false" true
+#[cfg(test)]
+merged_directly : &[String] -> bool
+merged_directly calls = calls.iter () |> .any (\c -> c.starts_with "pr merge")
+
+#[cfg(test)]
+armed_calls : &[String] -> Vec<String>
+armed_calls calls = calls.iter () |> .filter (\c -> c.starts_with "api graphql") |> .cloned |> .collect
+
+test "auto-merge is armed by the GraphQL mutation, squash, on the pull request vbump opened (GH-314)"
+  (root, l, p) = gh_world "arm" "false" "exit 0" true
   url = publish_live l p |> .expect "published"
   assert_eq! \-> url \-> "https://github.com/o/r/pull/9"
   calls = gh_calls (&root)
   assert! \-> calls.iter () |> .any (\c -> c.starts_with "pr create --base main --head update/flake-lock-a")
-  assert! \-> calls.contains (&(.to_string "pr merge https://github.com/o/r/pull/9 --auto --squash --repo o/r"))
+  arms = armed_calls (&calls)
+  assert_eq! \-> arms.len () \-> 1
+  assert! \-> arms[0].contains "enablePullRequestAutoMerge" && arms[0].contains "mergeMethod: SQUASH" && arms[0].ends_with "-f id=PR_node9"
+  -- `gh api` takes no --repo, and nothing ever runs `gh pr merge`.
+  assert! \-> !(arms[0].contains "--repo") && !(merged_directly (&calls))
   std::fs::remove_dir_all (&root) |> .ok
 
 test "auto-merge already armed is left alone, and off without --auto-merge"
-  (root, l, p) = gh_world "armed" "true" true
+  (root, l, p) = gh_world "armed" "true" "exit 0" true
   publish_live l p |> .expect "published"
-  assert! \-> !(gh_calls (&root) |> .iter |> .any (\c -> c.starts_with "pr merge"))
+  calls = gh_calls (&root)
+  arms = armed_calls (&calls)
+  assert! \-> arms.is_empty () && !(merged_directly (&calls))
   std::fs::remove_dir_all (&root) |> .ok
-  (root2, l2, p2) = gh_world "off" "false" false
+  (root2, l2, p2) = gh_world "off" "false" "exit 0" false
   publish_live l2 p2 |> .expect "published"
-  assert! \-> !(gh_calls (&root2) |> .iter |> .any (\c -> c.starts_with "pr view" || c.starts_with "pr merge"))
+  assert! \-> !(gh_calls (&root2) |> .iter |> .any (\c -> c.starts_with "pr view" || c.starts_with "api" || c.starts_with "pr merge"))
   std::fs::remove_dir_all (&root2) |> .ok
 
-test "the merge command is squash and auto"
-  assert_eq! \-> merge_args "u" \-> .to_vec ([.to_string "pr", .to_string "merge", .to_string "u", .to_string "--auto", .to_string "--squash"])
+test "a clean pull request is refused by GitHub and left open, never merged (GH-314)"
+  (root, l, p) = gh_world "clean" "false" "echo 'GraphQL: Pull request is in clean status (enablePullRequestAutoMerge)' >&2; exit 1" true
+  url = publish_live l p |> .expect "a clean pull request is not the input's failure"
+  assert_eq! \-> url \-> "https://github.com/o/r/pull/9"
+  calls = gh_calls (&root)
+  arms = armed_calls (&calls)
+  assert! \-> arms.len () == 1 && !(merged_directly (&calls))
+  std::fs::remove_dir_all (&root) |> .ok
+
+test "any other arming error fails the input"
+  (root, l, p) = gh_world "denied" "false" "echo 'GraphQL: Resource not accessible by integration' >&2; exit 1" true
+  err = publish_live l p |> .err |> .map (\e -> e.to_string ()) |> .unwrap_or_default
+  assert! \-> err.contains "arming auto-merge on https://github.com/o/r/pull/9" && err.contains "not accessible"
+  assert! \-> !(merged_directly (&gh_calls (&root)))
+  std::fs::remove_dir_all (&root) |> .ok
+
+test "the arming call, the view and the refusal, as text"
+  args = arm_args "PR_x"
+  assert_eq! \-> (args[0].as_str (), args[1].as_str (), args[2].as_str (), args[4].as_str (), args[5].as_str ()) \-> ("api", "graphql", "-f", "-f", "id=PR_x")
+  -- Literals with braces are bound first: inside a macro argument Voltaic escapes them.
+  input = "enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: SQUASH})"
+  has_input = args[3].contains input
+  assert! \-> args[3].starts_with "query=mutation($id: ID!)" && has_input
+  assert_eq! \-> view_of "PR_x true\n" \-> Some ((.to_string "PR_x", true))
+  assert_eq! \-> view_of "PR_x false" \-> Some ((.to_string "PR_x", false))
+  assert_eq! \-> view_of "" \-> None
+  assert! \-> clean_refusal "GitHub: gh api graphql failed (exit status: 1):\nGraphQL: Pull request is in clean status (enablePullRequestAutoMerge)" && !(clean_refusal "GraphQL: Resource not accessible by integration")

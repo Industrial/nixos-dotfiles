@@ -37,9 +37,11 @@ vbump runs these steps for each root input of the flake, one input at a time
    plumbing and dated by the base, so the same base and lock always give the same
    commit. That makes a retried or repeated publish a no-op. `--dry-run` publishes
    nothing. With `--auto-merge` (GH-247), vbump then arms GitHub's auto-merge
-   (`gh pr merge --auto --squash`) on the PR unless it is armed already, so the PR
-   merges itself once `main`'s required `ci / all-green` passes. Failing to arm it
-   fails the input.
+   (squash, through GraphQL `enablePullRequestAutoMerge`, GH-314) on the PR unless it
+   is armed already, so the PR merges itself once `main`'s required `ci / all-green`
+   passes. Failing to arm it fails the input. A PR GitHub calls clean (green and
+   mergeable already) is refused by the mutation and left open with a warning: vbump
+   never runs `gh pr merge`, whose `--auto` merges a clean PR on the spot (#308).
 
 Concurrency: inputs run `--jobs` at a time (`for_each_par`, `Bounded`). The hosts of
 one input run sequentially, because one evaluation takes about 3 GB. Each input's
