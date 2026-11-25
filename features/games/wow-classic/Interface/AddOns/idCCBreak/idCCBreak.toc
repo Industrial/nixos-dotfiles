@@ -1,0 +1,4 @@
+## Interface: 16001
+## Title: idCCBreak
+## Notes: Says in group chat who broke your crowd control (Polymorph, Sap, Freezing Trap, ...).
+idCCBreak.lua
