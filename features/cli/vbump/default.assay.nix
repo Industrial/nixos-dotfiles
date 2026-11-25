@@ -74,10 +74,14 @@ in
     # squash merge; main's required `ci / all-green` is the gate it waits for.
     scheduledRunArmsAutoMerge =
       assay.eq (lib.hasInfix "--committer \"$COMMITTER\" --auto-merge)\n" workflow) true;
+    # GH-314: through GraphQL enablePullRequestAutoMerge, which refuses a clean PR, and
+    # never `gh pr merge` (on a clean PR, `--auto` merges on the spot: #308).
     vbumpArmsSquashAutoMerge = assay.eq [
-      (lib.hasInfix "merge_args url = strings (.to_vec ([\"pr\", \"merge\", url, \"--auto\", \"--squash\"]))" forge)
+      (lib.hasInfix "enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: SQUASH})" forge)
+      (lib.hasInfix "arm_args node = .to_vec ([.to_string \"api\", .to_string \"graphql\"" forge)
       (lib.hasInfix "  if l.auto_merge\n    (armed (&l) (&url))?\n" forge)
-    ] [true true];
+    ] [true true true];
+    vbumpNeverMergesDirectly = assay.eq (lib.hasInfix "\"pr\", \"merge\"" forge || lib.hasInfix ".to_string \"merge\"" forge) false;
 
     # The token: minted per run from the vbump app, pinned by commit, only when both
     # secrets exist; the push and gh (and so the auto-merge) use it first.
