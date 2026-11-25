@@ -1,0 +1,4 @@
+## Interface: 16001
+## Title: idInterruptAnnounce
+## Notes: Says in group chat which spell you or your pet interrupted.
+idInterruptAnnounce.lua
