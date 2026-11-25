@@ -74,7 +74,8 @@ in
         gh185.withOverlay = extendModules {
           modules = [
             {
-              features.nixos.etc-overlay.enable = true;
+              # Over the node's mkOverride 60 false (node.nix).
+              features.nixos.etc-overlay.enable = lib.mkForce true;
               gh185.isOverlayVariant = true;
             }
           ];

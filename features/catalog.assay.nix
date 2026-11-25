@@ -26,8 +26,6 @@ in
     # Parked entries cost every host an evaluation. Only creative's three may be listed
     # without a host enabling them — profiles/creative.nix is commented out everywhere —
     # nvd, kept as vdiff's one-option rollback (GH-153, profiles/cli-core.assay.nix),
-    # nix-output-monitor, vmon's (GH-181, the same suite), and nix-tree, vwhy's (GH-182);
-    # and nixos.etc-overlay (GH-185), built and VM-gated, waiting on the user's decision
-    # to turn it on for a host.
-    onlyCreativeParked = assay.eq (lib.filter (n: !builtins.elem n enabledSomewhere) names) ["cli.nix-output-monitor" "cli.nix-tree" "cli.nvd" "creative.gimp" "creative.obs-studio" "creative.openpencil" "nixos.etc-overlay"];
+    # nix-output-monitor, vmon's (GH-181, the same suite), and nix-tree, vwhy's (GH-182).
+    onlyCreativeParked = assay.eq (lib.filter (n: !builtins.elem n enabledSomewhere) names) ["cli.nix-output-monitor" "cli.nix-tree" "cli.nvd" "creative.gimp" "creative.obs-studio" "creative.openpencil"];
   }
