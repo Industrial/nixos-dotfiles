@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: idGuildBlips
+## Notes: Guild members on the world map and minimap, like party blips (LibGuildPositions).
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibGuildPositions-1.0\LibGuildPositions-1.0.lua
+Libs\HereBeDragons\HereBeDragons-2.0.lua
+Libs\HereBeDragons\HereBeDragons-Pins-2.0.lua
+idGuildBlips.lua
