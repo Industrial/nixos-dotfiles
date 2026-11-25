@@ -1,0 +1,4 @@
+## Interface: 16001
+## Title: idBuyStack
+## Notes: Shift-click a vendor item to buy a full stack, as much as you can afford.
+idBuyStack.lua
