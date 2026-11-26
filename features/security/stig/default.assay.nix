@@ -19,6 +19,7 @@ in
     profileDefaultsNone = assay.eq opts.profile.default "none";
     profileAcceptsBaseSafe = assay.eq (opts.profile.type.check "base-safe") true;
     profileAcceptsFull = assay.eq (opts.profile.type.check "full") true;
+    profileAcceptsTestHost = assay.eq (opts.profile.type.check "test-host") true;
     profileAcceptsFleetBaseline = assay.eq (opts.profile.type.check "fleet-baseline") true;
     profileRejectsUnknown = assay.eq (opts.profile.type.check "hardened") false;
 
