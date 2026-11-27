@@ -1,0 +1,410 @@
+-- vwebbrowser's settings: compiled-in defaults, then TOML files, then the
+-- environment, each later source overriding the earlier per field.
+--
+--   1. compiled defaults (DEFAULT_*)
+--   2. every $XDG_CONFIG_DIRS entry (default /etc/xdg), least important first
+--      (the variable lists the most important first, so it is read reversed):
+--      <dir>/vwebbrowser/config.toml
+--   3. $XDG_CONFIG_HOME/vwebbrowser/config.toml (default ~/.config)
+--   4. VWEBBROWSER_HOMEPAGE, VWEBBROWSER_SEARCH_TEMPLATE,
+--      VWEBBROWSER_HARDWARE_ACCELERATION, VWEBBROWSER_DEVELOPER_EXTRAS
+--
+-- A missing file is no file. The NixOS feature writes the system file
+-- (/etc/xdg/vwebbrowser/config.toml), e.g. SearXNG as the search template.
+--
+-- The core is pure: `config_paths` (where to look), `parse_file` (one TOML
+-- document), `env_partial` (the variables) and `resolve` (merge + validate).
+-- The edge is two capabilities, both injectable: the environment is
+-- id_effect_config's `ConfigProviderService` (live: the process env; tests:
+-- a map), and files are `Files` (live: the disk; tests: a map). All reading
+-- happens in one effect, `load`.
+
+import std::collections::BTreeMap
+import std::sync::Arc
+import figment::Figment
+import figment::providers::{Format, Toml}
+import id_effect::{Effect, HCons, HNil, Layer, caps, effect, fail, hlist, succeed, suspend}
+import id_effect_config::{Config, ConfigError, ConfigProviderService, EnvConfigProviderLive, MapConfigProvider, extract}
+
+export const DEFAULT_HOMEPAGE : &str = "about:blank"
+
+export const DEFAULT_SEARCH_TEMPLATE : &str = "https://duckduckgo.com/?q={query}"
+
+-- Where a search template puts the query.
+export const QUERY_PLACEHOLDER : &str = "{query}"
+
+-- The file name under each config directory.
+export const CONFIG_FILE : &str = "vwebbrowser/config.toml"
+
+-- Whether WebKit composites on the GPU.
+export data HwAccel
+  = Always
+  | Never
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+-- The resolved settings: a capability (`need::<Settings>()`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+export data Settings { export homepage String, export search_template String, export hardware_acceleration HwAccel, export developer_extras bool }
+
+export defaults : Settings
+defaults = Settings { homepage = .to_string DEFAULT_HOMEPAGE, search_template = .to_string DEFAULT_SEARCH_TEMPLATE, hardware_acceleration = HwAccel::Always, developer_extras = false }
+
+-- The search URL for `query` (already percent-encoded by the caller).
+export search_url : &Settings -> &str -> String
+search_url settings query = settings.search_template.replace QUERY_PLACEHOLDER query
+
+-- Why the settings could not be resolved. Both name what to fix.
+export data SettingsError
+  = Malformed { path String, detail String }
+  | Invalid { field String, detail String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display SettingsError
+  fmt : &self -> &mut std::fmt::Formatter<'_> -> std::fmt::Result
+  fmt self f = case self of
+    SettingsError::Malformed { path, detail } -> write! \-> f \-> "settings file #{path} is not valid: #{detail} (fix or remove the file)"
+    SettingsError::Invalid { field, detail } -> write! \-> f \-> "setting #{field} is invalid: #{detail}"
+
+-- An environment variable that is not UTF-8 (the only failure an optional
+-- string read has) names the variable.
+instance From ConfigError SettingsError
+  from : ConfigError -> Self
+  from e = SettingsError::Invalid { field = .to_string "environment", detail = e.to_string () }
+
+-- One source's view: only the fields it sets. `origin` (a path or
+-- "environment") is for messages; it is never read from the document.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+export data Partial { #[serde(skip)] export origin String, export homepage Option<String>, export search_template Option<String>, export hardware_acceleration Option<String>, export developer_extras Option<bool> }
+
+-- The environment variables settings read.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+export data EnvVars { export homepage Option<String>, export search_template Option<String>, export hardware_acceleration Option<String>, export developer_extras Option<String>, export config_dirs Option<String>, export config_home Option<String>, export home Option<String> }
+
+-- Pure core
+
+-- A set, non-empty, absolute value of a path variable.
+absolute : &Option<String> -> Option<String>
+absolute value = case value of
+  Some v -> if v.starts_with "/"
+    Some (v.clone ())
+  else
+    None
+  None -> None
+
+-- The files to read, lowest priority first. Relative XDG entries are
+-- ignored (the XDG spec calls them invalid); no home at all means no user file.
+export config_paths : &EnvVars -> Vec<String>
+config_paths vars =
+  dirs_var = vars.config_dirs.clone () |> .filter (\v -> !v.is_empty ()) |> .unwrap_or (.to_string "/etc/xdg")
+  mut dirs = dirs_var.split ':' |> .filter (\d -> d.starts_with "/") |> .map (\d -> d.trim_end_matches '/' |> .to_string) |> .collect : Vec<String>
+  dirs.reverse ()
+  mut paths = dirs |> .into_iter |> .map (\d -> "#{d}/#{CONFIG_FILE}") |> .collect : Vec<String>
+  user = absolute (&vars.config_home) |> .or_else (\-> absolute (&vars.home) |> .map (\h -> "#{h.trim_end_matches '/'}/.config"))
+  paths.extend (user |> .map (\dir -> "#{dir.trim_end_matches '/'}/#{CONFIG_FILE}"))
+  paths
+
+-- One TOML document. Unknown keys are an error: a typo must not be silently
+-- ignored.
+export parse_file : &str -> &str -> Result<Partial, SettingsError>
+parse_file path text =
+  parsed = extract (&(Figment::from (Toml::string text))) : Result<Partial, ConfigError>
+  case parsed of
+    Ok p -> Ok (Partial { origin = .to_string path, ...p })
+    Err e -> Err (SettingsError::Malformed { path = .to_string path, detail = e.to_string () })
+
+-- A boolean variable: true/false/1/0/yes/no/on/off, any case.
+parse_bool : &str -> &str -> Result<bool, SettingsError>
+parse_bool var raw =
+  v = raw.trim () |> .to_ascii_lowercase
+  if v == "true" || v == "1" || v == "yes" || v == "on"
+    Ok true
+  else if v == "false" || v == "0" || v == "no" || v == "off"
+    Ok false
+  else
+    Err (SettingsError::Invalid { field = .to_string var, detail = "#{raw:?} is not a boolean (use true or false)" })
+
+-- The environment as the highest-priority source.
+export env_partial : &EnvVars -> Result<Partial, SettingsError>
+env_partial vars =
+  extras = case &vars.developer_extras of
+    Some raw -> Some ((parse_bool "VWEBBROWSER_DEVELOPER_EXTRAS" raw)?)
+    None -> None
+  Ok (Partial { origin = .to_string "environment", homepage = vars.homepage.clone (), search_template = vars.search_template.clone (), hardware_acceleration = vars.hardware_acceleration.clone (), developer_extras = extras })
+
+-- Each source's fields over the previous, then validation against the
+-- source that set the value.
+export resolve : &[Partial] -> Result<Settings, SettingsError>
+resolve layers =
+  mut s = defaults ()
+  for p in layers
+    (check p)?
+    s := Settings { homepage = p.homepage.clone () |> .unwrap_or (s.homepage.clone ()), search_template = p.search_template.clone () |> .unwrap_or (s.search_template.clone ()), hardware_acceleration = (hw_over p s.hardware_acceleration)?, developer_extras = p.developer_extras |> .unwrap_or s.developer_extras }
+  Ok s
+
+-- A source's hardware_acceleration over the current one.
+hw_over : &Partial -> HwAccel -> Result<HwAccel, SettingsError>
+hw_over p was = case &p.hardware_acceleration of
+  Some v -> hw_of (&p.origin) v
+  None -> Ok was
+
+-- A source's values that need more than their type.
+check : &Partial -> Result<(), SettingsError>
+check p =
+  case &p.search_template of
+    Some t -> if t.contains QUERY_PLACEHOLDER
+      Ok (())
+    else
+      Err (SettingsError::Invalid { field = .to_string "search_template", detail = "#{t:?} from #{p.origin} has no {query} placeholder (e.g. https://duckduckgo.com/?q={query})" })
+    None -> Ok (())
+
+hw_of : &str -> &str -> Result<HwAccel, SettingsError>
+hw_of origin raw =
+  v = raw.trim () |> .to_ascii_lowercase
+  if v == "always"
+    Ok HwAccel::Always
+  else if v == "never"
+    Ok HwAccel::Never
+  else
+    Err (SettingsError::Invalid { field = .to_string "hardware_acceleration", detail = "#{raw:?} from #{origin} is not always or never" })
+
+-- Every source, in order: the files that exist, then the environment.
+export sources_of : &EnvVars -> Vec<(String, Option<String>)> -> Result<Vec<Partial>, SettingsError>
+sources_of vars files =
+  mut layers = (files |> .into_iter |> .filter_map (\e -> e.1.map (\t -> parse_file (&e.0) (&t))) |> .collect : Result<Vec<Partial>, SettingsError>)?
+  layers.push ((env_partial vars)?)
+  Ok layers
+
+-- Edge: files
+
+-- Text of a file, None when it does not exist. Blocking: called inside
+-- `load`'s one `suspend`.
+export class FileSource
+  read_text : &self -> &str -> Result<Option<String>, SettingsError>
+
+export newtype Files = Files (export Arc<dyn FileSource + Send + Sync>)
+
+instance Clone Files
+  clone : &self -> Self
+  clone self = Files (Arc::clone (&self.0))
+
+-- The disk. A file that exists but cannot be read is Malformed (the path and
+-- the OS error say what to fix).
+export data DiskFiles
+
+instance FileSource DiskFiles
+  read_text : &self -> &str -> Result<Option<String>, SettingsError>
+  read_text self path =
+    case std::fs::read_to_string path of
+      Ok t -> Ok (Some t)
+      Err e -> if e.kind () == std::io::ErrorKind::NotFound
+        Ok None
+      else
+        Err (SettingsError::Malformed { path = .to_string path, detail = "cannot read it: #{e}" })
+
+-- Files held in memory (tests, and callers that already have the text).
+export data MemoryFiles { export files BTreeMap<String, String> }
+
+instance FileSource MemoryFiles
+  read_text : &self -> &str -> Result<Option<String>, SettingsError>
+  read_text self path = Ok (self.files.get path |> .cloned)
+
+-- Edge: the effect and the layers
+
+export type SettingsSources = caps!(ConfigProviderService, Files)
+
+export type SettingsEnv = caps!(Settings)
+
+-- The variables, in env_config's order.
+type EnvTuple = (Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)
+
+env_config : Config<EnvVars>
+env_config =
+  Config::all ((Config::optional_string "VWEBBROWSER_HOMEPAGE", Config::optional_string "VWEBBROWSER_SEARCH_TEMPLATE", Config::optional_string "VWEBBROWSER_HARDWARE_ACCELERATION", Config::optional_string "VWEBBROWSER_DEVELOPER_EXTRAS", Config::optional_string "XDG_CONFIG_DIRS", Config::optional_string "XDG_CONFIG_HOME", Config::optional_string "HOME")) |> .map env_vars_of
+
+env_vars_of : EnvTuple -> EnvVars
+env_vars_of fields =
+  (homepage, search_template, hardware_acceleration, developer_extras, config_dirs, config_home, home) = fields
+  EnvVars { homepage, search_template, hardware_acceleration, developer_extras, config_dirs, config_home, home }
+
+-- Every file, read in path order, then the merge. Blocking reads: the one
+-- effect that touches files.
+read_all : Files -> EnvVars -> Effect<Settings, SettingsError, HNil>
+read_all files vars = suspend (move \-> lifted (resolved (&files) (&vars)))
+
+resolved : &Files -> &EnvVars -> Result<Settings, SettingsError>
+resolved files vars =
+  mut texts = Vec::new () : Vec<(String, Option<String>)>
+  for path in config_paths vars
+    text = (files.0.read_text (&path))?
+    texts.push ((path, text))
+  resolve (&((sources_of vars texts)?))
+
+lifted : Result<Settings, SettingsError> -> Effect<Settings, SettingsError, HNil>
+lifted r = case r of
+  Ok s -> succeed s
+  Err e -> fail e
+
+-- The settings, from the environment and files in the context.
+export load : Effect<Settings, SettingsError, SettingsSources>
+load =
+  effect!
+    let vars = ~env_config().run::<EnvVars, SettingsError, SettingsSources, _>();
+    let files = ~Files;
+    ~read_all(Files::clone(&files), vars)
+
+-- The layers are generic in their error: id_effect's Layer has no map_err,
+-- so every layer of one graph must share E. The program's error only needs
+-- `From<SettingsError>`; tests use SettingsError itself.
+
+-- `Settings` built from the sources in the context.
+export layer : given <E: From<SettingsError> + Send + 'static> Layer<SettingsEnv, E, SettingsSources>
+layer = Layer::effect (\-> ((load ()).map_err E::from).map (\s -> hlist![s]))
+
+-- The sources from ready values: an env provider and a file port.
+export sources_layer : given <E: Send + 'static> ConfigProviderService -> Files -> Layer<SettingsSources, E>
+sources_layer provider files = Layer::succeed (HCons (Arc::new provider) (HCons (Arc::new files) HNil))
+
+-- Live: the process environment and the disk.
+export live_layer : given <E: From<SettingsError> + Send + 'static> Layer<SettingsEnv, E>
+live_layer =
+  disk = Files (Arc::new DiskFiles)
+  sources = (EnvConfigProviderLive::layer ()).merge (Layer::succeed (hlist![disk]))
+  sources.provide_to (layer ())
+
+-- Tests and fakes: env variables and files as maps, nothing real read.
+export layer_from : given <E: From<SettingsError> + Send + 'static> Vec<(String, String)> -> BTreeMap<String, String> -> Layer<SettingsEnv, E>
+layer_from vars files =
+  provider = ConfigProviderService::new (MapConfigProvider::from_pairs vars)
+  (sources_layer provider (Files (Arc::new (MemoryFiles { files })))).provide_to (layer ())
+
+-- The settings in the context, as a value.
+export current : given <E: Send + 'static> Effect<Settings, E, SettingsEnv>
+current =
+  effect!
+    let s = ~Settings;
+    Settings::clone(&s)
+
+-- Tests
+
+#[cfg(test)]
+import id_effect::{Exit, assert_exit_success, expect_exit_failure, run_test}
+
+#[cfg(test)]
+no_env : EnvVars
+no_env = EnvVars::default ()
+
+#[cfg(test)]
+env_with : Vec<(&str, &str)> -> EnvVars
+env_with pairs =
+  mut v = EnvVars::default ()
+  for pair in pairs
+    (k, x) = pair
+    val = Some (.to_string x)
+    if k == "XDG_CONFIG_DIRS"
+      v.config_dirs := val
+    else if k == "XDG_CONFIG_HOME"
+      v.config_home := val
+    else if k == "HOME"
+      v.home := val
+    else if k == "VWEBBROWSER_HOMEPAGE"
+      v.homepage := val
+    else if k == "VWEBBROWSER_SEARCH_TEMPLATE"
+      v.search_template := val
+    else if k == "VWEBBROWSER_HARDWARE_ACCELERATION"
+      v.hardware_acceleration := val
+    else
+      v.developer_extras := val
+  v
+
+#[cfg(test)]
+files_of : Vec<(&str, &str)> -> BTreeMap<String, String>
+files_of pairs = pairs |> .into_iter |> .map (\kv -> (kv.0.to_string (), kv.1.to_string ())) |> .collect
+
+#[cfg(test)]
+resolve_with : EnvVars -> Vec<(&str, &str)> -> Result<Settings, SettingsError>
+resolve_with vars files = resolved (&(Files (Arc::new (MemoryFiles { files = files_of files })))) (&vars)
+
+test "no files and no variables are the compiled defaults"
+  assert_eq! \-> resolve_with (no_env ()) (Vec::new ()) \-> Ok (defaults ())
+  d = defaults ()
+  assert_eq! \-> d.homepage \-> "about:blank"
+  ddg = "https://duckduckgo.com/?q={query}"
+  assert_eq! \-> d.search_template \-> ddg
+  assert_eq! \-> d.hardware_acceleration \-> HwAccel::Always
+  assert! \-> !d.developer_extras
+
+test "paths: XDG_CONFIG_DIRS reversed (least important first), then the user file"
+  v = env_with (.to_vec ([("XDG_CONFIG_DIRS", "/a:/b/:relative"), ("XDG_CONFIG_HOME", "/home/u/.cfg")]))
+  assert_eq! \-> config_paths (&v) \-> .to_vec ([.to_string "/b/vwebbrowser/config.toml", .to_string "/a/vwebbrowser/config.toml", .to_string "/home/u/.cfg/vwebbrowser/config.toml"])
+
+test "paths: defaults are /etc/xdg and ~/.config; no home means no user file"
+  h = env_with (.to_vec ([("HOME", "/home/u")]))
+  assert_eq! \-> config_paths (&h) \-> .to_vec ([.to_string "/etc/xdg/vwebbrowser/config.toml", .to_string "/home/u/.config/vwebbrowser/config.toml"])
+  assert_eq! \-> config_paths (&(no_env ())) \-> .to_vec ([.to_string "/etc/xdg/vwebbrowser/config.toml"])
+
+test "the /etc/xdg file overrides the defaults"
+  s = resolve_with (env_with (.to_vec ([("HOME", "/h")]))) (.to_vec ([("/etc/xdg/vwebbrowser/config.toml", "search_template = \"http://localhost:4001/search?q={query}\"\n")]))
+  r = s.unwrap ()
+  searx = "http://localhost:4001/search?q={query}"
+  assert_eq! \-> r.search_template \-> searx
+  assert_eq! \-> r.homepage \-> "about:blank"
+
+test "the user file overrides /etc/xdg"
+  s = resolve_with (env_with (.to_vec ([("HOME", "/h")]))) (.to_vec ([("/etc/xdg/vwebbrowser/config.toml", "homepage = \"https://system.example\"\nhardware_acceleration = \"never\"\n"), ("/h/.config/vwebbrowser/config.toml", "homepage = \"https://user.example\"\n")]))
+  r = s.unwrap ()
+  assert_eq! \-> r.homepage \-> "https://user.example"
+  assert_eq! \-> r.hardware_acceleration \-> HwAccel::Never
+
+test "the environment overrides every file"
+  v = env_with (.to_vec ([("HOME", "/h"), ("VWEBBROWSER_HOMEPAGE", "https://env.example"), ("VWEBBROWSER_DEVELOPER_EXTRAS", "TRUE"), ("VWEBBROWSER_HARDWARE_ACCELERATION", "always")]))
+  s = resolve_with v (.to_vec ([("/h/.config/vwebbrowser/config.toml", "homepage = \"https://user.example\"\ndeveloper_extras = false\nhardware_acceleration = \"never\"\n")]))
+  r = s.unwrap ()
+  assert_eq! \-> r.homepage \-> "https://env.example"
+  assert! \-> r.developer_extras
+  assert_eq! \-> r.hardware_acceleration \-> HwAccel::Always
+
+test "malformed TOML is Malformed, naming the path"
+  e = resolve_with (env_with (.to_vec ([("HOME", "/h")]))) (.to_vec ([("/h/.config/vwebbrowser/config.toml", "homepage = \n")]))
+  assert! \-> matches!(&e, Err(SettingsError::Malformed { path, .. }) if path == "/h/.config/vwebbrowser/config.toml")
+  msg = e.unwrap_err ().to_string ()
+  assert! \-> msg.contains "/h/.config/vwebbrowser/config.toml"
+
+test "an unknown key or a wrong type is Malformed too"
+  assert! \-> matches!(parse_file("/x", "homepgae = \"a\"\n"), Err(SettingsError::Malformed { .. }))
+  assert! \-> matches!(parse_file("/x", "developer_extras = \"yes\"\n"), Err(SettingsError::Malformed { .. }))
+
+test "a search template without {query} is Invalid"
+  e = resolve_with (env_with (.to_vec ([("VWEBBROWSER_SEARCH_TEMPLATE", "https://example.org/search")]))) (Vec::new ())
+  assert! \-> matches!(&e, Err(SettingsError::Invalid { field, .. }) if field == "search_template")
+  assert! \-> (e.unwrap_err ()).to_string ().contains "environment"
+
+test "hardware_acceleration = sometimes is Invalid, from a file or the environment"
+  f = resolve_with (no_env ()) (.to_vec ([("/etc/xdg/vwebbrowser/config.toml", "hardware_acceleration = \"sometimes\"\n")]))
+  assert! \-> matches!(&f, Err(SettingsError::Invalid { field, .. }) if field == "hardware_acceleration")
+  assert! \-> (f.unwrap_err ()).to_string ().contains "/etc/xdg/vwebbrowser/config.toml"
+  v = resolve_with (env_with (.to_vec ([("VWEBBROWSER_HARDWARE_ACCELERATION", "sometimes")]))) (Vec::new ())
+  assert! \-> matches!(v, Err(SettingsError::Invalid { .. }))
+
+test "a non-boolean VWEBBROWSER_DEVELOPER_EXTRAS is Invalid, naming the variable"
+  e = resolve_with (env_with (.to_vec ([("VWEBBROWSER_DEVELOPER_EXTRAS", "maybe")]))) (Vec::new ())
+  assert! \-> matches!(&e, Err(SettingsError::Invalid { field, .. }) if field == "VWEBBROWSER_DEVELOPER_EXTRAS")
+
+test "search_url fills the template"
+  d = defaults ()
+  assert_eq! \-> search_url (&d) "rust" \-> "https://duckduckgo.com/?q=rust"
+
+test "the Settings layer, built from injected env and files, provides the merged settings"
+  vars = .to_vec ([(.to_string "XDG_CONFIG_DIRS", .to_string "/etc/xdg"), (.to_string "XDG_CONFIG_HOME", .to_string "/cfg"), (.to_string "VWEBBROWSER_DEVELOPER_EXTRAS", .to_string "1")])
+  files = files_of (.to_vec ([("/etc/xdg/vwebbrowser/config.toml", "search_template = \"http://localhost:4001/search?q={query}\"\n"), ("/cfg/vwebbrowser/config.toml", "homepage = \"https://start.example\"\n")]))
+  program = current () : Effect<Settings, SettingsError, SettingsEnv>
+  exit = run_test (program.provide_layer (layer_from vars files))
+  expected = Settings { homepage = .to_string "https://start.example", search_template = .to_string "http://localhost:4001/search?q={query}", hardware_acceleration = HwAccel::Always, developer_extras = true }
+  assert_exit_success (&exit) (&expected)
+
+test "the Settings layer fails with the typed error when a file is malformed"
+  files = files_of (.to_vec ([("/etc/xdg/vwebbrowser/config.toml", "[[[")]))
+  program = current () : Effect<Settings, SettingsError, SettingsEnv>
+  exit = run_test (program.provide_layer (layer_from (Vec::new ()) files)) : Exit<Settings, SettingsError>
+  e = expect_exit_failure exit
+  assert! \-> matches!(e, SettingsError::Malformed { path, .. } if path == "/etc/xdg/vwebbrowser/config.toml")

@@ -27,11 +27,24 @@ id_effect_cli = "=0.13.0"
 id_effect_fsm = "=0.13.0"
 # The machine runs as a Statem process: ProcessNode, ProcessCtx, CallError.
 id_effect_process = "=0.13.0"
+# Settings (src/settings.vlt): env + XDG TOML layering. figment is named
+# directly for `Toml::string` (the 0.10 line id_effect_config uses); serde
+# derives the partial document.
+id_effect_config = "=0.13.0"
+figment = { version = "0.10.19", default-features = false, features = ["toml"] }
+serde = { version = "1", features = ["derive"] }
+# Log (src/log.vlt): JSON lines; url reduces a URL to its origin.
+id_effect_logger = "=0.13.0"
+url = "2"
 # The GTK edge (src/gtk_edge.rs) only: one gtk-rs generation (glib/gio 0.22).
 # webkit6 0.6.1 names gtk::Accessible, which gtk4 0.11 only exports from v4_10
 # on; nixpkgs ships gtk4 4.24, so the 4.14 API is safe to assume.
 gtk4 = { version = "0.11", features = ["v4_14"] }
 webkit6 = "0.6.1"
+
+[dev-dependencies]
+# The log tests read the JSON lines back.
+serde_json = "1"
 
 # Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Exact pin;
 # 0.2.0 has silent miscompiles.

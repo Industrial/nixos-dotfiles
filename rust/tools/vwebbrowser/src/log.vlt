@@ -1,0 +1,333 @@
+-- vwebbrowser's log: JSON lines (id_effect_logger's JsonLogBackend) to
+-- $XDG_STATE_HOME/vwebbrowser/log (default ~/.local/state), as the `Log`
+-- capability.
+--
+-- Redaction: at info and above a URL is reduced to its origin
+-- (https://example.org/secret?x -> https://example.org), in the message and
+-- in every field; the full URL is only ever written at debug. The crate's
+-- RedactionPolicy (recommended: secret-looking field names masked) applies
+-- first, at every level. Both run in `Redacting`, a LogBackend wrapper, so
+-- no call site can forget them.
+--
+-- `Log` holds its own backend rather than installing id_effect_logger's
+-- process-wide composite: two Logs (a test's and another's) never share a sink.
+--
+-- A line that cannot be written is dropped: logging never fails the browser.
+
+import std::borrow::Cow
+import std::collections::HashMap
+import std::fs::{File, OpenOptions}
+import std::io::{LineWriter, Write}
+import std::sync::{Arc, Mutex, PoisonError}
+import id_effect::{Effect, ExitKind, HNil, Layer, Never, caps, effect, fail, hlist, succeed, suspend, sync}
+import id_effect_config::{Config, ConfigEnv, ConfigError}
+import id_effect_logger::{EffectLoggerError, JsonLogBackend, LogBackend, LogLevel, LogRecord, RedactionPolicy}
+import url::Url
+
+-- Shown for a URL that does not parse, at info and above.
+export const REDACTED_URL : &str = "<url>"
+
+-- The log file under the state directory.
+export const LOG_FILE : &str = "vwebbrowser/log"
+
+-- Every record's target.
+export const TARGET : &str = "vwebbrowser"
+
+-- Pure core
+
+-- A URL reduced to what is safe at info level: the origin of a network URL
+-- (scheme, host, port; no user, path, query or fragment), an about: page as
+-- it is, any other scheme as just `scheme:` (file paths and data: payloads
+-- are private). Anything that is not a URL is REDACTED_URL.
+export redact_url : &str -> String
+redact_url raw =
+  case Url::parse raw of
+    Ok u -> origin_of (&u)
+    Err _ -> .to_string REDACTED_URL
+
+origin_of : &Url -> String
+origin_of u =
+  origin = u.origin ()
+  if u.scheme () == "about"
+    u.as_str () |> .to_string
+  else if origin.is_tuple ()
+    origin.ascii_serialization ()
+  else
+    "#{u.scheme ()}:"
+
+-- Free text with every URL-looking word (one containing `://`) redacted;
+-- the whitespace between words is kept.
+export scrub : &str -> String
+scrub text =
+  mut out = String::new ()
+  for piece in text.split_inclusive char::is_whitespace
+    word = piece.trim_end ()
+    rest = piece.strip_prefix word |> .unwrap_or ""
+    if word.contains "://"
+      out.push_str (&(redact_url word))
+    else
+      out.push_str word
+    out.push_str rest
+  out
+
+-- Whether records at `level` are reduced (info and above).
+export redacts_at : LogLevel -> bool
+redacts_at level = level != LogLevel::None && level.severity () >= LogLevel::Info.severity ()
+
+-- A record with its URLs redacted: the `url` field as a URL, the message
+-- and every other field as free text.
+export scrubbed : &LogRecord<'_> -> LogRecord<'static>
+scrubbed rec =
+  mut fields = HashMap::new () : HashMap<String, String>
+  for kv in rec.annotations.iter ()
+    (k, v) = kv
+    if k == "url"
+      fields.insert (k.clone ()) (redact_url v)
+    else
+      fields.insert (k.clone ()) (scrub v)
+  out = LogRecord::new rec.level (Cow::Owned (scrub (&rec.message))) |> .with_annotations fields |> .with_spans (rec.spans.clone ())
+  case &rec.target of
+    Some t -> out.with_target (Cow::Owned (t.to_string ()))
+    None -> out
+
+-- Edge: the backend wrapper
+
+-- A backend that redacts before it delivers.
+export data Redacting { inner Arc<dyn LogBackend>, policy RedactionPolicy }
+
+export redacting : Arc<dyn LogBackend> -> Redacting
+redacting inner = Redacting { inner, policy = RedactionPolicy::recommended () }
+
+instance LogBackend Redacting
+  emit : &self -> &LogRecord<'_> -> Result<(), EffectLoggerError>
+  emit self rec =
+    masked = self.policy.apply rec
+    if redacts_at rec.level
+      self.inner.emit (&(scrubbed (&masked)))
+    else
+      self.inner.emit (&masked)
+
+-- Edge: the capability
+
+-- The log: a redacting backend, its minimum level, and the writer to flush
+-- when the layer is released.
+#[derive(Clone)]
+export data Log { backend Arc<dyn LogBackend>, min LogLevel, writer Arc<Mutex<dyn Write + Send>> }
+
+export type LogEnv = caps!(Log)
+
+-- A Log over `writer`: JSON lines, redacted, at `min` and above.
+export log_over : given <W: Write + Send + 'static> LogLevel -> W -> Log
+log_over min writer =
+  (log, _shared) = built min writer
+  log
+
+-- The Log and the typed handle to its writer.
+built : given <W: Write + Send + 'static> LogLevel -> W -> (Log, Arc<Mutex<W>>)
+built min writer =
+  json = JsonLogBackend::new writer
+  shared = json.writer_arc () : Arc<Mutex<W>>
+  inner = Arc::new json : Arc<dyn LogBackend>
+  backend = Arc::new (redacting inner) : Arc<dyn LogBackend>
+  dyn_writer = shared.clone () : Arc<Mutex<dyn Write + Send>>
+  (Log { backend, min, writer = dyn_writer }, shared)
+
+-- One record on `log`, now. A write error drops the line.
+emit_on : Log -> LogLevel -> String -> Vec<(String, String)> -> Effect<(), Never, HNil>
+emit_on log level message fields = sync (move \-> written (&log) level message fields)
+
+written : &Log -> LogLevel -> String -> Vec<(String, String)> -> ()
+written log level message fields =
+  if log.min.allows level
+    rec = LogRecord::new level message |> .with_target TARGET |> .with_annotations (fields.into_iter () |> .collect)
+    log.backend.emit (&rec) |> .unwrap_or (())
+  ()
+
+-- One record with structured fields. A `url` field is redacted as a URL.
+export record : given <E: Send + 'static> LogLevel -> String -> Vec<(String, String)> -> Effect<(), E, LogEnv>
+record level message fields =
+  effect!
+    let log = ~Log;
+    ~emit_on(Log::clone(&log), level, message, fields)
+
+export debug : given <E: Send + 'static> String -> Effect<(), E, LogEnv>
+debug message = record LogLevel::Debug message (Vec::new ())
+
+export info : given <E: Send + 'static> String -> Effect<(), E, LogEnv>
+info message = record LogLevel::Info message (Vec::new ())
+
+export warn : given <E: Send + 'static> String -> Effect<(), E, LogEnv>
+warn message = record LogLevel::Warn message (Vec::new ())
+
+export error : given <E: Send + 'static> String -> Effect<(), E, LogEnv>
+error message = record LogLevel::Error message (Vec::new ())
+
+-- An event about a page: the URL goes in the `url` field (origin only at
+-- info and above).
+export page : given <E: Send + 'static> LogLevel -> String -> String -> Effect<(), E, LogEnv>
+page level message url = record level message (.to_vec ([(.to_string "url", url)]))
+
+-- Edge: the layers
+
+-- Why the log file could not be opened.
+export data LogError
+  = Open { path String, detail String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display LogError
+  fmt : &self -> &mut std::fmt::Formatter<'_> -> std::fmt::Result
+  fmt self f = case self of
+    LogError::Open { path, detail } -> write! \-> f \-> "cannot open the log file #{path}: #{detail} (set XDG_STATE_HOME to a writable directory)"
+
+instance From ConfigError LogError
+  from : ConfigError -> Self
+  from e = LogError::Open { path = .to_string "$XDG_STATE_HOME", detail = e.to_string () }
+
+-- The log file from XDG_STATE_HOME (absolute) or HOME; None with neither.
+export log_path : Option<String> -> Option<String> -> Option<String>
+log_path state home =
+  abs = \v : &String -> v.starts_with "/"
+  case state |> .filter abs of
+    Some s -> Some ("#{s.trim_end_matches '/'}/#{LOG_FILE}")
+    None -> home |> .filter abs |> .map (\h -> "#{h.trim_end_matches '/'}/.local/state/#{LOG_FILE}")
+
+-- The file, its directory created on demand, opened for append.
+export open_file : &str -> Result<LineWriter<File>, LogError>
+open_file path =
+  failed = \e : std::io::Error -> LogError::Open { path = .to_string path, detail = e.to_string () }
+  (std::path::Path::new path |> .parent |> .map std::fs::create_dir_all |> .transpose |> .map_err failed)?
+  file = (OpenOptions::new () |> .create true |> .append true |> .open path |> .map_err failed)?
+  Ok (LineWriter::new file)
+
+opened : LogLevel -> Option<String> -> Result<Log, LogError>
+opened min path =
+  case path of
+    None -> Err (LogError::Open { path = .to_string "(none)", detail = .to_string "neither XDG_STATE_HOME nor HOME is set" })
+    Some p -> Ok (log_over min ((open_file (&p))?))
+
+lifted : Result<Log, LogError> -> Effect<Log, LogError, HNil>
+lifted r = case r of
+  Ok l -> succeed l
+  Err e -> fail e
+
+-- Open the file named by the environment in the context.
+export open : LogLevel -> Effect<Log, LogError, ConfigEnv>
+open min =
+  effect!
+    let (state, home) = ~Config::all((Config::optional_string("XDG_STATE_HOME"), Config::optional_string("HOME"))).run::<(Option<String>, Option<String>), LogError, ConfigEnv, _>();
+    ~suspend(move || lifted(opened(min, log_path(state, home))))
+
+flushed : Log -> Effect<(), Never, HNil>
+flushed log = sync (move \-> flush_now (&log))
+
+flush_now : &Log -> ()
+flush_now log =
+  (log.writer.lock () |> .unwrap_or_else PoisonError::into_inner).flush () |> .unwrap_or (())
+  ()
+
+-- The file log, as a resource: opened when the layer is built, flushed when
+-- its scope closes.
+export file_layer : given <E: From<LogError> + Send + 'static> LogLevel -> Layer<LogEnv, E, ConfigEnv>
+file_layer min = Layer::acquire_release (move \-> ((open min).map_err E::from).map (\l -> hlist![l])) (\env _kind : ExitKind -> flushed (Log::clone (&env.0)))
+
+-- Live: the file named by the process environment.
+export live_layer : given <E: From<LogError> + Send + 'static> LogLevel -> Layer<LogEnv, E>
+live_layer min = (id_effect_config::EnvConfigProviderLive::layer ()).provide_to (file_layer min)
+
+-- A ready Log as a layer (in-memory logs, fakes).
+export layer : given <E: Send + 'static> Log -> Layer<LogEnv, E>
+layer log = Layer::succeed (hlist![log])
+
+-- In memory: what was logged, for tests.
+#[derive(Clone)]
+export data MemoryLog { buffer Arc<Mutex<Vec<u8>>> }
+
+-- The lines written so far.
+export lines : &MemoryLog -> Vec<String>
+lines m =
+  bytes = (m.buffer.lock () |> .unwrap_or_else PoisonError::into_inner).clone ()
+  String::from_utf8_lossy (&bytes) |> .lines |> .map (\l -> l.to_string ()) |> .collect
+
+-- A Log writing into memory, and the handle to read it back.
+export memory : LogLevel -> (Log, MemoryLog)
+memory min =
+  (log, buffer) = built min (Vec::new () : Vec<u8>)
+  (log, MemoryLog { buffer })
+
+-- Tests
+
+#[cfg(test)]
+import id_effect::{assert_exit_success, run_test}
+
+test "redact_url keeps only the origin"
+  assert_eq! \-> redact_url "https://example.org/secret?x" \-> "https://example.org"
+  assert_eq! \-> redact_url "https://user:pw@example.org:8443/a#frag" \-> "https://example.org:8443"
+  assert_eq! \-> redact_url "http://localhost:4001/search?q=private" \-> "http://localhost:4001"
+  assert_eq! \-> redact_url "https://example.org:443/" \-> "https://example.org"
+  assert_eq! \-> redact_url "HTTPS://Example.ORG/Path" \-> "https://example.org"
+  assert_eq! \-> redact_url "about:blank" \-> "about:blank"
+  assert_eq! \-> redact_url "file:///home/u/secret.html" \-> "file:"
+  assert_eq! \-> redact_url "data:text/html,<b>hi</b>" \-> "data:"
+  assert_eq! \-> redact_url "not a url" \-> "<url>"
+
+test "scrub redacts URL words and keeps the rest"
+  assert_eq! \-> scrub "loaded https://example.org/a?b in 3ms" \-> "loaded https://example.org in 3ms"
+  assert_eq! \-> scrub "two:\thttp://a.example/x\nhttps://b.example/y " \-> "two:\thttp://a.example\nhttps://b.example "
+  assert_eq! \-> scrub "no urls here" \-> "no urls here"
+
+test "log_path: XDG_STATE_HOME, else ~/.local/state, else none"
+  assert_eq! \-> log_path (Some (.to_string "/s/")) (Some (.to_string "/h")) \-> Some (.to_string "/s/vwebbrowser/log")
+  assert_eq! \-> log_path (Some (.to_string "relative")) (Some (.to_string "/h")) \-> Some (.to_string "/h/.local/state/vwebbrowser/log")
+  assert_eq! \-> log_path None None \-> None
+
+test "an info record is a JSON line with the URL reduced to its origin"
+  (log, mem) = memory LogLevel::Debug
+  program = page LogLevel::Info (.to_string "opened https://example.org/secret?x") (.to_string "https://example.org/secret?x") : Effect<(), Never, LogEnv>
+  assert_exit_success (&(run_test (program.provide_layer (layer log)))) (&())
+  got = lines (&mem)
+  assert_eq! \-> got.len () \-> 1
+  v = serde_json::from_str (&got[0]) |> .expect "a JSON line" : serde_json::Value
+  assert_eq! \-> v["level"] \-> "INFO"
+  assert_eq! \-> v["message"] \-> "opened https://example.org"
+  assert_eq! \-> v["fields"]["url"] \-> "https://example.org"
+  assert_eq! \-> v["target"] \-> "vwebbrowser"
+  assert! \-> !got[0].contains "secret"
+
+test "a debug record keeps the full URL; below the minimum nothing is written"
+  (log, mem) = memory LogLevel::Debug
+  program = page LogLevel::Debug (.to_string "nav") (.to_string "https://example.org/secret?x") : Effect<(), Never, LogEnv>
+  assert_exit_success (&(run_test (program.provide_layer (layer log)))) (&())
+  v = serde_json::from_str (&(lines (&mem))[0]) |> .expect "a JSON line" : serde_json::Value
+  assert_eq! \-> v["fields"]["url"] \-> "https://example.org/secret?x"
+  (quiet, none) = memory LogLevel::Info
+  dropped = debug (.to_string "hidden") : Effect<(), Never, LogEnv>
+  assert_exit_success (&(run_test (dropped.provide_layer (layer quiet)))) (&())
+  assert! \-> (lines (&none)).is_empty ()
+
+test "the recommended policy masks secret-looking fields"
+  (log, mem) = memory LogLevel::Info
+  program = record LogLevel::Info (.to_string "login") (.to_vec ([(.to_string "password", .to_string "hunter2")])) : Effect<(), Never, LogEnv>
+  assert_exit_success (&(run_test (program.provide_layer (layer log)))) (&())
+  assert! \-> !(lines (&mem))[0].contains "hunter2"
+
+test "open_file creates the directory and appends"
+  dir = std::env::temp_dir () |> .join (format! \-> "vwebbrowser-log-test-#{std::process::id ()}")
+  path = dir.join "state/vwebbrowser/log" |> .to_string_lossy |> .into_owned
+  log = log_over LogLevel::Info (open_file (&path) |> .expect "opens")
+  assert_exit_success (&(run_test (((info (.to_string "one")) : Effect<(), Never, LogEnv>).provide_layer (layer (log.clone ()))))) (&())
+  flush_now (&log)
+  text = std::fs::read_to_string (&path) |> .expect "written"
+  assert! \-> text.contains "\"one\""
+  std::fs::remove_dir_all (&dir) |> .ok
+
+test "file_layer opens the file named by an injected XDG_STATE_HOME and flushes on release"
+  dir = std::env::temp_dir () |> .join (format! \-> "vwebbrowser-file-layer-#{std::process::id ()}")
+  state = dir.to_string_lossy () |> .into_owned
+  provider = id_effect_config::MapConfigProvider::from_pairs (.to_vec ([(.to_string "XDG_STATE_HOME", state.clone ())]))
+  layers = (id_effect_config::ConfigProvider::layer provider).provide_to (file_layer LogLevel::Info) : Layer<LogEnv, LogError>
+  program = page LogLevel::Info (.to_string "visited") (.to_string "https://example.org/private") : Effect<(), LogError, LogEnv>
+  assert_exit_success (&(run_test (program.provide_layer layers))) (&())
+  text = std::fs::read_to_string ("#{state}/vwebbrowser/log") |> .expect "written"
+  assert! \-> text.contains "https://example.org"
+  assert! \-> !text.contains "private"
+  std::fs::remove_dir_all (&dir) |> .ok
