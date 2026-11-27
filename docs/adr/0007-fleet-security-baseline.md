@@ -235,14 +235,39 @@ writes signed UKIs to `/boot/EFI/Linux/`, and keeps the same 10-generation limit
 `lzbt` runs through our own install hook, `lzbt-all-profiles` in `features/nixos/boot`, not
 upstream's. Upstream's hook only sees `/nix/var/nix/profiles/system-*-link` and leaves
 `default nixos-*`, so the highest version number wins. comin deploys through
-`system-profiles/comin`, so on drakkar that would boot the stale `system-493`. Our hook
-passes every profile's generations, as the Python installer does, and writes the
-generation being switched to as `default` in `loader.conf`.
-`checks.x86_64-linux.lanzaboote-vm` (`features/nixos/boot/test.nix`) runs this whole runbook
-in a VM: switch, reboot into the lanzaboote generation, roll back, reboot.
+`system-profiles/comin`, and a host can carry a stale `system` profile (muninn's
+`system-10` from the install; drakkar's old `system-profiles/comin-*` from before vdeploy).
+Our hook passes every profile's generations, as the Python installer does, and writes the
+generation being switched to as `default` in `loader.conf`, matched by its toplevel, so
+generation numbers that collide across profiles do not matter.
 
-The order matters. comin deploys every merge to drakkar on its own, and `lzbt` fails the
-switch if the keys are missing. So **step 1 happens before the enable merges.**
+The hosts are deployed differently, and that changes where a missing key fails:
+
+| Host | Deployer | What it runs on merge | Where `lzbt` runs |
+|------|----------|-----------------------|-------------------|
+| muninn (first) | comin | `nix-env -p system-profiles/comin --set X`, then `X/bin/switch-to-configuration switch` | inside `switch`, which installs the bootloader BEFORE activating: a missing key fails comin's switch, the host stays on the previous generation and the ESP is untouched; only `system-profiles/comin` already names X |
+| drakkar | vdeploy | `switch-to-configuration test`, vhealth, `nix-env -p system --set X`, then `switch-to-configuration boot` (`rust/tools/vdeploy/src/apply.vlt`) | in the last step, after X is live and healthy |
+
+Two VM tests run this runbook through OVMF and the ESP, with each host's layout:
+`checks.x86_64-linux.lanzaboote-vm` (`features/nixos/boot/test.nix`, comin on muninn's
+layout, STIG test-host) and `checks.x86_64-linux.lanzaboote-vdeploy-vm`
+(`features/nixos/boot/test-vdeploy.nix`, the real `vdeploy apply` on drakkar's layout).
+Both switch in, reboot into the lanzaboote generation, roll back, and reboot.
+
+**What vdeploy does when the keys are missing** (proven by `lanzaboote-vdeploy-vm`): `lzbt`
+fails in step 4 (`Failed to read public key from /var/lib/sbctl/keys/db/db.pem`), and
+vdeploy still records `result: switched`, exits 0, and only says so in its note:
+`healthy and running, but the boot entry was not written: …switch-to-configuration boot
+failed`. X is running and is the `system` profile's newest generation; it is **not** marked
+bad; the ESP and `loader.conf` are untouched, so a reboot boots the previous generation
+through systemd-boot. Re-running vdeploy for the same X after creating the keys is
+`already`: **vdeploy does not retry the boot step.** To recover, either reboot (the host
+comes back on the previous generation, and the next apply of X does the whole transaction,
+writing the UKIs), or have root run `/nix/var/nix/profiles/system/bin/switch-to-configuration boot`.
+Watch `last.json`'s `note`, not its `result`.
+
+The order matters. Both deployers apply every merge on their own, and `lzbt` fails if the
+keys are missing. So **step 1 happens before the enable merges.**
 
 1. **Keys, on the host, before the enable.** Run
    `sudo nix run nixpkgs#sbctl -- create-keys`. This writes `/var/lib/sbctl/keys/{PK,KEK,db}`
@@ -254,10 +279,14 @@ switch if the keys are missing. So **step 1 happens before the enable merges.**
    lost bundle only means creating keys again. After enrollment, losing `db.key` means no
    new generation can be signed until new keys are enrolled at the machine.
 3. **Enable.** Set `features.hardening.secureBoot.enable = true` for the host, and merge.
-   comin switches the host, and `lzbt` installs signed UKIs for every generation it keeps.
-   Then check: `sudo sbctl verify` lists `/boot/EFI/Linux/nixos-generation-*.efi` as signed,
-   and `/boot/loader/loader.conf` has `default nixos-generation-<N>-….efi`, where N is
-   comin's newest generation (`ls /nix/var/nix/profiles/system-profiles/`), not 493.
+   The host's deployer switches it (comin on muninn, vdeploy on drakkar), and `lzbt`
+   installs signed UKIs for every generation it keeps. Then check: `sudo sbctl verify` lists
+   `/boot/EFI/Linux/nixos-generation-*.efi` as signed, and `/boot/loader/loader.conf` has
+   `default nixos-generation-<N>-….efi`, where N is the deployed generation: comin's newest
+   (`readlink /nix/var/nix/profiles/system-profiles/comin`) on muninn, the `system`
+   profile's newest (`readlink /nix/var/nix/profiles/system`) on drakkar. On drakkar also
+   read `/var/lib/vdeploy/last.json`: its `note` must be `now the system profile's newest
+   generation and the boot default`, not `the boot entry was not written`.
 4. **First reboot, at the machine.**
    - Remove the Python installer's entries:
      `sudo rm -f /boot/loader/entries/nixos-*.conf` (it names them by content hash,
@@ -265,7 +294,7 @@ switch if the keys are missing. So **step 1 happens before the enable merges.**
      they are unsigned, and once lanzaboote owns `EFI/nixos/` their kernels are not
      guaranteed to stay there.
    - Reboot. `bootctl status` should show `Current Entry: nixos-generation-<N>-….efi`, and
-     `readlink -f /run/booted-system` should be the generation that comin switched to.
+     `readlink -f /run/booted-system` should be the generation the deployer switched to.
    - If that entry fails to boot, pick an older lanzaboote generation in the systemd-boot
      menu. `lzbt` installs every kept generation, not just the new one.
 5. **Enroll, at the machine.** Put the firmware in Setup Mode, run
@@ -279,8 +308,9 @@ switch if the keys are missing. So **step 1 happens before the enable merges.**
 
 1. If Secure Boot is on in the firmware, **turn it off first**. The Python installer's
    systemd-boot and kernels are unsigned, so an enforcing firmware refuses them.
-2. Revert the enable (`features.hardening.secureBoot.enable` back to off) and merge. comin
-   switches to a new generation with the Python installer. That installer writes
+2. Revert the enable (`features.hardening.secureBoot.enable` back to off) and merge. The
+   deployer (comin on muninn, vdeploy on drakkar) switches to a new generation with the
+   Python installer. That installer writes
    `/boot/loader/entries/nixos-<sha256>.conf` for every generation and removes
    lanzaboote's files from `/boot/EFI/nixos/`. It does not touch `/boot/EFI/Linux/`.
 3. **ESP cleanup:** `sudo rm -f /boot/EFI/Linux/nixos-generation-*.efi`. Those UKIs now point
