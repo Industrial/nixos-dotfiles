@@ -1,0 +1,185 @@
+-- Emitting a `.drv`: the ATerm text, the output paths and the derivation's
+-- own store path, computed the way libstore computes them, so the result can
+-- be checked byte-for-byte against `nix eval … .drvPath`.
+--
+-- - ATerm: `Derive(outputs, inputDrvs, inputSrcs, system, builder, args, env)`,
+--   every list sorted the way libstore writes it (BTreeMap/BTreeSet order).
+-- - Output paths are input-addressed: `hashDerivationModulo` of the
+--   derivation with its output paths (and their env entries) blanked and each
+--   input `.drv` replaced by that input's own modulo hash.
+-- - The `.drv` path is a text path over the ATerm, referencing every input
+--   source and input `.drv`.
+--
+-- The modulo hash of an input comes from the package index (typed `Pkg`
+-- handles carry it), so emitting a derivation reads no file.
+
+import std::collections::{BTreeMap, BTreeSet}
+import nix_store_core::drv::{Derivation, Output}
+import nix_store_core::hash::{Sha256, digest, to_base16}
+import nix_store_core::nixbase32::encode
+import nix_store_core::storepath::STORE_DIR
+
+-- A package from the pinned index: what a derivation needs to depend on it.
+export data Pkg {
+  export attr &'static str,
+  export drv &'static str,
+  export out &'static str,
+  export modulo &'static str,
+}
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+escaped : &str -> String
+escaped s =
+  body = s
+    |> .replace "\\" "\\\\"
+    |> .replace "\"" "\\\""
+    |> .replace "\n" "\\n"
+    |> .replace "\r" "\\r"
+    |> .replace "\t" "\\t"
+  "\"#{body}\""
+
+list : Vec<String> -> String
+list items = "[#{items.join ","}]"
+
+strings : given <'a, I: IntoIterator<Item = &'a String>> I -> String
+strings xs = list (xs
+  |> .into_iter
+  |> .map (\s -> escaped s)
+  |> .collect)
+
+output_term : &str -> &Output -> String
+output_term name o = "(#{escaped name},#{escaped (&o.path)},#{escaped (&o.hash_algo)},#{escaped (&o.hash)})"
+
+input_term : &str -> &BTreeSet<String> -> String
+input_term path outs = "(#{escaped path},#{strings outs})"
+
+env_term : &str -> &str -> String
+env_term k v = "(#{escaped k},#{escaped v})"
+
+-- The ATerm text of a derivation, as libstore's `unparse` writes it.
+export aterm : &Derivation -> String
+aterm d =
+  outputs = d.outputs
+    |> .iter
+    |> .map (\kv -> output_term kv.0 kv.1)
+    |> .collect
+  inputs = d.input_drvs
+    |> .iter
+    |> .map (\kv -> input_term kv.0 kv.1)
+    |> .collect
+  env = d.env
+    |> .iter
+    |> .map (\kv -> env_term kv.0 kv.1)
+    |> .collect
+  "Derive(#{list outputs},#{list inputs},#{strings (&d.input_srcs)},#{escaped (&d.system)},#{escaped (&d.builder)},#{strings (&d.args)},#{list env})"
+
+-- libstore's `compressHash`: fold a digest onto 20 bytes by XOR.
+compressed : &Sha256 -> [u8; 20]
+compressed h =
+  mut out = [0u8; 20]
+  for i in 0 .. 32
+    out[i % 20] := out[i % 20] ^ h.bytes[i]
+  out
+
+-- `makeStorePath`: `<type>:sha256:<base16>:/nix/store:<name>`, hashed and
+-- compressed.
+export store_path : &str -> &Sha256 -> &str -> String
+store_path kind h name =
+  fingerprint = "#{kind}:sha256:#{to_base16 h}:#{STORE_DIR}:#{name}"
+  "#{STORE_DIR}/#{encode (&compressed (&digest (fingerprint.as_bytes ())))}-#{name}"
+
+-- `hashDerivationModulo`, given each input `.drv`'s own modulo hash
+-- (base16). A fixed-output derivation hashes to its output's fixed hash.
+export hash_modulo : &Derivation -> &BTreeMap<String, String> -> Result<Sha256, String>
+hash_modulo d inputs =
+  case d.outputs.get "out" of
+    Some o | !o.hash.is_empty () -> Ok (digest ("fixed:out:#{o.hash_algo}:#{o.hash}:#{o.path}".as_bytes ()))
+    _ -> masked_inputs d inputs
+
+masked_inputs : &Derivation -> &BTreeMap<String, String> -> Result<Sha256, String>
+masked_inputs d inputs =
+  mut replaced = BTreeMap::new ()
+  for kv in &d.input_drvs
+    m = (inputs.get kv.0
+      |> .ok_or (format! \-> "no modulo hash for input #{kv.0}"))?
+    replaced.insert (m.clone ()) (kv.1.clone ())
+  masked = Derivation {
+    input_drvs = replaced,
+    ...d.clone ()
+  }
+  Ok (digest ((aterm (&masked)).as_bytes ()))
+
+-- A derivation with every output path filled in, from one with them blank.
+export with_outputs : Derivation -> &BTreeMap<String, String> -> &str -> Result<Derivation, String>
+with_outputs d inputs name =
+  mut blank = d
+  for o in blank.outputs.values_mut ()
+    o.path := String::new ()
+  for k in blank.outputs.keys ()
+    blank.env.insert (k.clone ()) (String::new ())
+  m = (hash_modulo (&blank) inputs)?
+  mut full = blank.clone ()
+  for kv in full.outputs.iter_mut ()
+    path = store_path (&"output:#{kv.0}") (&m) (&output_name name kv.0)
+    kv.1.path := path.clone ()
+    full.env.insert (kv.0.clone ()) path
+  Ok full
+
+output_name : &str -> &str -> String
+output_name name output
+  | output == "out" = name.to_string ()
+  | _ = "#{name}-#{output}"
+
+-- `makeTextPath` for a `.drv`: its references are its input sources and
+-- input derivations.
+export drv_path : &Derivation -> &str -> String
+drv_path d name =
+  mut refs = d.input_srcs.clone ()
+  for p in d.input_drvs.keys ()
+    refs.insert (p.clone ())
+  mut kind = String::from "text"
+  for r in &refs
+    kind.push_str (&":#{r}")
+  store_path (&kind) (&digest ((aterm d).as_bytes ())) (&"#{name}.drv")
+
+-- An input-addressed derivation over packages from the index: its outputs
+-- are filled in and its `.drv` path and text computed.
+export data Emitted {
+  export path String,
+  export text String,
+  export derivation Derivation,
+}
+
+export emit : &str -> &str -> String -> Vec<String> -> Vec<(String, String)> -> &[Pkg] -> Result<Emitted, String>
+emit name system builder args env inputs =
+  mut input_drvs = BTreeMap::new ()
+  mut modulo = BTreeMap::new ()
+  for p in inputs
+    input_drvs.insert (p.drv.to_string ()) (BTreeSet::from ([String::from "out"]))
+    modulo.insert (p.drv.to_string ()) (p.modulo.to_string ())
+  mut envs = BTreeMap::new ()
+  envs.insert (String::from "builder") (builder.clone ())
+  envs.insert (String::from "name") (name.to_string ())
+  envs.insert (String::from "system") (system.to_string ())
+  for kv in env
+    envs.insert kv.0 kv.1
+  outputs = BTreeMap::from ([(String::from "out", Output {
+    path = String::new (),
+    hash_algo = String::new (),
+    hash = String::new (),
+  })])
+  d = Derivation {
+    outputs,
+    input_drvs,
+    input_srcs = BTreeSet::new (),
+    system = system.to_string (),
+    builder,
+    args,
+    env = envs,
+  }
+  full = (with_outputs d (&modulo) name)?
+  Ok (Emitted {
+    path = drv_path (&full) name,
+    text = aterm (&full),
+    derivation = full,
+  })

@@ -1,0 +1,97 @@
+-- Typed option slots: a declaration carries its path, docs, default and
+-- merge strategy; a definition carries the module it came from and a
+-- priority. The slot's type is the declaration's type parameter, so a
+-- definition of the wrong type is a rustc error at the definition site.
+--
+-- Priorities follow NixOS: lower wins. `mkForce` is 50, a plain definition
+-- 100, `mkDefault` 1000; with no definition at all the declaration's default
+-- is the value.
+--
+-- Voltaic notes (0.3.0), each hit while writing this file:
+-- - `module` is reserved, so the field naming a definition's origin is `origin`.
+-- - A `fn(t, t) -> t` pointer type in a data field does not parse (and `fn`
+--   is taken for a type variable); `Box<dyn Fn(t, t) -> t>` does.
+-- - A type written inside a body is verbatim, so it says `T`, where a
+--   signature says `t`.
+
+import std::fmt::Debug
+
+export const FORCE : u32 = 50
+export const NORMAL : u32 = 100
+export const DEFAULT : u32 = 1000
+
+-- How the winning definitions of one priority combine. `Unique` is NixOS's
+-- `types.str`-style "all equal or conflict"; `Fold` covers lists (concat),
+-- bools (any/all) and attribute sets (union) with a binary function.
+export data Strategy
+  = Unique
+  | Fold Box<dyn Fn(t, t) -> t + Send + Sync>
+
+export data OptionDecl {
+  export path &'static str,
+  export doc &'static str,
+  export default Option<t>,
+  export strategy Strategy<t>,
+}
+
+export data Def {
+  export origin &'static str,
+  export priority u32,
+  export value t,
+}
+  deriving (Debug, Clone)
+
+export errors MergeError
+  Missing &'static str              "option `#{0}` is used but not defined and has no default"
+  Conflict &'static str u32 String  "option `#{0}` has conflicting definitions at priority #{1}: #{2}"
+
+-- The lowest priority present wins; with no definitions the declaration's
+-- default is the value. Definitions are kept in module order, so a `Fold` is
+-- deterministic.
+export merge : Clone t, PartialEq t, Debug t => &OptionDecl<t> -> &[Def<t>] -> Result<t, MergeError>
+merge decl defs =
+  best = defs
+    |> .iter
+    |> .map (\d -> d.priority)
+    |> .min
+  case best of
+    None -> decl.default.clone ()
+      |> .ok_or (Missing decl.path)
+    Some p -> combine decl p defs
+
+combine : Clone t, PartialEq t, Debug t => &OptionDecl<t> -> u32 -> &[Def<t>] -> Result<t, MergeError>
+combine decl p defs =
+  winners = defs
+    |> .iter
+    |> .filter (\d -> d.priority == p)
+    |> .collect : Vec<&Def<T>>
+  first = winners[0].value.clone ()
+  case &decl.strategy of
+    Unique -> unique decl p first (&winners)
+    Fold f -> Ok (winners[1 .. winners.len ()]
+      |> .iter
+      |> .fold first (\acc d -> f acc (d.value.clone ())))
+
+unique : Clone t, PartialEq t, Debug t => &OptionDecl<t> -> u32 -> t -> &[&Def<t>] -> Result<t, MergeError>
+unique decl p first winners =
+  clash = winners
+    |> .iter
+    |> .any (\d -> d.value != first)
+  if clash
+    shown = winners
+      |> .iter
+      |> .map (\d -> format! \-> "#{d.origin} = #{d.value:?}")
+      |> .collect : Vec<String>
+    Err (Conflict decl.path p (shown.join ", "))
+  else
+    Ok first
+
+-- The `Fold` functions NixOS's common types use.
+export concat : given <T> Vec<T> -> Vec<T> -> Vec<T>
+concat a b =
+  mut out = a
+  out.extend b
+  out
+
+export any_true : bool -> bool -> bool
+any_true a b = a || b

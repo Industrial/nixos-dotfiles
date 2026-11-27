@@ -1,0 +1,12 @@
+# S1b spikes for #417: a typed NixOS-style module system in Voltaic 0.3.0.
+# Standalone (own lock, own [workspace]) like every Voltaic crate under rust/.
+# `modsys` is the library, `host` a host configuration that consumes it; they
+# are separate packages so a config edit recompiles only `host`.
+[workspace]
+resolver = "3"
+members = ["modsys", "host"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+publish = false
