@@ -327,7 +327,11 @@
     inherit nixosConfigurations;
 
     # Build with: nix build .#installer-iso
-    packages.${system}.installer-iso = nixosConfigurations.installer.config.system.build.isoImage;
+    packages.${system} = {
+      installer-iso = nixosConfigurations.installer.config.system.build.isoImage;
+      # The compartments guest kernel (#425): nix build .#compartment-guest-kernel
+      compartment-guest-kernel = pkgs.callPackage ./features/compartments/guest-kernel/package.nix {};
+    };
 
     deploy = {
       type = "deploy";
