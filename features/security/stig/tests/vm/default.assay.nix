@@ -21,11 +21,18 @@ let
     ++ import ./audit.nix args
     ++ import ./ssh.nix args
     ++ import ./system.nix args
-    ++ import ./password.nix args;
+    ++ import ./password.nix args
+    ++ import ./test-host.nix args;
 
   manifest = import ./../../lib/manifest.nix;
   ids = map (s: s.id) specs;
   deferredSpecs = specs;
+
+  # The control ids a profile imports directly, read off its import list.
+  controlsOf = profile:
+    map (n: builtins.head (builtins.match "(V-[0-9]+)\\.nix" n))
+    (builtins.filter (n: builtins.match "V-[0-9]+\\.nix" n != null)
+      (map (p: builtins.baseNameOf (toString p)) profile.imports));
 in
   assay.suite "stig-vm-tests" {
     # The aggregator throws on a malformed spec rather than building a useless VM. Proven by
@@ -39,18 +46,27 @@ in
     # Test names are the stig-V-<id> form the flake's checks and the moon task expect.
     namesAreStigPrefixed = assay.eq (builtins.all (id: builtins.match "V-[0-9]+" id != null) ids) true;
 
-    # Every control the host-wide profile carries has a VM test. That is the real exit
-    # criterion for runtime verification of wave 1, asserted rather than counted by hand.
-    vmCoverageSoFar = assay.eq (builtins.length ids) 68;
+    # Every control a fielded host configures has a VM test: base-safe's 68 (mimir) and the 15
+    # the test-host profile adds (muninn). That is the real exit criterion for runtime
+    # verification, asserted rather than counted by hand.
+    vmCoverageSoFar = assay.eq (builtins.length ids) 83;
     totalControls = assay.eq manifest.count 103;
 
-    coversEveryBaseSafeControl = let
-      profileControls =
-        map (n: builtins.head (builtins.match "(V-[0-9]+)\\.nix" n))
-        (builtins.filter (n: builtins.match "V-[0-9]+\\.nix" n != null)
-          (map (p: builtins.baseNameOf (toString p)) (import ./../../profiles/base-safe.nix {}).imports));
+    coversEveryBaseSafeControl =
+      assay.eq (builtins.filter (id: !builtins.elem id ids) (controlsOf (import ./../../profiles/base-safe.nix {}))) [];
+
+    # test-host imports base-safe and lists its own 15. Its own list is checked here and
+    # base-safe's above, so the two together are everything muninn configures.
+    coversEveryTestHostControl = let
+      own = controlsOf (import ./../../profiles/test-host.nix {lib = nixpkgsLib;});
     in
-      assay.eq (builtins.filter (id: !builtins.elem id ids) profileControls) [];
+      assay.eq {
+        count = builtins.length own;
+        untested = builtins.filter (id: !builtins.elem id ids) own;
+      } {
+        count = 15;
+        untested = [];
+      };
 
     # No control may appear in two spec groups — two tests named stig-V-<id> would collide
     # in the flake's checks attrset and one would silently shadow the other.

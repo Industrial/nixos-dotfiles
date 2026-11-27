@@ -4,6 +4,7 @@
 #
 # Spec groups are added here as they are written. Wave 2 starts with the seven controls that
 # cannot be verified any other way (deferred.nix); the remaining checks follow by subsystem.
+# test-host.nix is the 15 controls muninn's test-host profile adds to base-safe (ADR-0008).
 {
   pkgs,
   lib,
@@ -16,6 +17,7 @@
     (import ./ssh.nix {inherit pkgs lib;})
     (import ./system.nix {inherit pkgs lib;})
     (import ./password.nix {inherit pkgs lib;})
+    (import ./test-host.nix {inherit pkgs lib;})
   ];
 
   specs = builtins.concatLists specGroups;
