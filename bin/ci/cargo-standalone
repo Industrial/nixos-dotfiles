@@ -37,7 +37,13 @@
 # tracked files count, as in the fleet. The derivation's checkPhase runs the tests again,
 # in the sandbox.
 #
-# RUST_DIR (default rust/) points --list at another tree; bin/dev.d/test.sh uses it.
+# A crate that links system libraries names them in rust/tools/<crate>/ci-inputs, one
+# nixpkgs attribute per line (blank lines and # comments allowed): clippy and test then run
+# in a mkShell with those as buildInputs, so pkg-config finds them (see DEV_SHELL_EXPR).
+# Crates without the file run under plain `nix shell` as before.
+#
+# RUST_DIR (default rust/) points --list, clippy and test at another tree;
+# bin/dev.d/test.sh uses it.
 #
 # The `bash -c '…"$1"…' _ "$dir"` calls are single-quoted on purpose: the inner shell
 # expands $1, so a path never becomes part of a command string.
@@ -108,21 +114,69 @@ crate_dir() {
   [[ "$name" =~ ^[A-Za-z0-9_-]+$ ]] || die "not a crate name: '$name'"
   list | jq -e --arg c "$name" 'index($c) != null' >/dev/null \
     || die "'$name' is not a standalone crate under rust/tools"
-  echo "rust/tools/$name"
+  echo "${RUST_DIR:-rust}/tools/$name"
+}
+
+# ci_inputs <crate dir>: the nixpkgs attributes the crate's ci-inputs file names, one per
+# line (blank lines and # comments allowed), space-separated; nothing without the file.
+ci_inputs() {
+  local file="$1/ci-inputs" line n=0 words attrs=()
+  [[ -f "$file" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    n=$((n + 1))
+    read -r -a words <<<"${line%%#*}"
+    ((${#words[@]} == 0)) && continue
+    ((${#words[@]} == 1)) || die "$file:$n: one nixpkgs attribute per line"
+    [[ "${words[0]}" =~ ^[A-Za-z_][A-Za-z0-9_+-]*(\.[A-Za-z_][A-Za-z0-9_+-]*)*$ ]] \
+      || die "$file:$n: not a nixpkgs attribute: '${words[0]}'"
+    attrs+=("${words[0]}")
+  done <"$file"
+  ((${#attrs[@]} > 0)) || die "$file names no nixpkgs attribute"
+  echo "${attrs[*]}"
+}
+
+# A crate with a ci-inputs file links system libraries (GTK, WebKitGTK, …) through
+# pkg-config. `nix shell` runs no setup hooks, so it gives pkg-config no search path, and
+# a .pc file's Requires (gtk4 → pango, cairo, glib, …) live in other packages' dev outputs.
+# The legs run in a mkShell instead, from the same registry nixpkgs as `nix shell
+# nixpkgs#cargo`: its setup hooks walk the propagated inputs into pkg-config's path, and
+# its cc wrapper puts their library directories in the test binaries' rpath.
+DEV_SHELL_EXPR='{ tools, inputs }:
+  let
+    pkgs = (builtins.getFlake "flake:nixpkgs").legacyPackages.${builtins.currentSystem};
+    attrs = s: map (a: pkgs.lib.getAttrFromPath (pkgs.lib.splitString "." a) pkgs)
+      (builtins.filter (a: a != "") (pkgs.lib.splitString " " s));
+  in pkgs.mkShell { nativeBuildInputs = attrs tools; buildInputs = attrs inputs; }'
+
+# in_dev_shell <inputs> <tools> <script> <crate dir>
+in_dev_shell() {
+  nix develop --impure --argstr inputs "$1" --argstr tools "$2" --expr "$DEV_SHELL_EXPR" \
+    -c bash -c "$3" _ "$4"
 }
 
 # Same toolchain as the workspace jobs. --locked: a Cargo.lock that no longer matches
 # Cargo.toml is a failure, not something to rewrite on the runner.
 clippy() {
-  local dir
+  local dir inputs
   dir="$(crate_dir "$1")" || return 1
+  inputs="$(ci_inputs "$dir")" || return 1
+  if [[ -n "$inputs" ]]; then
+    in_dev_shell "$inputs" "cargo rustc clippy" \
+      'cd "$1" && cargo clippy --locked --all-targets -- -D warnings' "$dir"
+    return
+  fi
   nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#clippy \
     -c bash -c 'cd "$1" && cargo clippy --locked --all-targets -- -D warnings' _ "$dir"
 }
 
 test_crate() {
-  local dir
+  local dir inputs
   dir="$(crate_dir "$1")" || return 1
+  inputs="$(ci_inputs "$dir")" || return 1
+  if [[ -n "$inputs" ]]; then
+    in_dev_shell "$inputs" "cargo rustc" 'cd "$1" && cargo test --locked' "$dir"
+    return
+  fi
   nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c 'cd "$1" && cargo test --locked' _ "$dir"
 }
 

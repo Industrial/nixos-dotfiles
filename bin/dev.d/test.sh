@@ -139,6 +139,18 @@ expect "cargo-standalone --members fails when no member is left" 1 'no workspace
     env RUST_DIR="$T/rust" "$CS" --members
 expect "cargo-standalone workspace-drift fails when no member is left" 1 'no workspace member' \
     env RUST_DIR="$T/rust" "$CS" workspace-drift
+# ci-inputs: the nixpkgs attributes a crate's clippy and test legs add. A malformed file
+# fails before any nix call.
+printf 'pkg-config gtk4\n' >"$T/rust/tools/alpha/ci-inputs"
+expect "cargo-standalone rejects two attributes on one ci-inputs line" 1 \
+    'alpha/ci-inputs:1: one nixpkgs attribute per line' env RUST_DIR="$T/rust" "$CS" clippy alpha
+printf '# libraries\n\ngtk4;rm\n' >"$T/rust/tools/alpha/ci-inputs"
+expect "cargo-standalone rejects a ci-inputs line that is no attribute" 1 \
+    "alpha/ci-inputs:3: not a nixpkgs attribute: 'gtk4;rm'" env RUST_DIR="$T/rust" "$CS" test alpha
+printf '# nothing here\n\n' >"$T/rust/tools/alpha/ci-inputs"
+expect "cargo-standalone rejects a ci-inputs that names nothing" 1 \
+    'ci-inputs names no nixpkgs attribute' env RUST_DIR="$T/rust" "$CS" clippy alpha
+rm "$T/rust/tools/alpha/ci-inputs"
 expect "cargo-standalone --list on this tree has nixos-update-notifier and vcache" 0 '"vcache"' "$CS" --list
 has "and nixos-update-notifier" '"nixos-update-notifier"'
 lacks "and not the workspace member oomkiller" 'oomkiller'

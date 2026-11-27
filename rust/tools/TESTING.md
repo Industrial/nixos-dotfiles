@@ -476,6 +476,26 @@ cargo test --workspace
 
 CI runs the same clippy and test commands (see `.github/workflows/main.yml`).
 
+**Standalone crates and system libraries.** `bin/ci/cargo-standalone clippy|test <crate>`
+runs a standalone crate's legs under `nix shell nixpkgs#cargo nixpkgs#rustc`, which has no
+C libraries and no pkg-config. A crate that links system libraries (`gtk4-sys`,
+`webkit6-sys`, …) names them in `rust/tools/<crate>/ci-inputs`: one nixpkgs attribute per
+line, dotted paths allowed (`gst_all_1.gstreamer`), blank lines and `#` comments ignored.
+
+```text
+# rust/tools/vwebbrowser/ci-inputs
+pkg-config
+gtk4
+webkitgtk_6_0
+```
+
+With the file, both legs run in a `mkShell` from the same registry nixpkgs, with those
+attributes as `buildInputs`: the setup hooks put every propagated `.pc` file on
+pkg-config's path, and the cc wrapper puts the libraries in the test binaries' rpath.
+List `pkg-config` yourself; list only what the build and the tests need, not the
+runtime-only pieces (`glib-networking`, GStreamer plugins) that `default.nix` wraps in.
+Without the file, nothing changes.
+
 ```bash
 # Run all tests
 cargo test
