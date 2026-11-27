@@ -27,5 +27,7 @@ in
     # without a host enabling them — profiles/creative.nix is commented out everywhere —
     # nvd, kept as vdiff's one-option rollback (GH-153, profiles/cli-core.assay.nix),
     # nix-output-monitor, vmon's (GH-181, the same suite), and nix-tree, vwhy's (GH-182).
-    onlyCreativeParked = assay.eq (lib.filter (n: !builtins.elem n enabledSomewhere) names) ["cli.nix-output-monitor" "cli.nix-tree" "cli.nvd" "creative.gimp" "creative.obs-studio" "creative.openpencil"];
+    # nh is retired by vswitch (GH-241) and is not a rollback (vswitch's lands on
+    # nixos-rebuild); it stays parked so a host can still opt in.
+    onlyCreativeParked = assay.eq (lib.filter (n: !builtins.elem n enabledSomewhere) names) ["cli.nh" "cli.nix-output-monitor" "cli.nix-tree" "cli.nvd" "creative.gimp" "creative.obs-studio" "creative.openpencil"];
   }

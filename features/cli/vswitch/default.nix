@@ -30,7 +30,7 @@
 # off here too (--no-eval-cache).
 #
 # Take-over rollback: `features.cli.vswitch.enable = lib.mkForce false;` on a host, and
-# bin/update/system falls back to nixos-rebuild; nh stays installed (profiles/cli-core.nix).
+# bin/update/system falls back to nixos-rebuild. nh is retired (off in profiles/cli-core.nix).
 {
   config,
   lib,

@@ -57,12 +57,11 @@
 
     # Nix Tooling
     features.cli.assay.enable = true;
-    # vswitch is the local rebuild (GH-241): bin/update/system switches through it. nh stays
-    # installed off the default path (nothing calls it), so it works as the rollback at once;
-    # `features.cli.vswitch.enable = lib.mkForce false;` sends bin/update/system back to
-    # nixos-rebuild.
+    # vswitch is the local rebuild (GH-241): bin/update/system switches through it, and nh is
+    # retired (features.cli.nh stays in the catalog, off). The one rollback is
+    # `features.cli.vswitch.enable = lib.mkForce false;`, which sends bin/update/system back
+    # to nixos-rebuild.
     features.cli.vswitch.enable = true;
-    features.cli.nh.enable = true;
     features.cli.nix-index.enable = true;
     # vlocate complements nix-index (GH-245): the fleet's own systems, and the
     # command-not-found hint in nushell, fish and zsh. Rollback: lib.mkForce false on a host.
