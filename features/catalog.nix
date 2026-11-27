@@ -107,6 +107,9 @@
   ./communication/discord
   ./communication/signal-desktop
 
+  # compartments
+  ./compartments/guest-kernel
+
   # creative
   ./creative/gimp
   ./creative/obs-studio
