@@ -14,6 +14,9 @@
   profiles.communication.enable = true;
   # profiles.creative.enable = true;
   profiles.desktop.enable = true;
+  # vverify (Voltaic, #437, as drakkar GH-158): the store checked against its database
+  # weekly, into node_exporter. Rollback: delete this line.
+  features.nix.vverify.enable = true;
   profiles.development.enable = true;
   # profiles.gaming.enable = true;
 
