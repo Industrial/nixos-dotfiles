@@ -38,8 +38,11 @@ in
     enablesStigTestHost = assay.eq (has "security.stig.profiles.test-host") true;
     stigProfileIsTestHost = assay.eq [stig.enable stig.profile] [true "test-host"];
     stigAccountsForExactlyTheManifest = assay.eq (sorted accountedFor) (sorted manifest.ids);
-    stigCountsAre85Configured17Excluded1External =
-      assay.eq [(builtins.length stig.implemented) (builtins.length (builtins.attrNames stig.exclude)) (builtins.attrNames stig.satisfiedExternally)] [85 17 ["V-268144"]];
+    stigCountsAre84Configured18Excluded1External =
+      assay.eq [(builtins.length stig.implemented) (builtins.length (builtins.attrNames stig.exclude)) (builtins.attrNames stig.satisfiedExternally)] [84 18 ["V-268144"]];
+    # V-268132 is excluded because nothing enforces it; the file must not carry the line
+    # whose presence is all the published check looks at.
+    noMinimumAgeLineWithoutAnEnforcer = assay.eq (host.security.loginDefs.settings ? PASS_MIN_DAYS) false;
     stigExclusionsAreWritten =
       assay.eq (builtins.filter (id: builtins.stringLength stig.exclude.${id} <= 80) (builtins.attrNames stig.exclude)) [];
 

@@ -56,10 +56,10 @@ in
     # --- composition ---
     buildsOnBaseSafe = assay.eq (builtins.elem "base-safe.nix" (map baseName mod.imports)) true;
     addsOnlyWhatBaseSafeLacks = assay.eq (builtins.filter (id: builtins.elem id baseIds) ownIds) [];
-    # The 17 are drawn from the `full` set, and are pinned so that adding or dropping one is
+    # The 16 are drawn from the `full` set, and are pinned so that adding or dropping one is
     # a deliberate edit here and in ADR-0008.
     addsOnlyControlsFromFull = assay.eq (builtins.filter (id: !builtins.elem id fullOnlyIds) ownIds) [];
-    addsExactlyTheSeventeen =
+    addsExactlyTheSixteen =
       assay.eq (sorted ownIds)
       [
         "V-268081"
@@ -69,7 +69,6 @@ in
         "V-268086"
         "V-268101"
         "V-268102"
-        "V-268132"
         "V-268133"
         "V-268134"
         "V-268135"
@@ -80,24 +79,24 @@ in
         "V-268172"
         "V-268174"
       ];
-    carriesEightyFive = assay.eq (builtins.length carried) 85;
+    carriesEightyFour = assay.eq (builtins.length carried) 84;
     # mkForce-wrapped, because base-safe also labels the profile.
     declaresProfileName = assay.eq stig.profile.content "test-host";
     overridesTheBaseLabel = assay.eq (stig.profile._type or null) "override";
     everyImportExists = assay.eq (builtins.all builtins.pathExists mod.imports) true;
-    # Nothing excluded has a reboot to wait for, and none of the 17 is a kernel parameter:
+    # Nothing excluded has a reboot to wait for, and none of the 16 is a kernel parameter:
     # both registries are base-safe's, untouched.
     addsNoRebootOrDeferredEntries = assay.eq [(stig ? requiresReboot) (stig ? deferredVerification)] [false false];
 
     # --- the exclusions must be justified, not blank ---
-    excludesSeventeen = assay.eq (builtins.length excluded) 17;
+    excludesEighteen = assay.eq (builtins.length excluded) 18;
     everyExclusionIsJustified =
       assay.eq (builtins.filter (id: builtins.stringLength stig.exclude.${id} <= 80) excluded) [];
     # The three procedural controls carry the shared text, so `full` and this profile give an
     # assessor the same reason.
     proceduralExclusionsAreShared =
       assay.eq (lib.filterAttrs (id: _: procedural ? ${id}) stig.exclude) procedural;
-    # The 14 that are not procedural say that they were not applied.
+    # The 15 that are not procedural say that they were not applied.
     hostExclusionsSayNotApplied =
       assay.eq (builtins.filter (id: !(procedural ? ${id}) && builtins.match "Not applied.*" stig.exclude.${id} == null) excluded) [];
     # Exclusions that wait on the owner say so in the text an assessor reads.
@@ -114,6 +113,17 @@ in
     # ... and a gate on this host's own configuration (flake check stig-test-host-logon; its
     # node and script are pinned by ../tests/test-host-logon.assay.nix).
     testHostLogonGateExists = assay.eq (builtins.pathExists ./../tests/test-host-logon.nix) true;
+    # V-268132 is excluded under the same decision, and stays excluded while nothing enforces
+    # it: the text names what was observed, and tests/vm/test-host.nix pins each observation.
+    unenforcedMinimumAgeIsNotCarried =
+      assay.eq [(builtins.elem "V-268132" carried) (stig.exclude ? "V-268132")] [false true];
+    unenforcedMinimumAgeExclusionSaysWhatWasObserved = assay.eq (map (needle: lib.hasInfix needle stig.exclude."V-268132") [
+      "the published check, a grep of that file, passes"
+      "shadow 4.20.3 no longer implements the setting"
+      "chage has no --mindays"
+      "'password updated successfully' and exits 0"
+      "stig-V-268132"
+    ]) [true true true true true];
     # The pwquality.conf settings V-268170 makes PAM apply are all carried with it.
     pwqualitySettingsStayCarried =
       assay.eq (builtins.filter (id: !builtins.elem id carried) ["V-268126" "V-268127" "V-268128" "V-268129" "V-268134" "V-268145" "V-268169"]) [];
