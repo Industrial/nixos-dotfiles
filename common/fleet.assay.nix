@@ -66,6 +66,27 @@ in
     cacheKeysOnlyOnServers = assay.eq (lib.filter (name: !(builtins.elem name (runs "nix.vcache"))) (map (c: c.name) fleet.binaryCaches)) [];
     binaryCachesUseTheFleetPort = assay.eq (lib.all (c: lib.hasSuffix ":${toString fleet.cachePort}" c.url) fleet.binaryCaches) true;
 
+    # Compartment trust facts (GH-421): every host carries all of them, the tier is from a
+    # closed set and follows the TPM, and no attestation root is pinned yet (DICE roots
+    # are enrolled later, like operatorKey).
+    trustFactsOnEveryHost = assay.eq (lib.filter (n: let
+      h = fleet.hosts.${n};
+    in
+      !(h ? trustTier && h ? tpm2 && h ? attestationRoot && h ? cpu && lib.attrNames h.cpu == ["model" "sevSnp" "tdx" "vendor"]))
+    fleet.order) [];
+    trustTiersAreKnown = assay.eq (lib.filter (n: !(builtins.elem fleet.hosts.${n}.trustTier ["local-hw-attested" "local-unattested"])) fleet.order) [];
+    hwAttestedIffTpm2 = assay.eq (lib.filter (n: fleet.hosts.${n}.trustTier == "local-hw-attested") fleet.order) (lib.filter (n: fleet.hosts.${n}.tpm2) fleet.order);
+    cpuVendorsAreKnown = assay.eq (lib.filter (n: !(builtins.elem fleet.hosts.${n}.cpu.vendor ["amd" "intel"])) fleet.order) [];
+    # SEV-SNP is AMD-only and TDX Intel-only.
+    confidentialVmFlagsMatchVendor = assay.eq (lib.filter (n: let
+      c = fleet.hosts.${n}.cpu;
+    in
+      (c.sevSnp && c.vendor != "amd") || (c.tdx && c.vendor != "intel"))
+    fleet.order) [];
+    # Measured 2026-11-27: consumer parts only, so no host can run confidential VMs.
+    noConfidentialVmHostsToday = assay.eq (lib.filter (n: fleet.hosts.${n}.cpu.sevSnp || fleet.hosts.${n}.cpu.tdx) fleet.order) [];
+    noAttestationRootsYet = assay.eq (lib.filter (n: fleet.hosts.${n}.attestationRoot != null) fleet.order) [];
+
     everyHostEnrolled = assay.eq (builtins.length fleet.operatorKeys) (builtins.length fleet.names);
 
     # vpush pushes automatically from every builder-role host that is not a cache: today
