@@ -35,4 +35,7 @@
   # V-268093 (audit_backlog_limit=65536) are kernel command line parameters. The report
   # renders them "Configured (pending reboot)" until muninn restarts.
   features.security.stig.profiles.test-host.enable = true;
+  # /etc is the upstream overlay, with the host's stateful files carried in and out (GH-185;
+  # gate: etc-overlay-live-switch-muninn). Rollback: lib.mkForce false copies the state back out.
+  features.nixos.etc-overlay.enable = true;
 }
