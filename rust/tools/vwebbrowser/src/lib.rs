@@ -37,5 +37,6 @@ macro_rules! voltaic {
 voltaic!(error);
 voltaic!(ui);
 voltaic!(app);
+voltaic!(nav);
 
 pub mod gtk_edge;

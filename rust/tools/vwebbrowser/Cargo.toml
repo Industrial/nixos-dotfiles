@@ -23,6 +23,10 @@ id_effect = "=0.13.0"
 id_effect_tokio = "=0.13.0"
 # The exit contract (0/1/2/101/130) without run_main itself.
 id_effect_cli = "=0.13.0"
+# Per-tab navigation lifecycle (src/nav.vlt): typed FSM, Effect-valued steps.
+id_effect_fsm = "=0.13.0"
+# The machine runs as a Statem process: ProcessNode, ProcessCtx, CallError.
+id_effect_process = "=0.13.0"
 # The GTK edge (src/gtk_edge.rs) only: one gtk-rs generation (glib/gio 0.22).
 # webkit6 0.6.1 names gtk::Accessible, which gtk4 0.11 only exports from v4_10
 # on; nixpkgs ships gtk4 4.24, so the 4.14 API is safe to assume.

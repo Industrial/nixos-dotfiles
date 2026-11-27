@@ -769,6 +769,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "id_effect_fsm"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec90adecc3adc8f6e6eee318084aadea7f4da21a28f49b3bc5c14f1e81980e70"
+dependencies = [
+ "id_effect",
+ "id_effect_proc_macro",
+ "id_effect_process",
+ "thiserror",
+]
+
+[[package]]
 name = "id_effect_macro"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -783,6 +795,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "id_effect_process"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3cc1ff92aa9cc0c7c05032a7950ebe562152089df9d534efd00908078a9c09f"
+dependencies = [
+ "id_effect",
 ]
 
 [[package]]
@@ -1407,6 +1428,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "thiserror"
+version = "2.0.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
+]
+
+[[package]]
 name = "tinystr"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1612,6 +1653,8 @@ dependencies = [
  "gtk4",
  "id_effect",
  "id_effect_cli",
+ "id_effect_fsm",
+ "id_effect_process",
  "id_effect_tokio",
  "voltaic-diag",
  "voltaic-driver",
