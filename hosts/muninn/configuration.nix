@@ -16,6 +16,9 @@
   profiles.desktop.enable = true;
   profiles.development.enable = true;
   # profiles.gaming.enable = true;
+  # vgen (Voltaic, #437, as drakkar GH-190) owns generation retention and the boot entries;
+  # vgc only collects. Rollback: delete this line, and vgc prunes with nix-env again.
+  features.nixos.vgen.enable = true;
 
   features.fleet.comin.enable = true;
   # vdeploy (Voltaic) in observe mode next to comin (#437): it plans and logs the switch
