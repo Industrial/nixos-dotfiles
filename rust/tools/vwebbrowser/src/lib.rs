@@ -41,5 +41,6 @@ voltaic!(nav);
 voltaic!(settings);
 voltaic!(log);
 voltaic!(tabtree);
+voltaic!(omnibox);
 
 pub mod gtk_edge;
