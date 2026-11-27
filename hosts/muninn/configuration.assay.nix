@@ -24,6 +24,8 @@ in
   assay.suite "configuration" {
     enablesFleetAccess = assay.eq (has "fleet.remote-access") true;
     enablesAi = assay.eq cfg.profiles.ai.enable true;
+    # The first host with agent microVMs (ADR-0009, #353).
+    enablesAgentVm = assay.eq [(has "ai.agent-vm") cfg.features.ai.agent-vm.operators] [true ["tom"]];
     # muninn is the monitoring standby for when mimir is down.
     monitoringStandby = assay.eq [(has "monitoring.prometheus") (has "monitoring.grafana")] [true true];
     noRelay = assay.eq (has "fleet.remote-desktop-relay") false;

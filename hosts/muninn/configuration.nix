@@ -38,4 +38,10 @@
   # /etc is the upstream overlay, with the host's stateful files carried in and out (GH-185;
   # gate: etc-overlay-live-switch-muninn). Rollback: lib.mkForce false copies the state back out.
   features.nixos.etc-overlay.enable = true;
+
+  # One microVM per agent session (ADR-0009, #353): three slots, `vagent run --slot N --branch
+  # B`. muninn is the first host (#419, 2026-11-27). The way back to a host session is plain
+  # `claude`. Rollback: `features.ai.agent-vm.enable = lib.mkForce false;`.
+  features.ai.agent-vm.enable = true;
+  features.ai.agent-vm.operators = ["tom"];
 }
