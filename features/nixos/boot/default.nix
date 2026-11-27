@@ -52,7 +52,7 @@
         exit 1
       fi
       install -d -m 0700 "$bundle"
-      sbctl create-keys --database-path "$bundle" --export "$bundle/keys"
+      sbctl create-keys --database-path "$bundle/GUID" --export "$bundle/keys"
       chmod -R go-rwx "$bundle"
       test -s "$bundle/keys/db/db.key"
       echo "sbctl-ensure-keys: created the Secure Boot keys in $bundle" >&2

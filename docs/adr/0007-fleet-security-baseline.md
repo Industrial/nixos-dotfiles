@@ -278,7 +278,7 @@ configuration, with no new key material beyond the Secure Boot keys and no passp
 - **Keys.** `sbctl-ensure-keys` runs in the install hook, before `lzbt` signs (a systemd
   unit would be too late: `switch-to-configuration` installs the bootloader before it
   activates), and again from `sbctl-keys.service`. It runs
-  `sbctl create-keys --database-path /var/lib/sbctl --export /var/lib/sbctl/keys` only when
+  `sbctl create-keys --database-path /var/lib/sbctl/GUID --export /var/lib/sbctl/keys` only when
   `keys/db/db.key` is missing, keeps the bundle root-only (0700), and **never overwrites**:
   a `keys/` without `db.key` is refused with an error, not replaced.
 - **Encrypted backup.** `sbctl-keys.service` then writes, when it is missing,
