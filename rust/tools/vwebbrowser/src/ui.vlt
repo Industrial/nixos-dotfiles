@@ -1,0 +1,71 @@
+-- The seam between the effect world and GTK, as two capabilities and plain
+-- data. Nothing here names a GTK or WebKit type: the live `UiPort` is
+-- `gtk_edge.rs`, the only Rust module that touches widgets; tests provide a
+-- fake through the same trait.
+--
+--   effects -> GTK: `Ui` (a `UiPort`): `UiCmd`s, applied on the GTK thread.
+--   GTK -> effects: `UiEvents`: a sliding `Queue<UiEvent>` that signal
+--                   handlers feed with `try_offer`, settled inline.
+
+import std::sync::Arc
+import id_effect::{Effect, HCons, HNil, Layer, Never, Queue, caps}
+import crate::error::{AppError, UiError}
+
+-- A tab's identity. Widgets are looked up by it on the GTK thread; the id is
+-- all that ever crosses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+export newtype TabId = TabId { export id u64 }
+
+-- What the program asks of the window.
+export data UiCmd
+  = OpenUrl TabId String
+  | Quit
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- What the window tells the program.
+export data UiEvent
+  = WindowClosed
+  | TitleChanged TabId String
+  | UriChanged TabId String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The window as a port: one method, because handing a command over is all
+-- the program asks of it. The command is applied later, on the GTK thread.
+export class UiPort
+  send : &self -> UiCmd -> Effect<(), UiError>
+
+export newtype Ui = Ui (export Arc<dyn UiPort + Send + Sync>)
+
+instance Clone Ui
+  clone : &self -> Self
+  clone self = Ui (Arc::clone (&self.0))
+
+-- The window's events, oldest first. Sliding: a burst the program has not
+-- caught up with drops the oldest event, never blocks the GTK thread.
+export newtype UiEvents = UiEvents (export Queue<UiEvent>)
+
+instance Clone UiEvents
+  clone : &self -> Self
+  clone self = UiEvents (self.0.clone ())
+
+-- How many events wait for the program before the oldest is dropped.
+export const EVENT_CAPACITY : usize = 1024
+
+export new_events : UiEvents
+new_events = UiEvents (Queue::sliding EVENT_CAPACITY)
+
+export type UiEnv = caps!(Ui, UiEvents)
+
+export env : Ui -> UiEvents -> UiEnv
+env ui events = HCons (Arc::new ui) (HCons (Arc::new events) HNil)
+
+-- Both capabilities, ready values: the live edge builds them before the root
+-- starts (the queue is shared with the GTK thread), tests build fakes.
+export layer : Ui -> UiEvents -> Layer<UiEnv, AppError>
+layer ui events = Layer::succeed (env ui events)
+
+-- One event into the queue, without suspending: a pure synchronous step, so
+-- the GTK thread settles it inline (`Runtime::try_block_on`) and never parks.
+-- `false` when the queue is shut down.
+export offer : &UiEvents -> UiEvent -> Effect<bool, Never, HNil>
+offer events event = events.0.try_offer event
