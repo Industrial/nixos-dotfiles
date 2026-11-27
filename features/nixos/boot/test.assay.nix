@@ -28,7 +28,8 @@ in
     # daemon restricted to @wheel, so the non-root checks are the host's.
     muninnStigTestHost = assay.eq machine.security.stig.profile "test-host";
     restrictedDaemon = assay.eq (builtins.elem "@wheel" machine.nix.settings.allowed-users) true;
-    # Exactly one extra dependency: generation 2's toplevel (the same node, option on).
-    generationTwoInImage = assay.eq (builtins.length machine.system.extraDependencies) 1;
+    # Two extra dependencies: the Secure Boot generations, manual keys and createKeys.
+    generationTwoInImage = assay.eq (builtins.length machine.system.extraDependencies) 2;
+    ageForTheBackupCheck = assay.eq (nixos.hasPackage machine "age") true;
     generationTwoIsANixosSystem = assay.eq (pkgs.lib.hasInfix "nixos-system-machine" (toString secureBoot)) true;
   }
