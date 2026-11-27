@@ -3,9 +3,12 @@
 #   nix build .#checks.x86_64-linux.vswitch-vm
 #
 # The node is drakkar-like: nix.settings.allowed-users = ["@wheel"] (features/nixos/users on
-# every host), vhealth with its probes, and alice in wheel like tom. vswitch is run by alice;
-# only the activation is elevated (sudo, here without a password), in vdeploy's transient
-# unit. The generations are specialisations of the boot generation, handed over with
+# every host), vhealth with its probes, and alice in wheel like tom. It also carries the real
+# STIG base-safe profile, as mimir does (#241; vdeploy-rollback-vm's mimir node imports it the
+# same way): auditd, AppArmor, require-sigs, UMASK 077, and V-268156's
+# `security.sudo.wheelNeedsPassword = true`. vswitch is run by alice; only the activation is
+# elevated, by the real sudo asking alice's password on a terminal (askpw below answers it and
+# counts the prompts), in vdeploy's transient unit. The generations are specialisations of the boot generation, handed over with
 # --toplevel (the VM has no flake to build from; the build step is covered by the crate's
 # tests):
 #   good     the web page changes; its probe expects the new page
@@ -25,6 +28,38 @@
 {pkgs}: let
   inherit (pkgs) busybox;
 
+  # alice's password. Not a secret: the test VM's alone.
+  password = "gh241-pw";
+
+  # askpw "<shell command>": runs it on a fresh pseudo-terminal, as a person at a console
+  # would, and answers each sudo password prompt with alice's password. Output and exit
+  # status are the command's; the last line, on stdout, is `askpw: prompts=<n>`.
+  askpw = pkgs.writeScriptBin "askpw" ''
+    #!${pkgs.python3}/bin/python3
+    import os, pty, sys
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.execv("/bin/sh", ["/bin/sh", "-c", sys.argv[1]])
+    seen, prompts = b"", 0
+    while True:
+        try:
+            data = os.read(fd, 4096)
+        except OSError:
+            break
+        if not data:
+            break
+        sys.stdout.buffer.write(data)
+        sys.stdout.flush()
+        seen = (seen + data)[-256:]
+        if b"password for" in seen.lower():
+            os.write(fd, b"${password}\n")
+            prompts += 1
+            seen = b""
+    _, status = os.waitpid(pid, 0)
+    print(f"askpw: prompts={prompts}", flush=True)
+    sys.exit(os.waitstatus_to_exitcode(status))
+  '';
+
   node = {
     config,
     lib,
@@ -32,7 +67,12 @@
   }: let
     inherit (config.vmtest) gen;
   in {
-    imports = [./default.nix ../../nix/vhealth/default.nix];
+    imports = [
+      ./default.nix
+      ../../nix/vhealth/default.nix
+      # The real hardening, not a stand-in (#241): mimir's profile.
+      ../../security/stig/profiles/base-safe.nix
+    ];
 
     options.vmtest.gen = lib.mkOption {
       type = lib.types.enum ["base" "good" "broken"];
@@ -40,6 +80,9 @@
     };
 
     config = {
+      # qemu-vm turns timesyncd off; base-safe's V-268151 turns it on. The control wins here,
+      # as in vdeploy-rollback-vm.
+      services.timesyncd.enable = lib.mkForce true;
       system.switch.enable = true;
       # The test VM's disk is ext2 without room for GRUB's core image, so a real
       # `switch-to-configuration boot` cannot install GRUB there and fails (as it should;
@@ -91,14 +134,15 @@
       };
 
       nix.settings.experimental-features = ["nix-command"];
-      # In wheel, like tom: the only users the restricted daemon serves, and sudo's.
+      # In wheel, like tom: the only users the restricted daemon serves, and sudo's. sudo asks
+      # for this password (V-268156); nothing here turns that off.
       users.users.alice = {
         isNormalUser = true;
         uid = 1000;
         extraGroups = ["wheel"];
+        inherit password;
       };
-      security.sudo.wheelNeedsPassword = false;
-      environment.systemPackages = [pkgs.curl];
+      environment.systemPackages = [pkgs.curl askpw];
       virtualisation = {
         memorySize = 2048;
         cores = 2;
@@ -135,6 +179,13 @@ in
       def alice(cmd):
           return f"su - alice -c {json.dumps(cmd)}"
 
+      # alice at a terminal: sudo asks her password (STIG V-268156) and askpw types it.
+      def alice_tty(cmd):
+          return alice(f"askpw {json.dumps(cmd)}")
+
+      def prompts(out):
+          return int(out.strip().splitlines()[-1].removeprefix("askpw: prompts="))
+
       def non_root(page):
           machine.succeed(alice("timeout 60 nix-store --store daemon -q --hash /run/current-system"))
           body = machine.succeed(alice("timeout 30 curl -sf http://127.0.0.1:8080/index.html")).strip()
@@ -153,14 +204,27 @@ in
       def marks():
           return machine.succeed("ls /var/lib/vdeploy/bad 2>/dev/null || true").split()
 
-      with subtest("build needs no root: it only resolves and diffs"):
-          out = machine.succeed(alice(f"vswitch build --toplevel {good} 2>&1"))
+      with subtest("the STIG base-safe profile is in force on the node"):
+          machine.succeed("systemctl is-active auditd.service")
+          machine.succeed("grep -qx 'require-sigs = true' /etc/nix/nix.conf")
+
+      with subtest("build needs no root: it only resolves and diffs, and sudo is never asked"):
+          out = machine.succeed(alice_tty(f"vswitch build --toplevel {good} 2>&1"))
           t.assertIn(f"built {good}", out)
+          t.assertEqual(prompts(out), 0, out)
           t.assertEqual((current(), profile()), (base, boot_default))
 
+      with subtest("without alice's password, sudo refuses and nothing is activated"):
+          # No terminal, so sudo cannot ask: the STIG's password requirement is what stops it.
+          status, out = machine.execute(alice(f"timeout 60 vswitch test --toplevel {good} 2>&1"))
+          t.assertNotEqual(status, 0, out)
+          t.assertEqual((current(), profile()), (base, boot_default))
+          t.assertEqual(marks(), [])
+
       with subtest("a vhealth failure rolls back, the boot default never moves, and it is marked bad"):
-          status, out = machine.execute(alice(f"vswitch switch --toplevel {broken} --health-window 10s 2>&1"))
+          status, out = machine.execute(alice_tty(f"vswitch switch --toplevel {broken} --health-window 10s 2>&1"))
           t.assertEqual(status, 1, out)
+          t.assertEqual(prompts(out), 1, out)
           # `systemd-run --pipe`: the apply's own words reach the operator's terminal.
           t.assertIn(f"rolled back from {broken} to {base}", out)
           t.assertEqual(current(), base)
@@ -173,13 +237,14 @@ in
           non_root("base")
 
       with subtest("the rolled-back generation is refused when asked again, with no switch"):
-          machine.fail(alice(f"vswitch switch --toplevel {broken} --health-window 10s"))
+          machine.fail(alice_tty(f"vswitch switch --toplevel {broken} --health-window 10s"))
           t.assertEqual(current(), base)
           t.assertEqual(last()["result"], "refused")
           non_root("base")
 
       with subtest("a healthy switch is kept: running and boot default both move"):
-          out = machine.succeed(alice(f"vswitch switch --toplevel {good} --health-window 30s 2>&1"))
+          out = machine.succeed(alice_tty(f"vswitch switch --toplevel {good} --health-window 30s 2>&1"))
+          t.assertEqual(prompts(out), 1, out)
           t.assertEqual(current(), good)
           t.assertEqual(profile(), good)
           l = last()
@@ -214,12 +279,12 @@ in
           t.assertEqual(current(), good)
 
       with subtest("test activates without touching the boot default"):
-          machine.succeed(alice(f"vswitch test --toplevel {base}"))
+          machine.succeed(alice_tty(f"vswitch test --toplevel {base}"))
           t.assertEqual((current(), profile()), (base, good))
           non_root("base")
 
       with subtest("boot moves only the boot default"):
-          machine.succeed(alice(f"vswitch boot --toplevel {base}"))
+          machine.succeed(alice_tty(f"vswitch boot --toplevel {base}"))
           t.assertEqual((current(), profile()), (base, base))
           non_root("base")
 
