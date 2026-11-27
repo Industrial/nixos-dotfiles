@@ -1,0 +1,36 @@
+# nixos-users: the first NixOS subtree Voltaic owns (#417 S3, #457). The users and groups
+# this repository defines are declared as modsys modules, evaluated at R = HNil and
+# rendered to features/nixos/users/voltaic.json, which the features import. `cargo test`
+# fails when the committed JSON differs from what the modules generate.
+#
+# Standalone crate (own Cargo.lock, empty [workspace]), gated by bin/ci/cargo-standalone.
+# It depends on modsys and id_effect only: a configuration crate must not pull build
+# scripts or proc-macros that the clippy.toml purity fence cannot see.
+[workspace]
+
+[package]
+name = "nixos-users"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial"]
+description = "The repository's NixOS users and groups as Voltaic modules over modsys, rendered to JSON for NixOS"
+license = "MIT"
+publish = false
+build = "build.rs"
+
+[dependencies]
+# Fleet-wide pin; must equal modsys's.
+id_effect = "=0.13.0"
+modsys = { path = "../modsys" }
+
+[build-dependencies]
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
+
+[lib]
+name = "nixos_users"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nixos-users"
+path = "src/main.rs"

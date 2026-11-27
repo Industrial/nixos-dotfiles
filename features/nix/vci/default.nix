@@ -61,7 +61,9 @@
   fleet = import ../../../common/fleet.nix;
   vci = pkgs.callPackage ../../../rust/tools/vci/default.nix {};
   textfileDir = "/var/lib/prometheus-node-exporter-text";
-  state = "/var/lib/vci";
+  # The accounts are Voltaic's (#457, rust/tools/nixos-users); vci's state is its home.
+  voltaic = import ../../nixos/users/voltaic.nix;
+  state = voltaic.fragments.vci.users.vci.home;
   restricted = lib.attrByPath ["features" "nixos" "users" "enable"] false config || cfg.restrictedNixUsers;
   minted = cfg.statusApp.privateKeyFile != null;
   tokenDir = "/run/vci-token";
@@ -241,13 +243,13 @@ in {
 
     environment.systemPackages = [vci];
 
-    # The minter's own user (GH-247): its primary group is vci, so the token it writes
+    # The accounts are Voltaic's (#457): vci's own, and the minter's (GH-247) when minted.
+    # The minter's primary group is vci, so the token it writes
     # (0440) is readable by vci and nobody else, and vci never reads the key.
-    users.users.vci-token = lib.mkIf minted {
-      isSystemUser = true;
-      group = "vci";
-      description = "vci-token, the GitHub App token vci posts statuses with";
-    };
+    users = lib.mkMerge [
+      voltaic.fragments.vci
+      (lib.mkIf minted voltaic.fragments.vci-token)
+    ];
 
     systemd.services.vci-token = lib.mkIf minted {
       description = "vci-token: the vbump GitHub App's installation token for vci's commit statuses";
@@ -285,13 +287,6 @@ in {
       };
     };
 
-    users.users.vci = {
-      isSystemUser = true;
-      group = "vci";
-      home = state;
-      description = "vci, the fleet's CI builds";
-    };
-    users.groups.vci = {};
     # It may use the Nix daemon (never trusted-users), merged into the host's list.
     nix.settings.allowed-users = lib.mkIf restricted ["vci"];
 

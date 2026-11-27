@@ -1,0 +1,38 @@
+-- The typed slice of NixOS's `users.users.<name>` and `users.groups.<name>`
+-- that this repository sets. A field left `None` (or an empty list) is not
+-- rendered, so NixOS's own default applies, exactly as when the Nix source
+-- left it out. Names follow NixOS's options in camelCase when rendered.
+
+import std::collections::BTreeMap
+
+export data User {
+  export is_normal_user Option<bool>,
+  export is_system_user Option<bool>,
+  export uid Option<u32>,
+  export group Option<String>,
+  export extra_groups Vec<String>,
+  export home Option<String>,
+  export create_home Option<bool>,
+  export description Option<String>,
+  export hashed_password Option<String>,
+}
+  deriving (Debug, Clone, PartialEq, Default)
+
+export data Group {
+  export gid Option<u32>,
+}
+  deriving (Debug, Clone, PartialEq, Default)
+
+export type Users = BTreeMap<String, User>
+
+export type Groups = BTreeMap<String, Group>
+
+-- A system user with its own primary group: the shape of every service
+-- account here (flexget, vci, vhealth, …).
+export system_user : &str -> &str -> User
+system_user group description = User {
+  is_system_user = Some true,
+  group = Some (group.to_string ()),
+  description = Some (description.to_string ()),
+  ...User::default ()
+}

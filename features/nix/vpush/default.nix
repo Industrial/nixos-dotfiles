@@ -58,7 +58,9 @@
   inherit (settings) hostname;
 
   vpush = pkgs.callPackage ../../../rust/tools/vpush/default.nix {};
-  stateDir = "/var/lib/vpush";
+  # The account is Voltaic's (#457, rust/tools/nixos-users); its state is its home.
+  voltaic = import ../../nixos/users/voltaic.nix;
+  stateDir = voltaic.fragments.vpush.users.vpush.home;
   spool = "${stateDir}/spool";
 
   others = builtins.filter (c: c.name != hostname) fleet.binaryCaches;
@@ -179,13 +181,7 @@ in {
 
     nix.settings.post-build-hook = hook;
 
-    users.users.vpush = {
-      isSystemUser = true;
-      group = "vpush";
-      home = stateDir;
-      description = "vpush, pushes builds to the fleet cache";
-    };
-    users.groups.vpush = {};
+    users = voltaic.fragments.vpush;
 
     # The spool exists before the first build, whether the service has started or not.
     systemd.tmpfiles.rules = ["d ${spool} 0700 vpush vpush -"];

@@ -66,12 +66,6 @@ in {
     "d ${directoryPath} 0770 flexget data - -"
   ];
 
-  users.users.flexget = {
-    isSystemUser = true;
-    home = "/home/flexget";
-    createHome = true;
-    group = "flexget";
-    extraGroups = ["data"];
-  };
-  users.groups.flexget = {};
+  # The flexget account and group are Voltaic's (#457): rust/tools/nixos-users.
+  users = (import ../../nixos/users/voltaic.nix).fragments.flexget;
 }

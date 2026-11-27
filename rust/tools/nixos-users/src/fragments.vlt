@@ -1,0 +1,157 @@
+-- The users and groups this repository defines, one module per feature that
+-- owns them. A fragment is what one feature contributes; the feature's Nix
+-- imports it from features/nixos/users/voltaic.json (`fragments.<name>`) and
+-- keeps its own `enable` / `mkIf` gating, so which hosts get it is unchanged.
+--
+-- What stays in Nix, because it depends on host settings or other options:
+-- the operator's name, home, full name and initial password (common/settings.nix),
+-- the members of `data`, `games` and `vdeploy-wake`, and per-feature extras
+-- such as `linger`, `shell` and authorized keys.
+
+import std::collections::BTreeMap
+import modsys::eval::{Body, EvalError, Out, View, define}
+import modsys::option::NORMAL
+import crate::options::{GROUPS, OPERATOR, USERS}
+import crate::types::{Group, User, system_user}
+
+export data Fragment {
+  export name &'static str,
+  export origin &'static str,
+  export writes Vec<&'static str>,
+  export body Body,
+}
+
+named : given <V> &str -> V -> BTreeMap<String, V>
+named name value = BTreeMap::from ([(name.to_string (), value)])
+
+-- features/media/flexget
+flexget : &View -> &mut Out -> Result<(), EvalError>
+flexget _ out =
+  user = User {
+    is_system_user = Some true,
+    group = Some (String::from "flexget"),
+    extra_groups = [String::from "data"].to_vec (),
+    home = Some (String::from "/home/flexget"),
+    create_home = Some true,
+    ...User::default ()
+  }
+  define out (&USERS) NORMAL (named "flexget" user)
+  define out (&GROUPS) NORMAL (named "flexget" (Group::default ()))
+  Ok ()
+
+-- features/monitoring/vexporter
+vexporter : &View -> &mut Out -> Result<(), EvalError>
+vexporter _ out =
+  define out (&USERS) NORMAL (named "vexporter" (system_user "vexporter" "vexporter, the Nix and fleet metrics"))
+  define out (&GROUPS) NORMAL (named "vexporter" (Group::default ()))
+  Ok ()
+
+-- features/monitoring/textfile-collector
+textfile_collector : &View -> &mut Out -> Result<(), EvalError>
+textfile_collector _ out =
+  define out (&GROUPS) NORMAL (named "prometheus-textfile" (Group::default ()))
+  Ok ()
+
+-- features/nix/vci: the CI daemon. Its home is its state directory, which the
+-- feature reads back from here for its units.
+vci : &View -> &mut Out -> Result<(), EvalError>
+vci _ out =
+  user = User {
+    home = Some (String::from "/var/lib/vci"),
+    ...system_user "vci" "vci, the fleet's CI builds"
+  }
+  define out (&USERS) NORMAL (named "vci" user)
+  define out (&GROUPS) NORMAL (named "vci" (Group::default ()))
+  Ok ()
+
+-- features/nix/vci, when it mints its own token (GH-247): primary group vci,
+-- so the token it writes (0440) is readable by vci and nobody else.
+vci_token : &View -> &mut Out -> Result<(), EvalError>
+vci_token _ out =
+  define out (&USERS) NORMAL (named "vci-token" (system_user "vci" "vci-token, the GitHub App token vci posts statuses with"))
+  Ok ()
+
+-- features/nix/vhealth
+vhealth : &View -> &mut Out -> Result<(), EvalError>
+vhealth _ out =
+  define out (&USERS) NORMAL (named "vhealth" (system_user "vhealth" "vhealth probes"))
+  define out (&GROUPS) NORMAL (named "vhealth" (Group::default ()))
+  Ok ()
+
+-- features/nix/vpush. Its home is its state directory, as for vci.
+vpush : &View -> &mut Out -> Result<(), EvalError>
+vpush _ out =
+  user = User {
+    home = Some (String::from "/var/lib/vpush"),
+    ...system_user "vpush" "vpush, pushes builds to the fleet cache"
+  }
+  define out (&USERS) NORMAL (named "vpush" user)
+  define out (&GROUPS) NORMAL (named "vpush" (Group::default ()))
+  Ok ()
+
+-- features/nixos/users: the shared groups. Pinned gids: NFS (sec=sys)
+-- authorises by number, so they must agree with mimir's /data.
+users : &View -> &mut Out -> Result<(), EvalError>
+users _ out =
+  data_group = Group {
+    gid = Some 1111,
+  }
+  games_group = Group {
+    gid = Some 1112,
+  }
+  groups = BTreeMap::from ([(String::from "data", data_group), (String::from "games", games_group)])
+  define out (&GROUPS) NORMAL groups
+  Ok ()
+
+-- features/nixos/users, with features.hardening.lockRoot: "!" is never a valid
+-- crypt(3) hash, so no password matches it (ADR-0007).
+root : &View -> &mut Out -> Result<(), EvalError>
+root _ out =
+  user = User {
+    hashed_password = Some (String::from "!"),
+    ...User::default ()
+  }
+  define out (&USERS) NORMAL (named "root" user)
+  Ok ()
+
+-- features/nixos/users: the operator account. uid pinned, not allocated: NFS
+-- (sec=sys) authorises by number, so a client's uid must equal mimir's.
+operator : &View -> &mut Out -> Result<(), EvalError>
+operator _ out =
+  groups = ["audio", "networkmanager", "plugdev", "render", "video", "wheel", "data", "games"]
+  user = User {
+    is_normal_user = Some true,
+    uid = Some 1000,
+    extra_groups = groups
+      |> .iter
+      |> .map (\g -> g.to_string ())
+      |> .collect,
+    ...User::default ()
+  }
+  define out (&OPERATOR) NORMAL user
+  Ok ()
+
+fragment : &'static str -> &'static str -> Vec<&'static str> -> Body -> Fragment
+fragment name origin writes body = Fragment {
+  name,
+  origin,
+  writes,
+  body,
+}
+
+-- Every fragment, in the order the JSON lists them (by name).
+export fragments : Vec<Fragment>
+fragments =
+  both = [USERS.path, GROUPS.path].to_vec ()
+  vec![
+    fragment("flexget", "features/media/flexget", both.clone(), flexget),
+    fragment("operator", "features/nixos/users", vec![OPERATOR.path], operator),
+    fragment("root", "features/nixos/users", vec![USERS.path], root),
+    fragment("textfile-collector", "features/monitoring/textfile-collector", vec![GROUPS.path], textfile_collector),
+    fragment("users", "features/nixos/users", vec![GROUPS.path], users),
+    fragment("vci", "features/nix/vci", both.clone(), vci),
+    fragment("vci-token", "features/nix/vci", vec![USERS.path], vci_token),
+    fragment("vexporter", "features/monitoring/vexporter", both.clone(), vexporter),
+    fragment("vhealth", "features/nix/vhealth", both.clone(), vhealth),
+    fragment("vpush", "features/nix/vpush", both, vpush),
+  ]

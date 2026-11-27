@@ -20,7 +20,8 @@
   dir = "/var/lib/prometheus-node-exporter-text";
   group = "prometheus-textfile";
 in {
-  users.groups.${group} = {};
+  # The group is Voltaic's (#457): rust/tools/nixos-users.
+  users = (import ../nixos/users/voltaic.nix).fragments.textfile-collector;
 
   systemd.tmpfiles.rules = ["d ${dir} 2775 root ${group} - -"];
 
