@@ -1,4 +1,6 @@
-# vlocate (GH-245) in a VM, as a normal user, in all three shells:
+# vlocate (GH-245) in a VM, as a normal user, in all three shells, under the STIG
+# base-safe profile (mimir's hardening), which can tighten the permissions on
+# /nix/var/nix/db and the gcroots that vlocate reads (the lesson of vhealth, #230):
 #
 #   nix build .#checks.x86_64-linux.vlocate-vm
 #
@@ -21,13 +23,15 @@ in
     name = "vlocate-vm";
 
     nodes.machine = {config, ...}: {
-      imports = [./default.nix];
+      imports = [./default.nix ../../security/stig/profiles/base-safe.nix];
       # features/cli/shell-init declares this; the test has no shell-init, so declare it.
       options.cli.shellInit.extraAutoload = lib.mkOption {
         type = lib.types.attrsOf lib.types.path;
         default = {};
       };
       config = {
+        # base-safe turns timesyncd off; qemu-vm needs it on.
+        services.timesyncd.enable = lib.mkForce true;
         programs.fish.enable = true;
         programs.zsh.enable = true;
         environment.systemPackages = [pkgs.nushell];
