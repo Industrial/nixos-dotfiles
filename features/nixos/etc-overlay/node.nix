@@ -54,6 +54,10 @@ in {
     # this beats the host's plain `true`, and the live-switch gate's extension turns it
     # back on with lib.mkForce (test-live-switch.nix).
     features.nixos.etc-overlay.enable = lib.mkOverride 60 false;
+    # The agent microVMs (muninn, #353) are no part of /etc: their guest system is a whole NixOS
+    # evaluation inside each of this test's host evaluations, which put it over CI's 8 GiB
+    # evaluation budget. checks.agent-vm is their own VM test.
+    features.ai.agent-vm.enable = lib.mkForce false;
 
     # VM-only adjustments, the minimum for a host's config to coexist with qemu-vm.
     services.timesyncd.enable = lib.mkForce false;
