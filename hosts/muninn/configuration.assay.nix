@@ -15,7 +15,7 @@ let
   # flake.nix does: the selection above cannot see what a profile's imports switch on.
   mkHost = import ../../lib/mk-host.nix {inputs = nixos.flakeInputs;};
   host = (mkHost "muninn").config;
-  stig = host.security.stig;
+  inherit (host.security) stig;
   manifest = import ../../features/security/stig/lib/manifest.nix;
   accountedFor = stig.implemented ++ builtins.attrNames stig.exclude ++ builtins.attrNames stig.satisfiedExternally;
   sorted = builtins.sort (a: b: a < b);
@@ -62,4 +62,19 @@ in
     noPwqualityLineInPasswordStacks = assay.eq (map (s: hasPamLine s "pam_pwquality") ["passwd" "chpasswd" "sudo"]) [false false false];
     noFipsOnTheKernelCommandLine = assay.eq (builtins.elem "fips=1" host.boot.kernelParams) false; # V-268168
     timeServersAreNotPinned = assay.eq (builtins.any (s: builtins.match ".*navy\\.mil" s != null) host.networking.timeServers) false; # V-268149
+
+    # /etc on the overlay, mutable, state carried across (GH-185).
+    etcOnTheOverlay = assay.eq (has "nixos.etc-overlay") true;
+    # Rollback: lib.mkForce false turns it off; that generation carries the state back out
+    # (features/nixos/etc-overlay/default.assay.nix rollbackCarriesOut, and the VM gate).
+    etcOverlayRollsBack = let
+      off = features.evalSelection {
+        modules = [
+          ./configuration.nix
+          {disabledModules = [./disko.nix ./filesystems.nix ./hardware.nix];}
+          {features.nixos.etc-overlay.enable = nixos.lib.mkForce false;}
+        ];
+      };
+    in
+      assay.eq (builtins.elem "nixos.etc-overlay" (features.enabledFeatures off)) false;
   }
