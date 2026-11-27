@@ -287,3 +287,18 @@ test "the module order in the list does not change the result"
   by = value (&b) (&Y)
     |> .unwrap
   assert_eq! \-> fy \-> by
+
+-- x = 7, a second definition of x at the same priority as x_is_41.
+x_is_7 : &View -> &mut Out -> Result<(), EvalError>
+x_is_7 _ out =
+  define out (&X) NORMAL 7
+  Ok ()
+
+test "a conflict fails the evaluation even where nothing reads the option"
+  modules = vec![mk("a", vec![], vec!["x"], x_is_41), mk("b", vec![], vec!["x"], x_is_7)]
+  shown = evaluate (&modules)
+    |> .err
+    |> .unwrap
+    |> .to_string
+  expected = "option `x` has conflicting definitions at priority 100: a = 41, b = 7"
+  assert_eq! \-> shown \-> expected

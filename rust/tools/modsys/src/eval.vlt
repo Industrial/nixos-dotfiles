@@ -35,12 +35,19 @@ export errors EvalError
   UndeclaredWrite &'static str &'static str  "module `#{0}` writes `#{1}` without listing it in `writes`"
   Cycle String                               "evaluation cycle: #{0}"
   Emit String                                "emitting the derivation: #{0}"
+  Invalid String                             "invalid configuration: #{0}"
 
--- Declared slots and their definitions, both keyed by path.
+-- A declared option's merge, closed over its `T`: `evaluate` forces every
+-- one, so a conflict anywhere fails the evaluation, not only where the
+-- option is read (NixOS reports a conflict only when something forces it).
+type Check = Box<dyn Fn(&Registry) -> Result<(), EvalError>>
+
+-- Declared slots, their definitions, docs and merge checks, keyed by path.
 export data Registry {
   decls BTreeMap<&'static str, Box<dyn Any>>,
   defs BTreeMap<&'static str, Box<dyn Any>>,
   docs BTreeMap<&'static str, &'static str>,
+  checks BTreeMap<&'static str, Check>,
 }
 
 export empty : Registry
@@ -48,6 +55,7 @@ empty = Registry {
   decls = BTreeMap::new (),
   defs = BTreeMap::new (),
   docs = BTreeMap::new (),
+  checks = BTreeMap::new (),
 }
 
 -- Every declared option and its docs, sorted by path: the source of
@@ -83,7 +91,7 @@ export data Module {
   export body Box<dyn Fn(&View, &mut Out) -> Result<(), EvalError>>,
 }
 
-export declare : given <T: 'static> &mut Registry -> &'static str -> &Key<T> -> &'static str -> Option<T> -> Strategy<T> -> Result<(), EvalError>
+export declare : given <T: Clone + PartialEq + Debug + 'static> &mut Registry -> &'static str -> &Key<T> -> &'static str -> Option<T> -> Strategy<T> -> Result<(), EvalError>
 declare reg origin key doc default strategy =
   if reg.decls.contains_key key.path
     Err (Redeclared origin key.path)
@@ -96,6 +104,9 @@ declare reg origin key doc default strategy =
     }
     reg.decls.insert key.path (Box::new decl)
     reg.docs.insert key.path doc
+    path = key.path
+    check = Box::new (move \r -> forced r (Key { path, marker = PhantomData } : Key<T>)) : Check
+    reg.checks.insert key.path check
     empty_defs = Vec::new () : Vec<Def<T>>
     reg.defs.insert key.path (Box::new empty_defs)
     Ok ()
@@ -146,7 +157,14 @@ value reg key =
   merged = (merge decl? defs?)?
   Ok merged
 
--- Every module's declarations, then every body in dependency order.
+-- An option's merge, for its `Check`: the value is dropped, the error kept.
+forced : given <T: Clone + PartialEq + Debug + 'static> &Registry -> Key<T> -> Result<(), EvalError>
+forced reg key = value reg (&key)
+  |> .map (\_ -> ())
+
+-- Every module's declarations, then every body in dependency order, then
+-- every option's merge, so an evaluation that succeeds has no conflict and no
+-- missing value anywhere.
 export evaluate : &[Module] -> Result<Registry, EvalError>
 evaluate modules =
   mut reg = empty
@@ -156,6 +174,9 @@ evaluate modules =
   order = (schedule modules)?
   for i in order
     (run (&mut reg) (&modules[i]))?
+  for kv in &reg.checks
+    check = kv.1
+    (check (&reg))?
   Ok reg
 
 run : &mut Registry -> &Module -> Result<(), EvalError>
