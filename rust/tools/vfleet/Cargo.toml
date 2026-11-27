@@ -1,0 +1,39 @@
+# vfleet: the fleet inventory and feature catalog as Voltaic types (GH-417 S2).
+#
+# Standalone crate (own Cargo.lock, empty [workspace]) so buildRustPackage vendors
+# it on its own and it never contends with rust/Cargo.toml's members or lockfile.
+[workspace]
+
+[package]
+name = "vfleet"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial"]
+description = "Fleet inventory and feature catalog as Voltaic types: checks cross-host invariants and emits the JSON NixOS reads"
+license = "MIT"
+publish = false
+build = "build.rs"
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly, like
+# every other rust/tools consumer.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# The generated JSON (common/fleet.json, features/catalog.json).
+serde_json = "1"
+# Decoding operator and cache keys to check their length and type.
+base64 = "0.22"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly; 0.2.0 has silent miscompiles.
+[build-dependencies]
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
+
+[lib]
+name = "vfleet"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vfleet"
+path = "src/main.rs"

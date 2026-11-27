@@ -1,0 +1,108 @@
+-- Tests that each invariant in src/check.vlt fires: the real inventory, broken
+-- one way at a time.
+
+import crate::check::{addresses_unique, builders_exist, cache_key_problem, catalog_violations, debounce_ok, fleet_violations, keys_sound, nfs_sound, operator_key_problem, orders_sound, trust_sound}
+import crate::inventory::fleet
+import crate::catalog::catalog
+import crate::model::{CpuVendor, Fleet, HostName, Role, TrustTier}
+
+#[cfg(test)]
+base : Fleet
+base = fleet ()
+
+test "the unbroken inventory passes"
+  assert! \-> fleet_violations (&base ()) |> .is_empty
+
+test "a duplicate tailnet address is refused"
+  mut f = base ()
+  f.hosts[1].tailscale_ip := f.hosts[0].tailscale_ip
+  assert! \-> addresses_unique (&f) |> .iter |> .any (\v -> v.contains "used twice")
+
+test "an address outside the tailnet range is refused"
+  mut f = base ()
+  f.hosts[0].tailscale_ip := Some (std::net::Ipv4Addr::new 10 0 0 1)
+  assert! \-> addresses_unique (&f) |> .iter |> .any (\v -> v.contains "not a tailnet")
+
+test "a builder role without a spec, and a builder_order entry that is no builder, are refused"
+  mut f = base ()
+  f.hosts[0].builder := None
+  f.builder_order.push HostName::Mimir
+  found = builders_exist (&f)
+  assert! \-> found.iter () |> .any (\v -> v.contains "drakkar has the builder role but no builder spec")
+  assert! \-> found.iter () |> .any (\v -> v.contains "names mimir, which is not a builder")
+
+test "a builder missing from builder_order is refused"
+  mut f = base ()
+  f.builder_order.retain (\n -> *n != HostName::Muninn)
+  assert! \-> builders_exist (&f) |> .iter |> .any (\v -> v.contains "muninn is missing")
+
+test "order must name every host once"
+  mut f = base ()
+  f.order.pop ()
+  assert! \-> !(orders_sound (&f) |> .is_empty)
+
+test "a work host may not be an NFS client"
+  mut f = base ()
+  f.hosts[3].roles.push Role::NfsClient
+  f.nfs_client_order.push HostName::Muninn
+  found = nfs_sound (&f)
+  assert! \-> found.iter () |> .any (\v -> v.contains "work host")
+  assert! \-> found.iter () |> .any (\v -> v.contains "without a tailnet address")
+
+test "operator keys are checked for format, key bytes and host comment"
+  good = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAtviEPSAz5PlJ8K8mFzSQz/Y6WqzqrBA5PzXkhjZ2/y tom@drakkar"
+  assert_eq! \-> operator_key_problem "drakkar" good \-> None
+  assert! \-> operator_key_problem "mimir" good |> .is_some
+  assert! \-> operator_key_problem "drakkar" "ssh-rsa AAAAB3NzaC1yc2E tom@drakkar" |> .is_some
+  assert! \-> operator_key_problem "drakkar" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 tom@drakkar" |> .is_some
+  assert! \-> operator_key_problem "drakkar" "ssh-ed25519" |> .is_some
+
+test "two hosts with one operator key are refused"
+  mut f = base ()
+  f.hosts[1].operator_key := f.hosts[0].operator_key.clone ()
+  assert! \-> keys_sound (&f) |> .iter |> .any (\v -> v.contains "share an operatorKey")
+
+test "cache keys are checked, and only builders with an address may have one"
+  assert_eq! \-> cache_key_problem "drakkar" "drakkar-vcache-1:WtADMHunhHX0O8Et3619eHQwtbl4EkFEfwrujjaYMv8=" \-> None
+  assert! \-> cache_key_problem "mimir" "drakkar-vcache-1:WtADMHunhHX0O8Et3619eHQwtbl4EkFEfwrujjaYMv8=" |> .is_some
+  assert! \-> cache_key_problem "drakkar" "drakkar-vcache-1:short" |> .is_some
+  mut f = base ()
+  f.hosts[2].cache_key := Some (.to_string "mimir-vcache-1:WtADMHunhHX0O8Et3619eHQwtbl4EkFEfwrujjaYMv8=")
+  assert! \-> keys_sound (&f) |> .iter |> .any (\v -> v.contains "mimir has a cacheKey but is not a builder")
+
+test "trust facts must agree with the TPM and the vendor"
+  mut f = base ()
+  f.hosts[1].trust_tier := TrustTier::LocalHwAttested
+  f.hosts[0].cpu.tdx := true
+  f.hosts[3].cpu.sev_snp := true
+  f.hosts[1].attestation_root := Some (.to_string "root")
+  found = trust_sound (&f)
+  assert! \-> found.iter () |> .any (\v -> v.contains "huginn: trustTier")
+  assert! \-> found.iter () |> .any (\v -> v.contains "drakkar: TDX")
+  assert! \-> found.iter () |> .any (\v -> v.contains "muninn: SEV-SNP")
+  assert! \-> found.iter () |> .any (\v -> v.contains "huginn: an attestationRoot")
+  assert_eq! \-> f.hosts[0].cpu.vendor \-> CpuVendor::Amd
+
+test "deploy debounce is a positive duration"
+  assert! \-> debounce_ok "2m"
+  assert! \-> debounce_ok "30s"
+  assert! \-> !(debounce_ok "0m")
+  assert! \-> !(debounce_ok "2")
+  assert! \-> !(debounce_ok "")
+  assert! \-> !(debounce_ok "m")
+
+test "a catalog entry listed twice is refused"
+  mut c = catalog ()
+  c.push (c[0].clone ())
+  assert! \-> catalog_violations (&c) |> .iter |> .any (\v -> v.contains "twice")
+
+test "two entries for one option are refused"
+  mut c = catalog ()
+  first = c[0].clone ()
+  c.push (crate::model::Feature { category = first.category, rest = "#{first.rest}/default.nix" })
+  assert! \-> catalog_violations (&c) |> .iter |> .any (\v -> v.contains "declare features.")
+
+test "a catalog path that escapes is refused"
+  mut c = catalog ()
+  c.push (crate::model::Feature { category = crate::model::Category::Cli, rest = .to_string "../secrets" })
+  assert! \-> catalog_violations (&c) |> .iter |> .any (\v -> v.contains "not a plain relative path")

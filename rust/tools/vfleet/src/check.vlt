@@ -1,0 +1,238 @@
+-- The invariants the types cannot carry, checked when vfleet runs (and in its
+-- tests, on the real inventory). Each check returns the violations it found, as
+-- readable lines; an empty list is a pass.
+--
+-- What the types already guarantee at compile time (src/model.vlt): every role,
+-- builder feature, trust tier, CPU vendor and catalog category is from a closed
+-- set; every host name in the three orders is a declared host; every host record
+-- has every field; an IPv4 address is four octets; ports are u16.
+
+import std::collections::BTreeSet
+import base64::Engine
+import crate::model::{Feature, Fleet, Host, HostName, Role, TrustTier, CpuVendor, all_hosts, feature_path, host_name, option_name, port_list}
+
+-- The first value that appears twice, if any.
+export first_duplicate : given <T: Ord + Clone> &[T] -> Option<T>
+first_duplicate xs =
+  mut seen = BTreeSet::new () : BTreeSet<T>
+  xs.iter () |> .find (\x -> !(seen.insert ((*x).clone ()))) |> .cloned
+
+has_role : &Host -> Role -> bool
+has_role h r = h.roles.contains (&r)
+
+find_host : &Fleet -> HostName -> Option<&Host>
+find_host f n = f.hosts.iter () |> .find (\h -> h.name == n)
+
+-- Every declared name has exactly one host record, and all_hosts lists each
+-- variant once.
+export hosts_complete : &Fleet -> Vec<String>
+hosts_complete f =
+  mut out = Vec::new () : Vec<String>
+  names = f.hosts.iter () |> .map (\h -> h.name) |> .collect : Vec<HostName>
+  if first_duplicate (&names) is Some n
+    out.push "host #{host_name n} has two records"
+  declared = all_hosts ()
+  if first_duplicate (&declared) is Some n
+    out.push "all_hosts lists #{host_name n} twice"
+  for n in declared.iter ()
+    if !(names.contains n)
+      out.push "host #{host_name (*n)} has no record"
+  for n in names.iter ()
+    if !(declared.contains n)
+      out.push "host #{host_name (*n)} is missing from all_hosts"
+  out
+
+-- `order` names every host once; the other two orders name hosts once.
+export orders_sound : &Fleet -> Vec<String>
+orders_sound f =
+  mut out = Vec::new () : Vec<String>
+  mut sorted = f.order.clone ()
+  sorted.sort ()
+  mut all = all_hosts ()
+  all.sort ()
+  if sorted != all
+    out.push (.to_string "order must name every host exactly once")
+  if first_duplicate (&f.builder_order) is Some n
+    out.push "builder_order names #{host_name n} twice"
+  if first_duplicate (&f.nfs_client_order) is Some n
+    out.push "nfs_client_order names #{host_name n} twice"
+  out
+
+-- Builders exist: a host has a builder spec exactly when it has the Builder
+-- role, and builder_order is exactly the builder-role hosts.
+export builders_exist : &Fleet -> Vec<String>
+builders_exist f =
+  mut out = Vec::new () : Vec<String>
+  for h in f.hosts.iter ()
+    n = host_name h.name
+    if has_role h Role::Builder && h.builder.is_none ()
+      out.push "#{n} has the builder role but no builder spec"
+    if !(has_role h Role::Builder) && h.builder.is_some ()
+      out.push "#{n} has a builder spec but not the builder role"
+    if h.builder.as_ref () is Some b
+      if b.max_jobs == 0 || b.speed_factor == 0
+        out.push "#{n}: builder maxJobs and speedFactor must be positive"
+      if first_duplicate (&b.supported_features) |> .is_some
+        out.push "#{n}: builder lists a supported feature twice"
+  for n in f.builder_order.iter ()
+    if !(find_host f (*n) |> .map (\h -> has_role h Role::Builder) |> .unwrap_or false)
+      out.push "builder_order names #{host_name (*n)}, which is not a builder"
+  for h in f.hosts.iter ()
+    if has_role h Role::Builder && !(f.builder_order.contains (&h.name))
+      out.push "builder #{host_name h.name} is missing from builder_order"
+  out
+
+-- NFS clients: nfs_client_order is exactly the nfs-client hosts, each with a
+-- tailnet address (mimir's export list is by address); work hosts are never
+-- NFS clients.
+export nfs_sound : &Fleet -> Vec<String>
+nfs_sound f =
+  mut out = Vec::new () : Vec<String>
+  for h in f.hosts.iter ()
+    n = host_name h.name
+    if has_role h Role::NfsClient != f.nfs_client_order.contains (&h.name)
+      out.push "#{n}: the nfs-client role and nfs_client_order disagree"
+    if has_role h Role::NfsClient && h.tailscale_ip.is_none ()
+      out.push "#{n} is an NFS client without a tailnet address"
+    if has_role h Role::NfsClient && has_role h Role::Work
+      out.push "#{n} is a work host and an NFS client"
+  out
+
+-- Tailnet addresses are unique and inside Tailscale's 100.64.0.0/10; fleet
+-- ports are unique and not zero.
+export addresses_unique : &Fleet -> Vec<String>
+addresses_unique f =
+  mut out = Vec::new () : Vec<String>
+  ips = f.hosts.iter () |> .filter_map (\h -> h.tailscale_ip) |> .collect : Vec<std::net::Ipv4Addr>
+  if first_duplicate (&ips) is Some ip
+    out.push "tailnet address #{ip} is used twice"
+  for ip in ips.iter ()
+    o = ip.octets ()
+    if !(o[0] == 100 && o[1] >= 64 && o[1] < 128)
+      out.push "#{ip} is not a tailnet (100.64.0.0/10) address"
+  ports = port_list (&f.ports)
+  numbers = ports.iter () |> .map (\p -> p.1) |> .collect : Vec<u16>
+  if first_duplicate (&numbers) is Some p
+    out.push "port #{p} is used by two services"
+  for p in ports.iter ()
+    if p.1 == 0
+      out.push "port of #{p.0} is zero"
+  out
+
+-- The base64 payload of an ed25519 public key: 51 bytes, the length-prefixed
+-- key type and the length-prefixed 32-byte key.
+ed25519_blob_ok : &str -> bool
+ed25519_blob_ok b64 =
+  case base64::engine::general_purpose::STANDARD.decode b64 of
+    Err _ -> false
+    Ok blob -> blob.len () == 51 && blob.starts_with (b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x20")
+
+-- An operator key is `ssh-ed25519 <blob> tom@<host>`: the format
+-- features/fleet/operator-ssh.nix installs, and the comment names its own host.
+export operator_key_problem : &str -> &str -> Option<String>
+operator_key_problem host key =
+  parts = key.split ' ' |> .collect : Vec<&str>
+  if parts.len () != 3
+    return Some "#{host}: operatorKey must be `ssh-ed25519 <key> <comment>`"
+  if parts[0] != "ssh-ed25519"
+    return Some "#{host}: operatorKey must be an ssh-ed25519 key"
+  if !(ed25519_blob_ok (parts[1]))
+    return Some "#{host}: operatorKey is not a valid ed25519 public key"
+  if parts[2] != "tom@#{host}"
+    return Some "#{host}: operatorKey comment is #{parts[2]}, expected tom@#{host}"
+  None
+
+-- A cache key is `<host>-vcache-<n>:<base64 of 32 bytes>`.
+export cache_key_problem : &str -> &str -> Option<String>
+cache_key_problem host key =
+  case key.split_once ':' of
+    None -> Some "#{host}: cacheKey must be `<name>:<base64 key>`"
+    Some (name, b64) ->
+      prefix = "#{host}-vcache-"
+      decoded = base64::engine::general_purpose::STANDARD.decode b64
+      if !(name.starts_with (&prefix))
+        Some "#{host}: cacheKey name #{name} does not start with #{prefix}"
+      else if decoded.map (\k -> k.len () == 32) |> .unwrap_or false
+        None
+      else
+        Some "#{host}: cacheKey is not a base64 ed25519 public key"
+
+-- Keys: every operator key well-formed and unique; cache keys well-formed and
+-- only on builders with a tailnet address (the vcache server condition).
+export keys_sound : &Fleet -> Vec<String>
+keys_sound f =
+  mut out = Vec::new () : Vec<String>
+  keys = f.hosts.iter () |> .filter_map (\h -> h.operator_key.clone ()) |> .collect : Vec<String>
+  if first_duplicate (&keys) |> .is_some
+    out.push (.to_string "two hosts share an operatorKey")
+  for h in f.hosts.iter ()
+    n = host_name h.name
+    if h.operator_key.as_ref () is Some k
+      if operator_key_problem (&n) k is Some p
+        out.push p
+    if h.cache_key.as_ref () is Some k
+      if cache_key_problem (&n) k is Some p
+        out.push p
+      if !(has_role h Role::Builder) || h.tailscale_ip.is_none ()
+        out.push "#{n} has a cacheKey but is not a builder with a tailnet address"
+  out
+
+-- deployDebounce is a positive number of s, m or h.
+export debounce_ok : &str -> bool
+debounce_ok s =
+  (digits, unit) = s.split_at (s.len () - (s.len ().min 1))
+  n = (digits.parse () : Result<u64, std::num::ParseIntError>) |> .ok
+  (n.map (\x -> x > 0) |> .unwrap_or false) && (unit == "s" || unit == "m" || unit == "h")
+
+-- Trust facts (GH-421): hardware-attested exactly when there is a TPM2;
+-- SEV-SNP only on AMD and TDX only on Intel; a pinned root only with a TPM2.
+export trust_sound : &Fleet -> Vec<String>
+trust_sound f =
+  mut out = Vec::new () : Vec<String>
+  for h in f.hosts.iter ()
+    n = host_name h.name
+    if (h.trust_tier == TrustTier::LocalHwAttested) != h.tpm2
+      out.push "#{n}: trustTier local-hw-attested must go with tpm2 = true, and only with it"
+    if h.cpu.sev_snp && h.cpu.vendor != CpuVendor::Amd
+      out.push "#{n}: SEV-SNP is an AMD feature"
+    if h.cpu.tdx && h.cpu.vendor != CpuVendor::Intel
+      out.push "#{n}: TDX is an Intel feature"
+    if h.attestation_root.is_some () && !(h.tpm2)
+      out.push "#{n}: an attestationRoot needs a TPM2 to root it"
+    if h.cpu.model.trim ().is_empty () || h.description.trim ().is_empty ()
+      out.push "#{n}: description and cpu.model must not be empty"
+    if h.deploy_debounce.as_ref () is Some d
+      if !(debounce_ok d)
+        out.push "#{n}: deployDebounce #{d} is not a duration like 2m"
+  out
+
+-- Every fleet invariant, in one list.
+export fleet_violations : &Fleet -> Vec<String>
+fleet_violations f =
+  mut out = hosts_complete f
+  out.extend (orders_sound f)
+  out.extend (builders_exist f)
+  out.extend (nfs_sound f)
+  out.extend (addresses_unique f)
+  out.extend (keys_sound f)
+  out.extend (trust_sound f)
+  out
+
+path_char_ok : char -> bool
+path_char_ok c = c.is_ascii_lowercase () || c.is_ascii_digit () || c == '-' || c == '_' || c == '.' || c == '/'
+
+-- Catalog entries: well-formed relative paths, no entry twice, and no two
+-- entries mapping to one option name (it would be declared twice).
+export catalog_violations : &[Feature] -> Vec<String>
+catalog_violations entries =
+  mut out = Vec::new () : Vec<String>
+  paths = entries.iter () |> .map feature_path |> .collect : Vec<String>
+  if first_duplicate (&paths) is Some p
+    out.push "catalog lists #{p} twice"
+  names = entries.iter () |> .map option_name |> .collect : Vec<String>
+  if first_duplicate (&names) is Some n
+    out.push "two catalog entries declare features.#{n}"
+  for e in entries.iter ()
+    if !(e.rest.chars () |> .all path_char_ok) || e.rest.starts_with '/' || e.rest.ends_with '/' || e.rest.contains ".." || e.rest.contains "//"
+      out.push "catalog entry #{feature_path e} is not a plain relative path"
+  out

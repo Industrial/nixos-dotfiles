@@ -1,0 +1,128 @@
+{
+  "builderOrder": [
+    "drakkar",
+    "muninn",
+    "huginn"
+  ],
+  "cachePort": 5100,
+  "hosts": {
+    "drakkar": {
+      "attestationRoot": null,
+      "builder": {
+        "maxJobs": 8,
+        "speedFactor": 2,
+        "supportedFeatures": [
+          "big-parallel",
+          "kvm",
+          "nixos-test"
+        ]
+      },
+      "cacheKey": "drakkar-vcache-1:WtADMHunhHX0O8Et3619eHQwtbl4EkFEfwrujjaYMv8=",
+      "cpu": {
+        "model": "AMD Ryzen 9 7950X",
+        "sevSnp": false,
+        "tdx": false,
+        "vendor": "amd"
+      },
+      "description": "desktop and gaming station",
+      "operatorKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAtviEPSAz5PlJ8K8mFzSQz/Y6WqzqrBA5PzXkhjZ2/y tom@drakkar",
+      "roles": [
+        "desktop",
+        "builder",
+        "nfs-client",
+        "vdeploy"
+      ],
+      "tailscaleIp": "100.69.213.35",
+      "tpm2": true,
+      "trustTier": "local-hw-attested"
+    },
+    "huginn": {
+      "attestationRoot": null,
+      "builder": {
+        "maxJobs": 4,
+        "speedFactor": 1,
+        "supportedFeatures": [
+          "kvm",
+          "nixos-test"
+        ]
+      },
+      "cpu": {
+        "model": "Intel N200",
+        "sevSnp": false,
+        "tdx": false,
+        "vendor": "intel"
+      },
+      "description": "tablet (Intel N200)",
+      "online": false,
+      "operatorKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINvaH/4XK0nQr6vo1ZZYpk0SIv0LvtJm6yxWMv7U2/Gb tom@huginn",
+      "roles": [
+        "tablet",
+        "builder",
+        "nfs-client"
+      ],
+      "tailscaleIp": "100.70.136.13",
+      "tpm2": false,
+      "trustTier": "local-unattested"
+    },
+    "mimir": {
+      "attestationRoot": null,
+      "cpu": {
+        "model": "AMD Ryzen 7 5825U",
+        "sevSnp": false,
+        "tdx": false,
+        "vendor": "amd"
+      },
+      "deployDebounce": "2m",
+      "description": "always-on file server",
+      "operatorKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHaaBOy2a1WnlGy5B6WwEmVlf7s5VUgVIbsjdGZrsmK+ tom@mimir",
+      "roles": [
+        "server",
+        "monitoring",
+        "nfs-server",
+        "remote-desktop-relay",
+        "vdeploy"
+      ],
+      "tailscaleIp": "100.103.79.41",
+      "tpm2": true,
+      "trustTier": "local-hw-attested"
+    },
+    "muninn": {
+      "attestationRoot": null,
+      "builder": {
+        "maxJobs": 4,
+        "speedFactor": 1,
+        "supportedFeatures": [
+          "kvm",
+          "nixos-test"
+        ]
+      },
+      "cpu": {
+        "model": "Intel Core i7-10750H",
+        "sevSnp": false,
+        "tdx": false,
+        "vendor": "intel"
+      },
+      "description": "work laptop; monitoring standby when mimir is down",
+      "online": false,
+      "operatorKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAC/xRRyQ1Om1ChkxfeqfK8HjvAgzg1d+bfgU9ALxgYx tom@muninn",
+      "roles": [
+        "laptop",
+        "work",
+        "builder",
+        "monitoring"
+      ],
+      "tpm2": true,
+      "trustTier": "local-hw-attested"
+    }
+  },
+  "nfsClientOrder": [
+    "drakkar",
+    "huginn"
+  ],
+  "order": [
+    "mimir",
+    "drakkar",
+    "huginn",
+    "muninn"
+  ]
+}
