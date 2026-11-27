@@ -7,6 +7,13 @@ asks for compile latency to be measured. The answers come from spikes in
 [`rust/spikes/voltaic-modules/`](../../../rust/spikes/voltaic-modules/), which compile, pass their
 tests and are clippy-clean (`-D warnings`). Measured 2026-11-27 on drakkar.
 
+> **Promoted (#457, S3a).** The spikes have since moved into the tree and the spike
+> directory is gone: the module system is `rust/tools/modsys` (with a fallible `Merge`
+> strategy and total evaluation added), the `.drv` writer and the package-index helpers
+> are nix-store-core's `drvwrite`, with the oracle as `drvwrite-oracle.nix` and a golden
+> test, and the first real subtree built on them is `rust/tools/nixos-users`. Paths below
+> are as they were when this was measured; `git show 8ad1e467` has them.
+
 ## The one fact that frames everything
 
 Voltaic is a **type-free surface for Rust**. Every construct lowers to Rust from the source text

@@ -167,6 +167,20 @@ with the output `out`. vci writes one per (commit, host) it builds, vcache serve
 | `read : &Path -> Result<Derivation, String>` | read the file, then parse it |
 | `is_fixed_output : &Derivation -> bool`, `output_paths : &Derivation -> BTreeMap<String, String>` | conveniences |
 
+### `drvwrite`: writing store derivations (#457)
+
+The inverse of `drv`: what libstore computes when it writes a `.drv`. It is checked byte for byte against C++ Nix in two ways. Every golden `.drv` (`tests/fixtures/drvs.json`) is written back from its parse, and its path is recomputed. A derivation emitted from scratch equals the one `drvwrite-oracle.nix` instantiates on the pinned nixpkgs, which `drvwrite-oracle.assay.nix` checks. Moved here from the #417 S1b spike.
+
+| Item | Meaning |
+|---|---|
+| `aterm : &Derivation -> String` | libstore's `unparse`: the ATerm text, with every list in libstore's order |
+| `store_path : &str -> &Sha256 -> &str -> String` | `makeStorePath`: `<type>:sha256:<base16>:/nix/store:<name>`, hashed and compressed to 20 bytes |
+| `hash_modulo : &Derivation -> &BTreeMap<String, String> -> Result<Sha256, String>` | `hashDerivationModulo`, given each input `.drv`'s modulo hash (base 16). A fixed-output derivation hashes to its fixed output |
+| `with_outputs : Derivation -> &BTreeMap<String, String> -> &str -> Result<Derivation, String>` | an input-addressed derivation's output paths (and their env entries) filled in |
+| `drv_path : &Derivation -> &str -> String` | `makeTextPath` for the `.drv`, which references its input sources and input derivations |
+| `Pkg { attr, drv, out, modulo }`, `emit : name -> system -> builder -> args -> env -> &[Pkg] -> Result<Emitted, String>` | a derivation over packages from a pinned index: `Emitted { path, text, derivation }`. Emitting reads no file |
+| `modulo_of : &str -> &mut BTreeMap<String, String> -> Result<String, String>`, `pkg_constant` | the index side: a store `.drv`'s modulo hash, memoised over its closure (reads the `.drv` files), and one `Pkg` written as a Voltaic constant |
+
 ### `db`: the store database, read-only
 
 These are blocking reads over a `rusqlite::Connection` (rusqlite 0.37, bundled).
