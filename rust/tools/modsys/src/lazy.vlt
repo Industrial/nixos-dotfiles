@@ -1,0 +1,66 @@
+-- The other answer to cross-module reads: a lazy fixpoint, the way NixOS's
+-- `config` works. Every attribute is a thunk over the whole configuration;
+-- forcing one forces whatever it reads, and each value is computed once. A
+-- thunk forced while it is already being forced is a cycle, reported as the
+-- chain of attributes that reached it, where Nix says only "infinite
+-- recursion encountered".
+--
+-- Voltaic has no laziness of its own and needs none: a thunk is a boxed
+-- closure and the memo a `RefCell`, both plain Rust.
+
+import std::cell::RefCell
+import std::collections::BTreeMap
+
+export errors LazyError
+  Unknown &'static str  "no attribute `#{0}`"
+  Cycle String          "infinite recursion: #{0}"
+
+export data Fix {
+  thunks BTreeMap<&'static str, Box<dyn Fn(&Fix<t>) -> Result<t, LazyError>>>,
+  memo RefCell<BTreeMap<&'static str, t>>,
+  forcing RefCell<Vec<&'static str>>,
+}
+
+export fix : given <V> Vec<(&'static str, Box<dyn Fn(&Fix<V>) -> Result<V, LazyError>>)> -> Fix<V>
+fix attrs = Fix {
+  thunks = attrs
+    |> .into_iter
+    |> .collect,
+  memo = RefCell::new (BTreeMap::new ()),
+  forcing = RefCell::new (Vec::new ()),
+}
+
+-- An attribute's value: from the memo, or by forcing its thunk.
+export force : given <V: Clone> &Fix<V> -> &'static str -> Result<V, LazyError>
+force f name =
+  cached = f.memo.borrow ().get name
+    |> .cloned
+  case cached of
+    Some v -> Ok v
+    None -> evaluate f name
+
+evaluate : given <V: Clone> &Fix<V> -> &'static str -> Result<V, LazyError>
+evaluate f name =
+  thunk = (f.thunks.get name
+    |> .ok_or (Unknown name))?
+  on_stack = f.forcing.borrow ().contains (&name)
+  if on_stack
+    Err (Cycle (chain f name))
+  else
+    f.forcing.borrow_mut ().push name
+    result = thunk f
+    f.forcing.borrow_mut ().pop ()
+    v = result?
+    f.memo.borrow_mut ().insert name (v.clone ())
+    Ok v
+
+chain : given <V> &Fix<V> -> &'static str -> String
+chain f again =
+  stack = f.forcing.borrow ()
+  start = stack
+    |> .iter
+    |> .position (\n -> *n == again)
+    |> .unwrap_or 0
+  mut names = stack[start .. stack.len ()].to_vec ()
+  names.push again
+  names.join " -> "

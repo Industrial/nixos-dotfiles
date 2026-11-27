@@ -1,0 +1,36 @@
+# modsys: the typed module system for #417 (NixOS as IaC on Voltaic + id_effect).
+#
+# Typed option slots with a merge strategy, a priority, a default and docs; typed
+# keys over a type-erased registry; a declared read/write DAG with cycles reported as
+# paths; a lazy fixpoint for self-referential options; and evaluation as an id_effect
+# program at R = HNil. Promoted from the S1b spike (docs/research/417/s1b-voltaic-feature-check.md).
+#
+# Standalone crate (own Cargo.lock, empty [workspace]) like every Voltaic crate under
+# rust/tools, so bin/ci/cargo-standalone gates it (clippy -D warnings, which denies the
+# clippy.toml purity fence, and cargo test) without an edit to CI.
+[workspace]
+
+[package]
+name = "modsys"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial"]
+description = "Typed NixOS-style module system in Voltaic: options, priorities, merging, a read/write DAG, a lazy fixpoint and pure evaluation"
+license = "MIT"
+publish = false
+build = "build.rs"
+
+[dependencies]
+# Pure evaluation as an Effect at R = HNil, and the Fetch capability. Fleet-wide pin:
+# types from two id_effect versions do not unify.
+id_effect = "=0.13.0"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned exactly;
+# never 0.2.0 (silent miscompiles).
+[build-dependencies]
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
+
+[lib]
+name = "modsys"
+path = "src/lib.rs"

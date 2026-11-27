@@ -1,0 +1,304 @@
+-- The spike's claims, as tests: priorities, conflicts, folds and defaults;
+-- the DAG's ordering, its declared-read fence and its cycle path; the lazy
+-- fixpoint and its cycle path; the pure evaluation and the Fetch capability.
+
+import std::marker::PhantomData
+import std::sync::Arc
+import id_effect::Exit
+import crate::eval::{EvalError, Key, Module, Out, Registry, View, declare, define, documented, evaluate, get, module_of, no_body, value}
+import crate::lazy::{LazyError, Fix, fix, force}
+import std::collections::BTreeMap
+import crate::option::{DEFAULT, FORCE, NORMAL, Def, OptionDecl, concat, merge, union_unique}
+import crate::option::Strategy::{Fold, Merge, Unique}
+import crate::pure::{Fetch, Fetcher, evaluated, fetch_pinned}
+
+name_decl : OptionDecl<String>
+name_decl = OptionDecl {
+  path = "networking.hostName",
+  doc = "",
+  default = Some (String::from "nixos"),
+  strategy = Unique,
+}
+
+def : given <T> &'static str -> u32 -> T -> Def<T>
+def origin priority value = Def {
+  origin,
+  priority,
+  value,
+}
+
+test "the lowest priority wins, whatever the module order"
+  defs = [def "profile" DEFAULT (String::from "nixos-test"), def "host" NORMAL (String::from "muninn")].to_vec ()
+  assert_eq! \-> merge (&name_decl) (&defs)
+    |> .unwrap \-> "muninn"
+
+test "mkForce beats a plain definition"
+  defs = [def "host" NORMAL (String::from "muninn"), def "override" FORCE (String::from "forced")].to_vec ()
+  assert_eq! \-> merge (&name_decl) (&defs)
+    |> .unwrap \-> "forced"
+
+test "two different definitions at one priority conflict, naming both modules"
+  defs = [def "a" NORMAL (String::from "x"), def "b" NORMAL (String::from "y")].to_vec ()
+  shown = merge (&name_decl) (&defs)
+    |> .unwrap_err
+    |> .to_string
+  expected = "option `networking.hostName` has conflicting definitions at priority 100: a = \"x\", b = \"y\""
+  assert_eq! \-> shown \-> expected
+
+test "a list option concatenates its winners in module order"
+  decl = OptionDecl {
+    path = "environment.systemPackages",
+    doc = "",
+    default = Some (Vec::new ()),
+    strategy = Fold (Box::new concat),
+  }
+  defs = [def "a" NORMAL ([1u8].to_vec ()), def "b" NORMAL ([2u8].to_vec ()), def "c" DEFAULT ([3u8].to_vec ())].to_vec ()
+  assert_eq! \-> merge (&decl) (&defs)
+    |> .unwrap \-> [1u8, 2u8].to_vec ()
+
+test "with no definition the default applies, and without a default it is an error"
+  assert_eq! \-> merge (&name_decl) (&[])
+    |> .unwrap \-> "nixos"
+  bare = OptionDecl {
+    path = "x",
+    doc = "",
+    default = None,
+    strategy = Unique,
+  } : OptionDecl<u8>
+  assert! \-> merge (&bare) (&[])
+    |> .is_err
+
+-- Two modules that read each other's writes.
+const X : Key<u32> = Key {
+  path = "x",
+  marker = PhantomData,
+}
+
+const Y : Key<u32> = Key {
+  path = "y",
+  marker = PhantomData,
+}
+
+declare_xy : &mut Registry -> &'static str -> Result<(), EvalError>
+declare_xy reg origin =
+  (declare reg origin (&X) "" (Some 0) Unique)?
+  declare reg origin (&Y) "" (Some 0) Unique
+
+none : &mut Registry -> &'static str -> Result<(), EvalError>
+none _ _ = Ok ()
+
+-- y = x + 1
+y_from_x : &View -> &mut Out -> Result<(), EvalError>
+y_from_x view out =
+  x = (get view (&X))?
+  define out (&Y) NORMAL (x + 1)
+  Ok ()
+
+-- x = y + 1
+x_from_y : &View -> &mut Out -> Result<(), EvalError>
+x_from_y view out =
+  y = (get view (&Y))?
+  define out (&X) NORMAL (y + 1)
+  Ok ()
+
+-- x = 41
+x_is_41 : &View -> &mut Out -> Result<(), EvalError>
+x_is_41 _ out =
+  define out (&X) NORMAL 41
+  Ok ()
+
+-- A `fn(…)` type in a signature without `given` is read as a type variable
+-- named `fn`, so the pointer types go through aliases.
+type Body = fn(&View, &mut Out) -> Result<(), EvalError>
+
+type Declares = fn(&mut Registry, &'static str) -> Result<(), EvalError>
+
+mk : &'static str -> Vec<&'static str> -> Vec<&'static str> -> Body -> Module
+mk name reads writes body = Module {
+  name,
+  reads,
+  writes,
+  declares = Box::new (declarations name),
+  body = Box::new body,
+}
+
+-- Module `a` declares both options; the rest declare nothing.
+declarations : &'static str -> Declares
+declarations name
+  | name == "a" = declare_xy
+  | _ = none
+
+test "a reader runs after the writers of what it reads, whatever the list order"
+  modules = vec![mk("a", vec!["x"], vec!["y"], y_from_x), mk("b", vec![], vec!["x"], x_is_41)]
+  reg = evaluate (&modules)
+    |> .unwrap
+  assert_eq! \-> value (&reg) (&Y)
+    |> .unwrap \-> 42
+
+test "a cycle is reported as its path through modules and options"
+  modules = vec![mk("a", vec!["x"], vec!["y"], y_from_x), mk("b", vec!["y"], vec!["x"], x_from_y)]
+  shown = evaluate (&modules)
+    |> .err
+    |> .unwrap
+    |> .to_string
+  expected = "evaluation cycle: a -[x]-> b -[y]-> a"
+  assert_eq! \-> shown \-> expected
+
+test "a read the module did not declare is refused"
+  modules = vec![mk("a", vec![], vec!["y"], y_from_x)]
+  shown = evaluate (&modules)
+    |> .err
+    |> .unwrap
+    |> .to_string
+  expected = "module `a` reads `x` without listing it in `reads`"
+  assert_eq! \-> shown \-> expected
+
+test "a write the module did not declare is refused"
+  modules = vec![mk("a", vec![], vec![], x_is_41)]
+  shown = evaluate (&modules)
+    |> .err
+    |> .unwrap
+    |> .to_string
+  expected = "module `a` writes `x` without listing it in `writes`"
+  assert_eq! \-> shown \-> expected
+
+-- The lazy fixpoint.
+plus_one_of_b : &Fix<u32> -> Result<u32, LazyError>
+plus_one_of_b f = force f "b"
+  |> .map (\b -> b + 1)
+
+two : &Fix<u32> -> Result<u32, LazyError>
+two _ = Ok 2
+
+back_to_a : &Fix<u32> -> Result<u32, LazyError>
+back_to_a f = force f "a"
+
+test "the fixpoint forces what an attribute reads, once"
+  f = fix (vec![("a", Box::new(plus_one_of_b) as Box<dyn Fn(&Fix<u32>) -> Result<u32, LazyError>>), ("b", Box::new(two))])
+  assert_eq! \-> force (&f) "a"
+    |> .unwrap \-> 3
+
+test "a fixpoint cycle is reported as its chain"
+  f = fix (vec![("a", Box::new(plus_one_of_b) as Box<dyn Fn(&Fix<u32>) -> Result<u32, LazyError>>), ("b", Box::new(back_to_a))])
+  shown = force (&f) "a"
+    |> .unwrap_err
+    |> .to_string
+  expected = "infinite recursion: a -> b -> a"
+  assert_eq! \-> shown \-> expected
+
+-- The pure evaluation, and a pinned fetch through its capability.
+xy_modules : Vec<Module>
+xy_modules = vec![mk("a", vec!["x"], vec!["y"], y_from_x), mk("b", vec![], vec!["x"], x_is_41)]
+
+project_y : &Registry -> Result<u32, EvalError>
+project_y reg = value reg (&Y)
+
+test "evaluation runs as an Effect with an empty environment"
+  case evaluated (\-> xy_modules) project_y
+    |> .block_on of
+    Exit::Success y -> assert_eq! \-> y \-> 42
+    Exit::Failure c -> panic! \-> "#{c:?}"
+
+data Table = Table
+
+instance Fetcher Table
+  fetch : &self -> &str -> &str -> Result<String, String>
+  fetch self url sha256 = Ok "/nix/store/#{sha256}-#{url.len ()}"
+
+test "a pinned fetch needs the Fetch capability, provided explicitly"
+  eff = fetch_pinned (String::from "https://x") (String::from "abc")
+  provided = eff.provide (Fetch (Arc::new Table))
+  case provided.block_on () of
+    Exit::Success p -> assert_eq! \-> p \-> "/nix/store/abc-9"
+    Exit::Failure c -> panic! \-> "#{c:?}"
+
+-- Attribute sets: `Merge` with `union_unique`, NixOS's `attrsOf` for entries
+-- owned whole by one module.
+attrs_decl : OptionDecl<BTreeMap<String, u32>>
+attrs_decl = OptionDecl {
+  path = "users.groups",
+  doc = "",
+  default = Some (BTreeMap::new ()),
+  strategy = Merge (Box::new union_unique),
+}
+
+one : &'static str -> u32 -> BTreeMap<String, u32>
+one name gid = BTreeMap::from ([(String::from name, gid)])
+
+test "an attribute set is the union of its definitions"
+  defs = [def "a" NORMAL (one "data" 1111), def "b" NORMAL (one "games" 1112), def "c" NORMAL (one "data" 1111)].to_vec ()
+  merged = merge (&attrs_decl) (&defs)
+    |> .unwrap
+  expected = BTreeMap::from ([(String::from "data", 1111), (String::from "games", 1112)])
+  assert_eq! \-> merged \-> expected
+
+test "a name two modules define differently is a conflict naming the module and the values"
+  defs = [def "a" NORMAL (one "data" 1111), def "b" NORMAL (one "data" 2222)].to_vec ()
+  shown = merge (&attrs_decl) (&defs)
+    |> .unwrap_err
+    |> .to_string
+  expected = "option `users.groups` has conflicting definitions at priority 100: b: `data` is defined twice, differently: 1111 and 2222"
+  assert_eq! \-> shown \-> expected
+
+test "a fallible merge still lets a lower priority lose"
+  defs = [def "a" DEFAULT (one "data" 2222), def "b" NORMAL (one "data" 1111)].to_vec ()
+  merged = merge (&attrs_decl) (&defs)
+    |> .unwrap
+  assert_eq! \-> merged \-> one "data" 1111
+
+test "two modules declaring one option is refused"
+  modules = vec![mk("a", vec![], vec![], x_is_41), mk("a", vec![], vec![], x_is_41)]
+  shown = evaluate (&modules)
+    |> .err
+    |> .unwrap
+    |> .to_string
+  expected = "module `a` declares `x`, which is already declared"
+  assert_eq! \-> shown \-> expected
+
+test "a definition of an option nobody declares is refused"
+  modules = vec![module_of("lonely", vec![], vec!["x"], none, x_is_41)]
+  shown = evaluate (&modules)
+    |> .err
+    |> .unwrap
+    |> .to_string
+  expected = "module `lonely` defines `x`, which no module declares"
+  assert_eq! \-> shown \-> expected
+
+declare_documented : &mut Registry -> &'static str -> Result<(), EvalError>
+declare_documented reg origin =
+  (declare reg origin (&Y) "Why." (Some 0) Unique)?
+  declare reg origin (&X) "What." (Some 0) Unique
+
+test "the registry lists every declared option with its docs, by path"
+  modules = vec![module_of("docs", vec![], vec![], declare_documented, no_body)]
+  reg = evaluate (&modules)
+    |> .unwrap
+  assert_eq! \-> documented (&reg) \-> vec![("x", "What."), ("y", "Why.")]
+
+test "the module order in the list does not change the result"
+  forward = vec![mk("a", vec!["x"], vec!["y"], y_from_x), mk("b", vec![], vec!["x"], x_is_41)]
+  backward = vec![mk("b", vec![], vec!["x"], x_is_41), mk("a", vec!["x"], vec!["y"], y_from_x)]
+  f = evaluate (&forward)
+    |> .unwrap
+  b = evaluate (&backward)
+    |> .unwrap
+  fy = value (&f) (&Y)
+    |> .unwrap
+  by = value (&b) (&Y)
+    |> .unwrap
+  assert_eq! \-> fy \-> by
+
+-- x = 7, a second definition of x at the same priority as x_is_41.
+x_is_7 : &View -> &mut Out -> Result<(), EvalError>
+x_is_7 _ out =
+  define out (&X) NORMAL 7
+  Ok ()
+
+test "a conflict fails the evaluation even where nothing reads the option"
+  modules = vec![mk("a", vec![], vec!["x"], x_is_41), mk("b", vec![], vec!["x"], x_is_7)]
+  shown = evaluate (&modules)
+    |> .err
+    |> .unwrap
+    |> .to_string
+  expected = "option `x` has conflicting definitions at priority 100: a = 41, b = 7"
+  assert_eq! \-> shown \-> expected
