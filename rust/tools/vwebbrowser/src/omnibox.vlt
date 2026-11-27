@@ -1,0 +1,279 @@
+-- The omnibox: what the user typed into the address bar, as the one URL to
+-- load. Pure: no effects, no capabilities; the caller decides what loading
+-- means (a `UiCmd::OpenUrl`, a new tab) and where the search template comes
+-- from (configuration).
+--
+-- The rules, in order, on the trimmed input:
+--   1. empty: `Empty`.
+--   2. a scheme: `https`, `http`, `file` and `about` load as typed; every
+--      other scheme (`javascript:`, `data:`, `mailto:`, …) is `Refused`.
+--   3. an address (no whitespace; a dotted host name, `localhost`, an IPv4
+--      or a bracketed IPv6 literal, each with an optional port and path):
+--      `https://` in front, or `http://` for `localhost` and IP literals.
+--   4. anything else: a search, the template's `{query}` replaced by the
+--      percent-encoded input.
+--
+-- Telling a scheme from `host:port`. `localhost:8080` and
+-- `example.org:443/x` are scheme-shaped (RFC 3986 allows letters, digits,
+-- `+`, `-` and `.` before the colon) but are addresses. The rule: a
+-- scheme-shaped prefix is a scheme when it is one of the listed schemes
+-- (allowed or refused), or when what follows the colon is NOT a port, that
+-- is NOT one or more digits followed by the end or by `/`, `?` or `#`.
+-- So `localhost:8080`, `example.org:443/x` are addresses; `mailto:a@b.org`
+-- and `foo:bar` are schemes, and refused: an unknown scheme is never loaded.
+
+-- The placeholder a search template must contain.
+export const PLACEHOLDER : &str = "{query}"
+
+-- Where the input leads: a URL, ready for the web view.
+export data Target
+  = Load String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Why the input leads nowhere.
+export data OmniboxError
+  = Empty
+  | Refused String
+  | BadTemplate
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display OmniboxError
+  fmt : &self -> &mut std::fmt::Formatter<'_> -> std::fmt::Result
+  fmt self f = case self of
+    OmniboxError::Empty -> write! \-> f \-> "nothing to load"
+    OmniboxError::Refused scheme -> write! \-> f \-> "refusing to load a #{scheme}: URL"
+    OmniboxError::BadTemplate -> write! \-> f \-> "the search template has no #{PLACEHOLDER} placeholder"
+
+-- The input as a URL to load. `search_template` must contain `{query}`
+-- (e.g. `https://duckduckgo.com/?q={query}`), checked whenever there is
+-- input, so a bad configuration surfaces on the first use, not the first
+-- search.
+export classify : &str -> &str -> Result<Target, OmniboxError>
+classify input search_template =
+  s = input.trim ()
+  if s.is_empty ()
+    Err OmniboxError::Empty
+  else if !search_template.contains PLACEHOLDER
+    Err OmniboxError::BadTemplate
+  else
+    case scheme_of s of
+      Some scheme ->
+        if allowed (&scheme)
+          Ok (Target::Load (.to_string s))
+        else
+          Err (OmniboxError::Refused scheme)
+      None ->
+        case address s of
+          Some url -> Ok (Target::Load url)
+          None -> Ok (Target::Load (search_template.replace PLACEHOLDER (&(percent_encode s))))
+
+-- Schemes loaded as typed.
+allowed : &str -> bool
+allowed scheme = matches!(scheme, "https" | "http" | "file" | "about")
+
+-- Schemes refused by name. Every unlisted scheme is refused too; listing
+-- these makes `javascript:8080` a scheme rather than a host and port.
+refused : &str -> bool
+refused scheme = matches!(scheme, "javascript" | "data" | "vbscript" | "blob")
+
+-- RFC 3986's scheme: a letter, then letters, digits, `+`, `-` or `.`.
+is_scheme_name : &str -> bool
+is_scheme_name name =
+  first = name.bytes () |> .next |> .is_some_and (\c -> c.is_ascii_alphabetic ())
+  rest = name.bytes () |> .all (\c -> c.is_ascii_alphanumeric () || c == b'+' || c == b'-' || c == b'.')
+  first && rest
+
+-- One or more digits, then the end or the start of a path, query or
+-- fragment: what follows the colon in `host:port`.
+is_port_then_path : &str -> bool
+is_port_then_path rest =
+  digits = rest.bytes () |> .take_while (\c -> c.is_ascii_digit ()) |> .count
+  tail = rest.get (digits .. rest.len ()) |> .unwrap_or ""
+  digits > 0 && (tail.is_empty () || tail.starts_with (['/', '?', '#']))
+
+-- The input's scheme, lower-cased, when it has one (see the module comment
+-- for how `host:port` is told apart).
+scheme_of : &str -> Option<String>
+scheme_of s = case s.split_once ':' of
+  Some (name, rest) ->
+    lower = name.to_ascii_lowercase ()
+    listed = allowed (&lower) || refused (&lower)
+    if is_scheme_name name && (listed || !(is_port_then_path rest))
+      Some lower
+    else
+      None
+  None -> None
+
+-- An address's authority: everything before the first `/`, `?` or `#`.
+authority_of : &str -> &str
+authority_of s = case s.find (['/', '?', '#']) of
+  Some i -> s.get (0 .. i) |> .unwrap_or s
+  None -> s
+
+is_port : &str -> bool
+is_port p = !p.is_empty () && (p.bytes () |> .all (\c -> c.is_ascii_digit ()))
+
+-- The authority's host, its port (if any) checked and dropped. A bracketed
+-- IPv6 literal keeps its brackets. None when a port is not digits.
+host_of : &str -> Option<&str>
+host_of authority =
+  if authority.starts_with '['
+    case authority.find ']' of
+      Some close ->
+        host = authority.get (0 .. close + 1) |> .unwrap_or ""
+        after = authority.get (close + 1 .. authority.len ()) |> .unwrap_or ""
+        if after.is_empty () || (after.strip_prefix ':' |> .is_some_and is_port)
+          Some host
+        else
+          None
+      None -> None
+  else
+    case authority.split_once ':' of
+      Some (host, port) ->
+        if is_port port
+          Some host
+        else
+          None
+      None -> Some authority
+
+-- One IPv4 octet: decimal digits worth at most 255.
+is_octet : &str -> bool
+is_octet label =
+  digits = !label.is_empty () && (label.bytes () |> .all (\c -> c.is_ascii_digit ()))
+  parsed : Result<u8, std::num::ParseIntError> = label.parse ()
+  digits && parsed.is_ok ()
+
+is_ipv4 : &str -> bool
+is_ipv4 host =
+  labels = host.split '.' |> .collect : Vec<&str>
+  labels.len () == 4 && (labels.iter () |> .all (\l -> is_octet l))
+
+-- `[` hex digits, colons (and dots, for an embedded IPv4) `]`, with at
+-- least one colon. Loose on purpose: the web view parses it properly.
+is_ipv6_literal : &str -> bool
+is_ipv6_literal host =
+  inner = host.strip_prefix '[' |> .and_then (\h -> h.strip_suffix ']') |> .unwrap_or ""
+  chars_ok = inner.chars () |> .all (\c -> c.is_ascii_hexdigit () || c == ':' || c == '.')
+  inner.contains ':' && chars_ok
+
+-- A dotted host name: at least two labels, none empty, each of letters,
+-- digits, `-` or non-ASCII (an internationalised name, which the web view
+-- turns into punycode). So `a.` and `.a` are not host names.
+is_domain : &str -> bool
+is_domain host =
+  labels = host.split '.' |> .collect : Vec<&str>
+  labels.len () >= 2 && (labels.iter () |> .all (\l -> is_label l))
+
+is_label : &str -> bool
+is_label label = !label.is_empty () && (label.chars () |> .all (\c -> !c.is_ascii () || c.is_ascii_alphanumeric () || c == '-'))
+
+-- `localhost` and IP literals: almost always a dev server or a box on the
+-- LAN, which rarely has TLS, so they get `http://`. Everything else gets
+-- `https://`.
+is_local : &str -> bool
+is_local host = host.eq_ignore_ascii_case "localhost" || is_ipv4 host || is_ipv6_literal host
+
+-- The input as an address with a scheme in front, when it is one.
+address : &str -> Option<String>
+address s =
+  if s.chars () |> .any (\c -> c.is_whitespace ())
+    None
+  else
+    case host_of (authority_of s) of
+      Some host ->
+        if is_local host
+          Some ("http://#{s}")
+        else if is_domain host
+          Some ("https://#{s}")
+        else
+          None
+      None -> None
+
+-- Percent-encoding for a query value: RFC 3986's unreserved characters
+-- (letters, digits, `-`, `.`, `_`, `~`) as they are, every other byte of the
+-- UTF-8 as `%XX` (so a space is `%20`, never `+`).
+export percent_encode : &str -> String
+percent_encode s =
+  mut out = String::with_capacity (s.len () * 3)
+  for b in s.bytes ()
+    if b.is_ascii_alphanumeric () || b == b'-' || b == b'.' || b == b'_' || b == b'~'
+      out.push (char::from b)
+    else
+      out.push_str (&(format! \-> "%#{b:02X}"))
+  out
+
+#[cfg(test)]
+const DDG : &str = "https://duckduckgo.com/?q={query}"
+
+#[cfg(test)]
+const LOCAL_SEARCH : &str = "http://localhost:4001/search?q={query}"
+
+#[cfg(test)]
+load : &str -> Result<Target, OmniboxError>
+load url = Ok (Target::Load (.to_string url))
+
+#[cfg(test)]
+search : &str -> Result<Target, OmniboxError>
+search encoded = Ok (Target::Load (DDG.replace PLACEHOLDER encoded))
+
+#[cfg(test)]
+refused_as : &str -> Result<Target, OmniboxError>
+refused_as scheme = Err (OmniboxError::Refused (.to_string scheme))
+
+-- Each row is (input, what it leads to with the DuckDuckGo template); the
+-- input rides along in the assertion so a failure names its row.
+#[cfg(test)]
+test "the omnibox table"
+  rows = .to_vec ([
+    ("example.org", load "https://example.org"),
+    ("example.org/path?q=1", load "https://example.org/path?q=1"),
+    ("example.org:443/x", load "https://example.org:443/x"),
+    ("https://example.org", load "https://example.org"),
+    ("HTTP://x.y", load "HTTP://x.y"),
+    ("localhost", load "http://localhost"),
+    ("LocalHost:8080", load "http://LocalHost:8080"),
+    ("localhost:8080/x", load "http://localhost:8080/x"),
+    ("127.0.0.1:3000", load "http://127.0.0.1:3000"),
+    ("[::1]:8080", load "http://[::1]:8080"),
+    ("[::1]", load "http://[::1]"),
+    ("über.de", load "https://über.de"),
+    ("  padded.org  ", load "https://padded.org"),
+    ("about:blank", load "about:blank"),
+    ("file:///etc/hosts", load "file:///etc/hosts"),
+    ("foo bar", search "foo%20bar"),
+    ("rust", search "rust"),
+    ("what is 1.5", search "what%20is%201.5"),
+    ("über café", search "%C3%BCber%20caf%C3%A9"),
+    ("a.", search "a."),
+    (".a", search ".a"),
+    ("a..b", search "a..b"),
+    ("foo@bar.com", search "foo%40bar.com"),
+    ("example.org:abc", refused_as "example.org"),
+    ("javascript:alert(1)", refused_as "javascript"),
+    ("JavaScript:alert(1)", refused_as "javascript"),
+    ("javascript:8080", refused_as "javascript"),
+    ("data:text/html,x", refused_as "data"),
+    ("mailto:a@b.org", refused_as "mailto"),
+    ("ftp://example.org", refused_as "ftp"),
+    ("", Err OmniboxError::Empty),
+    ("   ", Err OmniboxError::Empty)
+  ])
+  for row in rows
+    assert_eq! \-> (row.0, classify row.0 DDG) \-> (row.0, row.1)
+
+test "a search fills the template it is given"
+  want = "http://localhost:4001/search?q=rust%20book"
+  assert_eq! \-> classify "rust book" LOCAL_SEARCH \-> load want
+
+test "a template without the placeholder is refused, addresses included"
+  assert_eq! \-> classify "rust" "https://duckduckgo.com/?q=" \-> Err OmniboxError::BadTemplate
+  assert_eq! \-> classify "example.org" "https://duckduckgo.com/" \-> Err OmniboxError::BadTemplate
+
+test "percent-encoding keeps only the unreserved characters"
+  assert_eq! \-> percent_encode "AZaz09-._~" \-> "AZaz09-._~"
+  assert_eq! \-> percent_encode "a b+c&d/e?f#g%" \-> "a%20b%2Bc%26d%2Fe%3Ff%23g%25"
+
+test "errors read as sentences"
+  want = "the search template has no {query} placeholder"
+  assert_eq! \-> OmniboxError::BadTemplate.to_string () \-> want
+  assert_eq! \-> (OmniboxError::Refused (.to_string "data")).to_string () \-> "refusing to load a data: URL"
