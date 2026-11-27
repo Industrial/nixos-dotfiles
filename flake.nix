@@ -441,6 +441,9 @@
       # features/cli/vlocate (GH-245): the fleet's systems and the command-not-found hint in
       # nushell, fish and zsh, as a normal user.
       // {vlocate-vm = import ./features/cli/vlocate/test.nix {inherit pkgs;};}
+      # features/ai/agent-vm (ADR-0009, #353): a microVM nested in a STIG test-host VM, probed
+      # from inside the guest, the feature switched in and out live.
+      // {agent-vm = import ./features/ai/agent-vm/test.nix {inherit pkgs inputs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;

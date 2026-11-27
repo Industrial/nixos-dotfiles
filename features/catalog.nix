@@ -20,6 +20,7 @@
 # out until they are listed here.
 [
   # ai
+  ./ai/agent-vm
   ./ai/claude-code
   ./ai/paseo
 
