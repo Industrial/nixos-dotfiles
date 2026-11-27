@@ -141,10 +141,11 @@ ssh_command s remote =
       c.push cmd
   c
 
--- The export: the guest bundles its branch into the one file the host reads,
+-- The export: the guest bundles its branch (the commits on top of the base, so a partial
+-- clone needs no blobs it never fetched) into the one file the host reads,
 -- the host fetches that bundle into its own repository and pushes it.
 export bundle_remote : &Session -> String
-bundle_remote s = "git -C /work/repo bundle create /work/.session/out.bundle #{s.branch}"
+bundle_remote s = "git -C /work/repo bundle create /work/.session/out.bundle origin/#{s.base}..#{s.branch}"
 
 export bundle_path : &Session -> String
 bundle_path s = "#{s.state}/work/.session/out.bundle"

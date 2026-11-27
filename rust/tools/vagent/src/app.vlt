@@ -185,7 +185,7 @@ test "--export: the guest bundles, the host fetches and pushes to agent/<session
   w = scripted (Vec::new ())
   assert! \-> ran_in (w.clone ()) s |> .is_ok
   log = log_of (&w)
-  assert! \-> index_of (&log) "bundle create /work/.session/out.bundle feat/x" < index_of (&log) "fetch --no-tags"
+  assert! \-> index_of (&log) "bundle create /work/.session/out.bundle origin/main..feat/x" < index_of (&log) "fetch --no-tags"
   assert! \-> index_of (&log) "fetch --no-tags" < index_of (&log) "refs/heads/agent/s2-100"
   assert! \-> index_of (&log) "refs/heads/agent/s2-100" < index_of (&log) "systemctl stop"
 
