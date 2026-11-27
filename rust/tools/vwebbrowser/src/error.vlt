@@ -1,0 +1,30 @@
+-- vwebbrowser's typed failures. Plain enums with hand-written Display (an
+-- `errors` block names its fields `_0`, which trips
+-- clippy::just_underscores_and_digits, and drops derives: voltaic#15).
+
+-- What the UI edge can refuse: a command it could not hand to the GTK thread.
+export data UiError
+  = Unavailable String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display UiError
+  fmt : &self -> &mut std::fmt::Formatter<'_> -> std::fmt::Result
+  fmt self f = case self of
+    UiError::Unavailable why -> write! \-> f \-> "the window is unavailable: #{why}"
+
+-- The program's one failure boundary. `Usage` is answered before the root
+-- starts (exit 2); everything else the root can fail with exits 1.
+export data AppError
+  = Usage String
+  | Ui UiError
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display AppError
+  fmt : &self -> &mut std::fmt::Formatter<'_> -> std::fmt::Result
+  fmt self f = case self of
+    AppError::Usage why -> write! \-> f \-> "#{why}"
+    AppError::Ui e -> write! \-> f \-> "#{e}"
+
+instance From UiError AppError
+  from : UiError -> Self
+  from e = AppError::Ui e

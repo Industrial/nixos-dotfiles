@@ -1,0 +1,44 @@
+# vwebbrowser: a WebKitGTK browser whose whole program is an id_effect value.
+#
+# Standalone crate (own Cargo.lock, empty [workspace]) so buildRustPackage
+# vendors it on its own and it never contends with rust/Cargo.toml's members
+# or lockfile.
+[workspace]
+
+[package]
+name = "vwebbrowser"
+version = "0.0.1"
+edition = "2024"
+authors = ["Industrial"]
+description = "A minimal WebKitGTK browser on Voltaic + id_effect: id_effect owns the program, GTK owns one thread"
+license = "MIT"
+publish = false
+build = "build.rs"
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly.
+id_effect = "=0.13.0"
+# The root fiber runs on tokio (inside its context), never on run_main's
+# parked main thread: that thread belongs to gtk::Application::run.
+id_effect_tokio = "=0.13.0"
+# The exit contract (0/1/2/101/130) without run_main itself.
+id_effect_cli = "=0.13.0"
+# The GTK edge (src/gtk_edge.rs) only: one gtk-rs generation (glib/gio 0.22).
+# webkit6 0.6.1 names gtk::Accessible, which gtk4 0.11 only exports from v4_10
+# on; nixpkgs ships gtk4 4.24, so the 4.14 API is safe to assume.
+gtk4 = { version = "0.11", features = ["v4_14"] }
+webkit6 = "0.6.1"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Exact pin;
+# 0.2.0 has silent miscompiles.
+[build-dependencies]
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
+
+[lib]
+name = "vwebbrowser"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vwebbrowser"
+path = "src/main.rs"

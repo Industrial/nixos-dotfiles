@@ -1,0 +1,171 @@
+-- The program, as one id_effect value over the two UI capabilities.
+--
+--   vwebbrowser [URL]       (default about:blank)
+--
+-- The root opens the URL in the first tab, then consumes the window's events
+-- (a Stream over the UiEvents queue) until the window is closed, and succeeds.
+-- However it ends, it asks the window to quit. It never sees a widget: the
+-- live UiPort is gtk_edge.rs, the tests below provide a fake.
+--
+-- Exit (main.rs, through id_effect_cli's contract): 0 success, 1 typed
+-- failure, 2 usage, 101 defect, 130 interrupted.
+
+import id_effect::{Effect, Exit, Need, Never, Stream, need, succeed}
+import crate::error::AppError
+import crate::ui::{TabId, Ui, UiCmd, UiEnv, UiEvent, UiEvents}
+
+export const DEFAULT_URL : &str = "about:blank"
+
+export const USAGE : &str = "usage: vwebbrowser [URL]"
+
+-- What the command line asks for.
+export data Start
+  = Browse String
+  | Help
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The command line (argv, program name first). More than one argument, or a
+-- flag other than --help, is a usage error.
+export start_of : &[String] -> Result<Start, AppError>
+start_of args =
+  rest = args |> .iter |> .skip 1 |> .cloned |> .collect : Vec<String>
+  if rest.is_empty ()
+    Ok (Start::Browse (.to_string DEFAULT_URL))
+  else if rest.len () > 1
+    Err (AppError::Usage ("expected at most one URL, got #{rest.len ()}\n#{USAGE}"))
+  else
+    one = rest[0].clone ()
+    if one == "--help" || one == "-h"
+      Ok Start::Help
+    else if one.starts_with "-"
+      Err (AppError::Usage ("unknown flag #{one}\n#{USAGE}"))
+    else
+      Ok (Start::Browse one)
+
+-- The tab the start URL opens in.
+export first_tab : TabId
+first_tab = TabId { id = 1 }
+
+-- One command to the window.
+export send : UiCmd -> Effect<(), AppError, UiEnv>
+send cmd =
+  ui : Need<Ui> = need ()
+  ui.flat_map (move \u -> ((u.0.send cmd).map_err AppError::Ui).any_env ())
+
+-- Whether the window is still there after `event`.
+still_open : &UiEvent -> bool
+still_open event = *event != UiEvent::WindowClosed
+
+-- One event. The skeleton has one tab and nothing to keep in step with it;
+-- the Tabs service (a later leaf) takes these over.
+handle : UiEvent -> Effect<(), AppError, UiEnv>
+handle _event = succeed (())
+
+-- The window's events, in order, until it is closed.
+consume : Effect<(), AppError, UiEnv>
+consume =
+  events : Need<UiEvents> = need ()
+  events.flat_map (\q -> ((Stream::from_queue (q.0.clone ())).take_while still_open).run_for_each handle)
+
+-- The start URL in the first tab, then the events until the window closes.
+export root : String -> Effect<(), AppError, UiEnv>
+root url = (send (UiCmd::OpenUrl (first_tab ()) url)).flat_map (\_ -> consume ())
+
+-- Asking the window to quit cannot fail the program: a window that is gone
+-- already has nothing left to quit.
+quit : Effect<(), Never, UiEnv>
+quit = (send UiCmd::Quit).catch (\_ -> succeed (()))
+
+-- The root, followed by Quit however it ends (success, failure, defect or
+-- interrupt), so the GTK thread's Application::run returns.
+export program : String -> Effect<(), AppError, UiEnv>
+program url = (root url).ensuring (quit ())
+
+-- The exit byte of a finished program, id_effect_cli's contract
+-- (exit_code_for_exit maps the same way): 0 / 1 / 101 / 130.
+export exit_byte : given <A> &Exit<A, AppError> -> u8
+exit_byte exit = case exit of
+  Exit::Success _ -> 0
+  Exit::Failure cause -> id_effect_cli::cause_max_exit_byte cause
+
+-- Fakes: a window that records what it was asked to do (and, refusing,
+-- fails every command after recording it).
+
+#[cfg(test)]
+import std::sync::{Arc, Mutex, PoisonError}
+#[cfg(test)]
+import id_effect::{assert_exit_success, expect_exit_failure, fail, run_test}
+#[cfg(test)]
+import crate::error::UiError
+#[cfg(test)]
+import crate::ui::{UiPort, env, layer, new_events, offer}
+
+#[cfg(test)]
+data FakeUi { sent Arc<Mutex<Vec<UiCmd>>>, refuse bool }
+
+#[cfg(test)]
+instance UiPort FakeUi
+  send : &self -> UiCmd -> Effect<(), UiError>
+  send self cmd =
+    (self.sent.lock ().unwrap_or_else PoisonError::into_inner).push cmd
+    if self.refuse
+      fail (UiError::Unavailable (.to_string "no window"))
+    else
+      succeed (())
+
+#[cfg(test)]
+data Fakes { ui Ui, events UiEvents, sent Arc<Mutex<Vec<UiCmd>>> }
+
+-- A fake window whose queue already holds `pending`.
+#[cfg(test)]
+fakes : bool -> Vec<UiEvent> -> Fakes
+fakes refuse pending =
+  sent = Arc::new (Mutex::new (Vec::new ()))
+  ui = Ui (Arc::new (FakeUi { sent = Arc::clone (&sent), refuse }))
+  events = new_events ()
+  for event in pending
+    assert_exit_success (&(run_test (offer (&events) event))) (&true)
+  Fakes { ui, events, sent }
+
+#[cfg(test)]
+sent_of : &Fakes -> Vec<UiCmd>
+sent_of f = (f.sent.lock ().unwrap_or_else PoisonError::into_inner).clone ()
+
+#[cfg(test)]
+argv : Vec<&str> -> Vec<String>
+argv xs = xs |> .into_iter |> .map (\s -> s.to_string ()) |> .collect
+
+test "no argument opens about:blank"
+  assert_eq! \-> start_of (&(argv (.to_vec (["vwebbrowser"])))) \-> Ok (Start::Browse (.to_string "about:blank"))
+
+test "one argument is the start URL"
+  assert_eq! \-> start_of (&(argv (.to_vec (["vwebbrowser", "https://example.org"])))) \-> Ok (Start::Browse (.to_string "https://example.org"))
+
+test "--help is help; two URLs or an unknown flag are usage errors"
+  assert_eq! \-> start_of (&(argv (.to_vec (["vwebbrowser", "--help"])))) \-> Ok Start::Help
+  assert! \-> matches!(start_of(&argv(vec!["vwebbrowser", "a", "b"])), Err(AppError::Usage(_)))
+  assert! \-> matches!(start_of(&argv(vec!["vwebbrowser", "--private"])), Err(AppError::Usage(_)))
+
+test "the root opens the argv URL in the first tab and succeeds when the window closes"
+  f = fakes false (.to_vec ([UiEvent::TitleChanged (first_tab ()) (.to_string "Example Domain"), UiEvent::WindowClosed]))
+  url = .to_string "https://example.org"
+  exit = run_test ((program url).provide_layer (layer (f.ui.clone ()) (f.events.clone ())))
+  assert_exit_success (&exit) (&())
+  assert_eq! \-> exit_byte (&exit) \-> 0
+  assert_eq! \-> sent_of (&f) \-> .to_vec ([UiCmd::OpenUrl (first_tab ()) (.to_string "https://example.org"), UiCmd::Quit])
+
+test "a shut-down event queue ends the root, as a closed window does"
+  f = fakes false (.to_vec ([UiEvent::UriChanged (first_tab ()) (.to_string "about:blank")]))
+  shut = run_test (f.events.0.shutdown ()) : Exit<(), Never>
+  assert_exit_success (&shut) (&())
+  exit = run_test ((root (.to_string "about:blank")).provide_all (env (f.ui.clone ()) (f.events.clone ())))
+  assert_exit_success (&exit) (&())
+  assert_eq! \-> sent_of (&f) \-> .to_vec ([UiCmd::OpenUrl (first_tab ()) (.to_string "about:blank")])
+
+test "a window that refuses the start URL is a typed failure: exit 1, and Quit is still asked"
+  f = fakes true (.to_vec ([UiEvent::WindowClosed]))
+  exit = run_test ((program (.to_string "https://example.org")).provide_layer (layer (f.ui.clone ()) (f.events.clone ())))
+  assert_eq! \-> exit_byte (&exit) \-> 1
+  e = expect_exit_failure exit
+  assert_eq! \-> e \-> AppError::Ui (UiError::Unavailable (.to_string "no window"))
+  assert_eq! \-> sent_of (&f) \-> .to_vec ([UiCmd::OpenUrl (first_tab ()) (.to_string "https://example.org"), UiCmd::Quit])

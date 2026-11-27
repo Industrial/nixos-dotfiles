@@ -1,0 +1,14 @@
+# The nixpkgs attributes bin/ci/cargo-standalone adds to this crate's clippy
+# and test shells: what gtk4-sys, webkit6-sys and soup3-sys find through
+# pkg-config (rust/tools/TESTING.md). Keep in step with default.nix.
+pkg-config
+glib
+glib-networking
+gtk4
+webkitgtk_6_0
+libsoup_3
+cairo
+pango
+gdk-pixbuf
+graphene
+harfbuzz
