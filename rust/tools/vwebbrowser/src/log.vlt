@@ -234,6 +234,21 @@ file_layer min = Layer::acquire_release (move \-> ((open min).map_err E::from).m
 export live_layer : given <E: From<LogError> + Send + 'static> LogLevel -> Layer<LogEnv, E>
 live_layer min = (id_effect_config::EnvConfigProviderLive::layer ()).provide_to (file_layer min)
 
+-- What the browser runs with: the file log, or, when the file cannot be
+-- opened, an in-memory log and one warning on stderr. A browser that cannot
+-- write its log still browses, so this layer never fails.
+export live_or_memory_layer : given <E: Send + 'static> LogLevel -> Layer<LogEnv, E>
+live_or_memory_layer min = (id_effect_config::EnvConfigProviderLive::layer ()).provide_to (Layer::acquire_release (move \-> (open_or_memory min).map (\l -> hlist![l])) (\env _kind : ExitKind -> flushed (Log::clone (&env.0))))
+
+open_or_memory : given <E: Send + 'static> LogLevel -> Effect<Log, E, ConfigEnv>
+open_or_memory min = (open min).catch (move \e -> sync (move \-> in_memory_after min e))
+
+in_memory_after : LogLevel -> LogError -> Log
+in_memory_after min e =
+  eprintln! \-> "vwebbrowser: #{e}; logging to memory only"
+  (log, _lines) = memory min
+  log
+
 -- A ready Log as a layer (in-memory logs, fakes).
 export layer : given <E: Send + 'static> Log -> Layer<LogEnv, E>
 layer log = Layer::succeed (hlist![log])
