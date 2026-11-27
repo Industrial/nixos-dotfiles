@@ -35,6 +35,13 @@ let
   sbOn = {features.hardening.secureBoot.enable = true;};
   sb = eval [sbOn];
   sbNoLanza = evalNoLanza [sbOn];
+  createOn = {features.hardening.secureBoot.createKeys.enable = true;};
+  sbKeys = eval [sbOn createOn];
+  # createKeys alone, Secure Boot off: inert.
+  keysOnly = eval [createOn];
+  fleet = import ../../../common/fleet.nix;
+  keysUnit = sbKeys.systemd.services.sbctl-keys;
+  execs = map toString keysUnit.serviceConfig.ExecStart;
   sbMeasured = eval [sbOn {boot.lanzaboote.extraEfiSysMountPoints = ["/boot2"];}];
   # What a host evaluates when the option is off: the lanzaboote module is there, inert.
   noLanzaDefault = evalNoLanza [];
@@ -146,4 +153,29 @@ in
     # The hook ports neither of these upstream extras: on, they must refuse to evaluate.
     secureBootRefusesUnportedExtras = assay.eq (builtins.any (a: builtins.match ".*supports neither extraEfiSysMountPoints nor measuredBoot.*" a.message != null) (failed sbMeasured)) true;
     secureBootShipsSbctl = assay.eq (nixos.hasPackage sb "sbctl") true;
+
+    # createKeys (GH-184, GH-343): off by default, and nothing of it without the option.
+    createKeysOffByDefault = assay.eq [sb.features.hardening.secureBoot.createKeys.enable (sb.systemd.services ? sbctl-keys)] [false false];
+    createKeysEvaluatesCleanly = assay.eq (failed sbKeys) [];
+    # Without Secure Boot it does nothing: no unit, the Python installer stays.
+    createKeysInertWithoutSecureBoot =
+      assay.eq [(keysOnly.systemd.services ? sbctl-keys) keysOnly.boot.loader.systemd-boot.enable keysOnly.boot.lanzaboote.enable] [false true false];
+    # The unit: a oneshot at boot, keys (if missing) then the backup (if missing).
+    createKeysUnit =
+      assay.eq [keysUnit.serviceConfig.Type keysUnit.serviceConfig.RemainAfterExit (builtins.elem "multi-user.target" keysUnit.wantedBy)] ["oneshot" true true];
+    createKeysThenBackup =
+      assay.eq (map (e: builtins.match ".*/bin/(sbctl-[a-z-]+)" e) execs) [["sbctl-ensure-keys"] ["sbctl-backup-keys"]];
+    # The install hook changes with createKeys (it runs sbctl-ensure-keys before lzbt):
+    # switch-to-configuration installs the bootloader before it activates, so only the hook
+    # is early enough for the first switch.
+    createKeysChangesTheInstallHook =
+      assay.eq (sbKeys.boot.loader.external.installHook != sb.boot.loader.external.installHook) true;
+    # Ours, not upstream's: no autoGenerateKeys, no unsigned images, no auto-enrollment.
+    createKeysNotUpstreamAuto =
+      assay.eq [sbKeys.boot.lanzaboote.autoGenerateKeys.enable sbKeys.boot.lanzaboote.autoEnrollKeys.enable sbKeys.boot.lanzaboote.allowUnsigned] [false false false];
+    # The backup is encrypted to the operator ssh keys in common/fleet.nix, owned by tom.
+    createKeysRecipientsAreTheOperators =
+      assay.eq sbKeys.features.hardening.secureBoot.createKeys.recipients fleet.operatorKeys;
+    createKeysBackup =
+      assay.eq [sbKeys.features.hardening.secureBoot.createKeys.backupDirectory sbKeys.features.hardening.secureBoot.createKeys.backupOwner] ["/var/lib/sbctl-backup" "tom"];
   }

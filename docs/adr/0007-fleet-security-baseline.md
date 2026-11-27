@@ -235,8 +235,9 @@ writes signed UKIs to `/boot/EFI/Linux/`, and keeps the same 10-generation limit
 `lzbt` runs through our own install hook, `lzbt-all-profiles` in `features/nixos/boot`, not
 upstream's. Upstream's hook only sees `/nix/var/nix/profiles/system-*-link` and leaves
 `default nixos-*`, so the highest version number wins. comin deploys through
-`system-profiles/comin`, and a host can carry a stale `system` profile (muninn's
-`system-10` from the install; drakkar's old `system-profiles/comin-*` from before vdeploy).
+`system-profiles/comin`, and a host can carry another profile's generations (muninn's
+`system-10` from the install and its `comin-*` from before vdeploy; drakkar's old
+`system-profiles/comin-*`).
 Our hook passes every profile's generations, as the Python installer does, and writes the
 generation being switched to as `default` in `loader.conf`, matched by its toplevel, so
 generation numbers that collide across profiles do not matter.
@@ -245,14 +246,16 @@ The hosts are deployed differently, and that changes where a missing key fails:
 
 | Host | Deployer | What it runs on merge | Where `lzbt` runs |
 |------|----------|-----------------------|-------------------|
-| muninn (first) | comin | `nix-env -p system-profiles/comin --set X`, then `X/bin/switch-to-configuration switch` | inside `switch`, which installs the bootloader BEFORE activating: a missing key fails comin's switch, the host stays on the previous generation and the ESP is untouched; only `system-profiles/comin` already names X |
-| drakkar | vdeploy | `switch-to-configuration test`, vhealth, `nix-env -p system --set X`, then `switch-to-configuration boot` (`rust/tools/vdeploy/src/apply.vlt`) | in the last step, after X is live and healthy |
+| muninn (first), drakkar | vdeploy (muninn since #437) | `switch-to-configuration test`, vhealth, `nix-env -p system --set X`, then `switch-to-configuration boot` (`rust/tools/vdeploy/src/apply.vlt`) | in the last step, after X is live and healthy. With `createKeys` (muninn), `sbctl-keys.service` has already created the keys in the `test` step |
+| a host still on comin | comin | `nix-env -p system-profiles/comin --set X`, then `X/bin/switch-to-configuration switch` | inside `switch`, which installs the bootloader BEFORE activating: a missing key fails comin's switch, the host stays on the previous generation and the ESP is untouched; only `system-profiles/comin` already names X |
 
-Two VM tests run this runbook through OVMF and the ESP, with each host's layout:
-`checks.x86_64-linux.lanzaboote-vm` (`features/nixos/boot/test.nix`, comin on muninn's
-layout, STIG test-host) and `checks.x86_64-linux.lanzaboote-vdeploy-vm`
-(`features/nixos/boot/test-vdeploy.nix`, the real `vdeploy apply` on drakkar's layout).
-Both switch in, reboot into the lanzaboote generation, roll back, and reboot.
+Three VM tests run this runbook through OVMF and the ESP, each host's layout and hardening:
+`checks.x86_64-linux.lanzaboote-vdeploy-vm-muninn` (`features/nixos/boot/test-vdeploy-muninn.nix`,
+muninn's gate: the real `vdeploy apply` with `createKeys`, STIG test-host, `/etc` overlay),
+`checks.x86_64-linux.lanzaboote-vdeploy-vm` (`features/nixos/boot/test-vdeploy.nix`, the
+real `vdeploy apply` on drakkar's layout, keys by hand, including the missing-keys case) and
+`checks.x86_64-linux.lanzaboote-vm` (`features/nixos/boot/test.nix`, the comin path). All
+switch in, reboot into the lanzaboote generation, roll back, and reboot.
 
 **What vdeploy does when the keys are missing** (proven by `lanzaboote-vdeploy-vm`): `lzbt`
 fails in step 4 (`Failed to read public key from /var/lib/sbctl/keys/db/db.pem`), and
@@ -267,7 +270,48 @@ writing the UKIs), or have root run `/nix/var/nix/profiles/system/bin/switch-to-
 Watch `last.json`'s `note`, not its `result`.
 
 The order matters. Both deployers apply every merge on their own, and `lzbt` fails if the
-keys are missing. So **step 1 happens before the enable merges.**
+keys are missing. So **step 1 happens before the enable merges**, either by hand or, on a
+host with `createKeys`, by the configuration itself.
+
+### Keys created by the host: `features.hardening.secureBoot.createKeys` (GH-343)
+
+muninn sets it; drakkar does not (yet). With it on, steps 1 and 2 below are done by the
+configuration, with no new key material beyond the Secure Boot keys and no passphrase:
+
+- **Keys.** `sbctl-ensure-keys` runs in the install hook, before `lzbt` signs (a systemd
+  unit would be too late: `switch-to-configuration` installs the bootloader before it
+  activates), and again from `sbctl-keys.service`. It runs
+  `sbctl create-keys --database-path /var/lib/sbctl/GUID --export /var/lib/sbctl/keys` only when
+  `keys/db/db.key` is missing, keeps the bundle root-only (0700), and **never overwrites**:
+  a `keys/` without `db.key` is refused with an error, not replaced.
+- **Encrypted backup.** `sbctl-keys.service` then writes, when it is missing,
+  `/var/lib/sbctl-backup/sbctl-<host>.tar.age`: `tar` of `/var/lib/sbctl` piped to
+  `age -R` with every operator ssh-ed25519 key in `common/fleet.nix` as a recipient. It is
+  owned by the operator (`tom`, 0400), so it can be copied off the host without root. The
+  keys never change, so the backup is written once; removed by hand, it is rewritten from
+  the same keys at the next start of the unit.
+- **Off-host copies** (unprivileged, from drakkar, after the first switch):
+  `mkdir -p ~/backups/sbctl && scp tom@muninn:/var/lib/sbctl-backup/sbctl-muninn.tar.age ~/backups/sbctl/`,
+  and a second copy onto mimir's `/data`, which drakkar mounts over NFS at `/mnt/mimir`
+  (tom is in group `data`):
+  `mkdir -p /mnt/mimir/backups/sbctl && cp ~/backups/sbctl/sbctl-muninn.tar.age /mnt/mimir/backups/sbctl/`.
+  A file write only: nothing on mimir is restarted or reconfigured, and no root anywhere.
+- **Recovery**, on the host, with any operator key (one command):
+  `age -d -i ~/.ssh/id_ed25519 sbctl-<host>.tar.age | sudo tar -C /var/lib -xf -`
+  This restores `/var/lib/sbctl` (keys, GUID) exactly; check with
+  `sudo test -s /var/lib/sbctl/keys/db/db.key`. To inspect without restoring:
+  `age -d -i ~/.ssh/id_ed25519 sbctl-<host>.tar.age | tar -tf -`.
+- **Not automated:** enrollment. lanzaboote's `autoEnrollKeys` stays off. It only acts
+  when the firmware is in Setup Mode (muninn, a Dell XPS 15 9500 on UEFI 2.70, reports
+  `Secure Boot: disabled`, not in Setup Mode), and it would force-enroll at the next boot
+  with nobody watching. Enrollment stays step 5, by hand, at the machine.
+
+Under vdeploy (muninn), `sbctl-keys.service` is new in the generation, so the `test` step
+starts it and it creates the keys; the hook in the `boot` step finds them and `lzbt` signs.
+Both take one lock, so they never race. `checks.x86_64-linux.lanzaboote-vdeploy-vm-muninn`
+asserts that order from the journal (the keys before `Installing Lanzaboote`), a rerun that
+changes nothing, and the backup decrypting with an operator key. `lanzaboote-vm` covers the
+comin path (keys from the hook on the first `switch`) and the refusal of a partial bundle.
 
 1. **Keys, on the host, before the enable.** Run
    `sudo nix run nixpkgs#sbctl -- create-keys`. This writes `/var/lib/sbctl/keys/{PK,KEK,db}`
@@ -279,13 +323,13 @@ keys are missing. So **step 1 happens before the enable merges.**
    lost bundle only means creating keys again. After enrollment, losing `db.key` means no
    new generation can be signed until new keys are enrolled at the machine.
 3. **Enable.** Set `features.hardening.secureBoot.enable = true` for the host, and merge.
-   The host's deployer switches it (comin on muninn, vdeploy on drakkar), and `lzbt`
-   installs signed UKIs for every generation it keeps. Then check: `sudo sbctl verify` lists
+   vdeploy switches the host (muninn, drakkar), and `lzbt` installs signed UKIs for every
+   generation it keeps. Then check: `sudo sbctl verify` lists
    `/boot/EFI/Linux/nixos-generation-*.efi` as signed, and `/boot/loader/loader.conf` has
-   `default nixos-generation-<N>-….efi`, where N is the deployed generation: comin's newest
-   (`readlink /nix/var/nix/profiles/system-profiles/comin`) on muninn, the `system`
-   profile's newest (`readlink /nix/var/nix/profiles/system`) on drakkar. On drakkar also
-   read `/var/lib/vdeploy/last.json`: its `note` must be `now the system profile's newest
+   `default nixos-generation-<N>-….efi`, where N is the `system` profile's newest
+   (`readlink /nix/var/nix/profiles/system`; on a comin host, comin's newest,
+   `readlink /nix/var/nix/profiles/system-profiles/comin`). Also read
+   `/var/lib/vdeploy/last.json`: its `note` must be `now the system profile's newest
    generation and the boot default`, not `the boot entry was not written`.
 4. **First reboot, at the machine.**
    - Remove the Python installer's entries:
@@ -309,7 +353,7 @@ keys are missing. So **step 1 happens before the enable merges.**
 1. If Secure Boot is on in the firmware, **turn it off first**. The Python installer's
    systemd-boot and kernels are unsigned, so an enforcing firmware refuses them.
 2. Revert the enable (`features.hardening.secureBoot.enable` back to off) and merge. The
-   deployer (comin on muninn, vdeploy on drakkar) switches to a new generation with the
+   deployer (vdeploy on muninn and drakkar) switches to a new generation with the
    Python installer. That installer writes
    `/boot/loader/entries/nixos-<sha256>.conf` for every generation and removes
    lanzaboote's files from `/boot/EFI/nixos/`. It does not touch `/boot/EFI/Linux/`.

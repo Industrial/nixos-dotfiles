@@ -25,9 +25,68 @@
   options,
   inputs,
   pkgs,
+  settings ? {},
   ...
 }: let
   cfg = config.features.hardening;
+  fleet = import ../../../common/fleet.nix;
+  sb = cfg.secureBoot;
+  createKeys = sb.enable && sb.createKeys.enable;
+
+  # The Secure Boot keys, created on the host when they are missing (createKeys, GH-184,
+  # GH-343). Idempotent: it does nothing when db.key exists, and it refuses, rather than
+  # overwrites, when keys/ exists without db.key (a partial or foreign bundle). Run by the
+  # install hook BEFORE lzbt, because switch-to-configuration installs the bootloader before
+  # it activates, so a unit would come too late for the first switch; and by
+  # sbctl-keys.service at boot and on every switch.
+  ensureKeys = pkgs.writeShellApplication {
+    name = "sbctl-ensure-keys";
+    runtimeInputs = [pkgs.sbctl pkgs.coreutils pkgs.util-linux];
+    text = ''
+      bundle=${lib.escapeShellArg sb.pkiBundle}
+      # One at a time: under vdeploy the unit starts in the `test` step and the hook runs in
+      # the `boot` step; neither may see the other's half-written keys/.
+      exec 9>/run/sbctl-ensure-keys.lock
+      flock 9
+      if [ -s "$bundle/keys/db/db.key" ]; then
+        exit 0
+      fi
+      if [ -e "$bundle/keys" ]; then
+        echo "sbctl-ensure-keys: $bundle/keys exists but has no db/db.key; refusing to create keys over it" >&2
+        exit 1
+      fi
+      install -d -m 0700 "$bundle"
+      sbctl create-keys --database-path "$bundle/GUID" --export "$bundle/keys"
+      chmod -R go-rwx "$bundle"
+      test -s "$bundle/keys/db/db.key"
+      echo "sbctl-ensure-keys: created the Secure Boot keys in $bundle" >&2
+    '';
+  };
+
+  # The encrypted backup of pkiBundle: tar | age to the operator ssh-ed25519 keys. Written
+  # once, when it is missing; the keys never change, so neither does the backup. No new key
+  # material and no passphrase: any operator key in common/fleet.nix decrypts it.
+  backupFile = "${sb.createKeys.backupDirectory}/sbctl-${config.networking.hostName}.tar.age";
+  recipients = pkgs.writeText "sbctl-backup-recipients" (lib.concatLines sb.createKeys.recipients);
+  backupKeys = pkgs.writeShellApplication {
+    name = "sbctl-backup-keys";
+    runtimeInputs = [pkgs.age pkgs.gnutar pkgs.coreutils];
+    text = ''
+      bundle=${lib.escapeShellArg sb.pkiBundle}
+      dir=${lib.escapeShellArg sb.createKeys.backupDirectory}
+      out=${lib.escapeShellArg backupFile}
+      test -s "$bundle/keys/db/db.key"
+      install -d -m 0755 "$dir"
+      if [ ! -s "$out" ]; then
+        tar -C "$(dirname "$bundle")" -cf - "$(basename "$bundle")" | age -R ${recipients} -o "$out.tmp"
+        sync "$out.tmp"
+        mv -f "$out.tmp" "$out"
+        echo "sbctl-backup-keys: wrote $out" >&2
+      fi
+      chown ${lib.escapeShellArg sb.createKeys.backupOwner} "$out"
+      chmod 0400 "$out"
+    '';
+  };
 
   # Network protocols nothing in this fleet uses. Their modules have had a history of
   # remotely or locally reachable bugs, and an unprivileged socket() call is enough to
@@ -92,6 +151,8 @@
           fi
         done
 
+        ${lib.optionalString createKeys "${ensureKeys}/bin/sbctl-ensure-keys"}
+
         PATH=${config.systemd.package}/lib/systemd:$PATH
         ${lz.installCommand} \
           ${lib.escapeShellArgs ["--public-key=${toString lz.publicKeyFile}" "--private-key=${toString lz.privateKeyFile}"]} \
@@ -134,6 +195,34 @@ in {
         type = lib.types.str;
         default = "/var/lib/sbctl";
         description = "Where `sbctl create-keys` put the Secure Boot keys.";
+      };
+
+      createKeys = {
+        enable = lib.mkEnableOption ''
+          creating the Secure Boot keys on the host when they are missing (GH-184, GH-343):
+          `sbctl create-keys` into pkiBundle (root, 0700), from the install hook before lzbt
+          signs and from sbctl-keys.service. Never overwrites existing keys. Also writes an
+          age-encrypted backup of pkiBundle to the operator keys. Only takes effect with
+          secureBoot.enable. See ADR-0007, "Runbook: Secure Boot"'';
+
+        recipients = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = fleet.operatorKeys;
+          defaultText = lib.literalExpression "(import common/fleet.nix).operatorKeys";
+          description = "age recipients (ssh-ed25519 public keys) the backup is encrypted to.";
+        };
+
+        backupDirectory = lib.mkOption {
+          type = lib.types.str;
+          default = "/var/lib/sbctl-backup";
+          description = "Where the encrypted backup, sbctl-<host>.tar.age, is written.";
+        };
+
+        backupOwner = lib.mkOption {
+          type = lib.types.str;
+          default = settings.username or "tom";
+          description = "The operator who owns (and can copy off-host) the encrypted backup.";
+        };
       };
     };
 
@@ -259,6 +348,27 @@ in {
         # `sbctl verify` (is everything on the ESP signed?) and `sbctl status`.
         environment.systemPackages = [pkgs.sbctl];
       }
+      (lib.mkIf createKeys {
+        assertions = [
+          {
+            assertion = sb.createKeys.recipients != [];
+            message = "features.hardening.secureBoot.createKeys needs at least one backup recipient.";
+          }
+        ];
+        # Keys (if missing), then the backup (if missing). Also at boot, so a backup removed
+        # by hand comes back; the keys themselves are never rewritten.
+        systemd.services.sbctl-keys = {
+          description = "Secure Boot keys: create if missing, back up encrypted to the operators";
+          wantedBy = ["multi-user.target"];
+          restartTriggers = [ensureKeys backupKeys];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            UMask = "0077";
+            ExecStart = ["${ensureKeys}/bin/sbctl-ensure-keys" "${backupKeys}/bin/sbctl-backup-keys"];
+          };
+        };
+      })
       (lib.optionalAttrs hasLanzaboote {
         boot.lanzaboote = {
           enable = true;
