@@ -118,3 +118,8 @@ features/nix/vci
 # nix-tree: vwhy took over in profiles/cli-core.nix (GH-182). A host that sets
 # `features.cli.nix-tree.enable = true;` has it back (profiles/cli-core.assay.nix).
 features/cli/nix-tree
+
+# --- Built ahead of the hosts that will use it. -------------------------------------
+# The compartments guest kernel (#425) is off on every host until a host runs
+# compartments (#419); it builds alone as .#compartment-guest-kernel.
+features/compartments/guest-kernel
