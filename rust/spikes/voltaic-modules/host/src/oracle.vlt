@@ -1,6 +1,6 @@
 -- The oracle: Nix's own `.drv` for the same derivation, from
--- `nix eval --json --file oracle.nix --apply …` (this crate's oracle.nix) on the
--- nixpkgs this repository pins. The emitted path and ATerm must equal it
+-- `oracle.nix`, which `oracle.assay.nix` evaluates on the nixpkgs this
+-- repository pins. The emitted path and ATerm must equal it
 -- byte for byte.
 
 import id_effect::Exit

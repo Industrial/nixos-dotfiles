@@ -1,14 +1,8 @@
-# The oracle for host/src/oracle.vlt: the same derivation, instantiated by Nix
-# on the nixpkgs this repository pins.
-#
-#   nix eval --json --file rust/spikes/voltaic-modules/oracle.nix \
-#     --apply "f: f { rev = \"$(git rev-parse HEAD)\"; }"
-#
-# `git+file` with a rev, never `path:` or a bare directory, which would copy
-# .git into the store (#266).
-{rev}: let
-  flake = builtins.getFlake "git+file:///home/tom/.dotfiles?rev=${rev}";
-  pkgs = flake.inputs.nixpkgs.legacyPackages.x86_64-linux;
+# The oracle for host/src/oracle.vlt: the same derivation as the spike host's
+# toplevel, instantiated by Nix on the nixpkgs this repository pins.
+# oracle.assay.nix evaluates it with the flake.lock's nixpkgs and checks the
+# paths that host/src/oracle.vlt expects.
+{pkgs}: let
   d = derivation {
     name = "s1b-hello";
     system = "x86_64-linux";
