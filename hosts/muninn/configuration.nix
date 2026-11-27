@@ -26,6 +26,10 @@
   features.monitoring.grafana.enable = true;
   features.monitoring.homepage-dashboard.enable = true;
   features.monitoring.prometheus-exporter.enable = true;
+  # vhealth (Voltaic, #437): the probes muninn's features declare (nix-daemon as the vhealth
+  # user, sshd, node_exporter, ...), checked every minute into node_exporter; `vhealth
+  # check`. vdeploy's deploy mode decides keep or roll back with it. Rollback: delete this line.
+  features.nix.vhealth.enable = true;
   features.monitoring.prometheus.enable = true;
   features.nixos.graphics.amd.enable = true;
 

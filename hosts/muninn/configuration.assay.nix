@@ -24,6 +24,10 @@ in
   assay.suite "configuration" {
     enablesFleetAccess = assay.eq (has "fleet.remote-access") true;
     enablesAi = assay.eq cfg.profiles.ai.enable true;
+    # vhealth runs its probes here (#437), and the vhealth user may use the Nix daemon that
+    # the STIG profile restricts (allowed-users), or the nix-daemon probe is down.
+    vhealthProbesAsAnAllowedNixUser =
+      assay.eq [(has "nix.vhealth") (builtins.elem "vhealth" host.nix.settings.allowed-users) (host.environment.etc ? "vhealth/probes.json")] [true true true];
     # muninn is the monitoring standby for when mimir is down.
     monitoringStandby = assay.eq [(has "monitoring.prometheus") (has "monitoring.grafana")] [true true];
     noRelay = assay.eq (has "fleet.remote-desktop-relay") false;
