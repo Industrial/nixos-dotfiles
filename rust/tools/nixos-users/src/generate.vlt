@@ -1,0 +1,135 @@
+-- The subtree, evaluated and rendered.
+--
+-- Two evaluations, both through modsys:
+-- - every fragment together, which is where conflicts surface (two features
+--   giving one name different records), and where the cross-entry check runs:
+--   a system user's primary group must be one this subtree defines;
+-- - each fragment alone with the declaring module, which is what the
+--   fragment's feature imports, so a host gets exactly the entries of the
+--   features it enables.
+--
+-- The whole run is `modsys::pure::evaluated`, an Effect at R = HNil.
+
+import std::collections::BTreeMap
+import id_effect::{Effect, HNil}
+import modsys::eval::{EvalError, Module, Registry, evaluate, module_of, no_declarations, value}
+import modsys::pure::evaluated
+import crate::fragments::{Fragment, fragments}
+import crate::json::{object, string, strings}
+import crate::options::{GROUPS, OPERATOR, USERS, users_groups}
+import crate::types::{Group, User}
+
+module_for : &Fragment -> Module
+module_for f = module_of f.name (Vec::new ()) (f.writes.clone ()) no_declarations f.body
+
+export all_modules : Vec<Module>
+all_modules =
+  mut out = vec![users_groups()]
+  for f in &fragments ()
+    out.push (module_for f)
+  out
+
+-- A system user's primary group must exist: NixOS refuses a missing one at
+-- activation, this refuses it at generation.
+export check : &Registry -> Result<(), EvalError>
+check reg =
+  users = (value reg (&USERS))?
+  groups = (value reg (&GROUPS))?
+  for kv in &users
+    (name, u) = kv
+    case &u.group of
+      Some g | !groups.contains_key g ->
+        (Err (EvalError::Invalid "user `#{name}` has primary group `#{g}`, which no fragment defines"))?
+      _ -> ()
+  Ok ()
+
+user_json : usize -> &User -> String
+user_json indent u =
+  member = indent + 2
+  mut m = Vec::new () : Vec<(String, String)>
+  case u.create_home of
+    Some b -> m.push (String::from "createHome", b.to_string ())
+    None -> ()
+  case &u.description of
+    Some d -> m.push (String::from "description", string d)
+    None -> ()
+  if !u.extra_groups.is_empty ()
+    m.push (String::from "extraGroups", strings member "extraGroups" (&u.extra_groups))
+  case &u.group of
+    Some g -> m.push (String::from "group", string g)
+    None -> ()
+  case &u.hashed_password of
+    Some h -> m.push (String::from "hashedPassword", string h)
+    None -> ()
+  case &u.home of
+    Some h -> m.push (String::from "home", string h)
+    None -> ()
+  case u.is_normal_user of
+    Some b -> m.push (String::from "isNormalUser", b.to_string ())
+    None -> ()
+  case u.is_system_user of
+    Some b -> m.push (String::from "isSystemUser", b.to_string ())
+    None -> ()
+  case u.uid of
+    Some n -> m.push (String::from "uid", n.to_string ())
+    None -> ()
+  object indent m
+
+group_json : usize -> &Group -> String
+group_json indent g =
+  mut m = Vec::new () : Vec<(String, String)>
+  case g.gid of
+    Some n -> m.push (String::from "gid", n.to_string ())
+    None -> ()
+  object indent m
+
+users_json : usize -> &BTreeMap<String, User> -> String
+users_json indent users =
+  members = users
+    |> .iter
+    |> .map (\kv -> (kv.0.clone (), user_json (indent + 2) kv.1))
+    |> .collect
+  object indent members
+
+groups_json : usize -> &BTreeMap<String, Group> -> String
+groups_json indent groups =
+  members = groups
+    |> .iter
+    |> .map (\kv -> (kv.0.clone (), group_json (indent + 2) kv.1))
+    |> .collect
+  object indent members
+
+-- One fragment's `{ users, groups }`, the shape of NixOS's `users` option,
+-- or None when it has neither (the operator, which is rendered on its own).
+fragment_json : usize -> &Fragment -> Result<Option<String>, EvalError>
+fragment_json indent f =
+  modules = vec![users_groups(), module_for(f)]
+  reg = (evaluate (&modules))?
+  users = (value (&reg) (&USERS))?
+  groups = (value (&reg) (&GROUPS))?
+  mut m = Vec::new () : Vec<(String, String)>
+  if !groups.is_empty ()
+    m.push (String::from "groups", groups_json (indent + 2) (&groups))
+  if !users.is_empty ()
+    m.push (String::from "users", users_json (indent + 2) (&users))
+  if m.is_empty ()
+    Ok None
+  else
+    Ok (Some (object indent m))
+
+-- The generated file, from the evaluation of every fragment together.
+render : &Registry -> Result<String, EvalError>
+render reg =
+  (check reg)?
+  operator = (value reg (&OPERATOR))?
+  mut frags = Vec::new () : Vec<(String, String)>
+  for f in &fragments ()
+    rendered = (fragment_json 4 f)?
+    case rendered of
+      Some text -> frags.push (f.name.to_string (), text)
+      None -> ()
+  top = [(String::from "fragments", object 2 frags), (String::from "operator", user_json 2 (&operator))].to_vec ()
+  Ok ("#{object 0 top}\n")
+
+export generated : Effect<String, EvalError, HNil>
+generated = evaluated (\-> all_modules ()) render

@@ -45,6 +45,8 @@
   pkgs,
   ...
 }: let
+  # The vhealth account and group are Voltaic's (#457): rust/tools/nixos-users.
+  voltaic = import ../../nixos/users/voltaic.nix;
   inherit (lib) mkOption types;
   cfg = config.features.nix.vhealth;
   # Whether something restricts nix.settings.allowed-users on this host: the users feature
@@ -147,12 +149,7 @@ in {
     environment.etc."vhealth/probes.json".source = probesFile;
 
     # The identity the probes run as: this daemon, and vdeploy's post-switch check.
-    users.users.vhealth = {
-      isSystemUser = true;
-      group = "vhealth";
-      description = "vhealth probes";
-    };
-    users.groups.vhealth = {};
+    users = voltaic.fragments.vhealth;
     # It may use the Nix daemon, merged into whatever the host allows (features/nixos/users
     # sets ["@wheel"], STIG V-268152 ["root" "@wheel"]); never trusted-users. Only where
     # the list is restricted: a definition here alone would replace nixpkgs' ["*"] with

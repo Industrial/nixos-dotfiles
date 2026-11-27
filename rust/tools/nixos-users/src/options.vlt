@@ -1,0 +1,38 @@
+-- The options this subtree declares, as typed keys. `users.users` and
+-- `users.groups` are attribute sets merged with `union_unique`: an entry is
+-- owned whole by one module, and two modules giving one name different values
+-- is a conflict that names the module. The operator account is its own
+-- option, because its name, home and full name are host settings that stay in
+-- Nix (common/settings.nix); Voltaic owns the rest of its record.
+
+import std::collections::BTreeMap
+import std::marker::PhantomData
+import modsys::eval::{EvalError, Key, Module, Registry, declare, module_of, no_body}
+import modsys::option::Strategy::{Merge, Unique}
+import modsys::option::union_unique
+import crate::types::{Groups, User, Users}
+
+export const USERS : Key<Users> = Key {
+  path = "users.users",
+  marker = PhantomData,
+}
+
+export const GROUPS : Key<Groups> = Key {
+  path = "users.groups",
+  marker = PhantomData,
+}
+
+export const OPERATOR : Key<User> = Key {
+  path = "users.operator",
+  marker = PhantomData,
+}
+
+declarations : &mut Registry -> &'static str -> Result<(), EvalError>
+declarations reg origin =
+  (declare reg origin (&USERS) "User accounts, by name (NixOS users.users)." (Some (BTreeMap::new ())) (Merge (Box::new union_unique)))?
+  (declare reg origin (&GROUPS) "Groups, by name (NixOS users.groups)." (Some (BTreeMap::new ())) (Merge (Box::new union_unique)))?
+  declare reg origin (&OPERATOR) "The operator account's record; Nix adds its name, home, full name and initial password from the host settings." (Some (User::default ())) Unique
+
+-- The module that declares the subtree; every evaluation starts with it.
+export users_groups : Module
+users_groups = module_of "users-groups" (Vec::new ()) (Vec::new ()) declarations no_body

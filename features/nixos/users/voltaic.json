@@ -1,0 +1,113 @@
+{
+  "fragments": {
+    "flexget": {
+      "groups": {
+        "flexget": {}
+      },
+      "users": {
+        "flexget": {
+          "createHome": true,
+          "extraGroups": ["data"],
+          "group": "flexget",
+          "home": "/home/flexget",
+          "isSystemUser": true
+        }
+      }
+    },
+    "root": {
+      "users": {
+        "root": {
+          "hashedPassword": "!"
+        }
+      }
+    },
+    "textfile-collector": {
+      "groups": {
+        "prometheus-textfile": {}
+      }
+    },
+    "users": {
+      "groups": {
+        "data": {
+          "gid": 1111
+        },
+        "games": {
+          "gid": 1112
+        }
+      }
+    },
+    "vci": {
+      "groups": {
+        "vci": {}
+      },
+      "users": {
+        "vci": {
+          "description": "vci, the fleet's CI builds",
+          "group": "vci",
+          "home": "/var/lib/vci",
+          "isSystemUser": true
+        }
+      }
+    },
+    "vci-token": {
+      "users": {
+        "vci-token": {
+          "description": "vci-token, the GitHub App token vci posts statuses with",
+          "group": "vci",
+          "isSystemUser": true
+        }
+      }
+    },
+    "vexporter": {
+      "groups": {
+        "vexporter": {}
+      },
+      "users": {
+        "vexporter": {
+          "description": "vexporter, the Nix and fleet metrics",
+          "group": "vexporter",
+          "isSystemUser": true
+        }
+      }
+    },
+    "vhealth": {
+      "groups": {
+        "vhealth": {}
+      },
+      "users": {
+        "vhealth": {
+          "description": "vhealth probes",
+          "group": "vhealth",
+          "isSystemUser": true
+        }
+      }
+    },
+    "vpush": {
+      "groups": {
+        "vpush": {}
+      },
+      "users": {
+        "vpush": {
+          "description": "vpush, pushes builds to the fleet cache",
+          "group": "vpush",
+          "home": "/var/lib/vpush",
+          "isSystemUser": true
+        }
+      }
+    }
+  },
+  "operator": {
+    "extraGroups": [
+      "audio",
+      "networkmanager",
+      "plugdev",
+      "render",
+      "video",
+      "wheel",
+      "data",
+      "games"
+    ],
+    "isNormalUser": true,
+    "uid": 1000
+  }
+}

@@ -1,0 +1,64 @@
+-- The subtree's claims: the committed JSON is what the modules generate (the
+-- drift gate CI runs), conflicts and dangling groups are refused, and the
+-- evaluation is the HNil effect.
+
+import std::collections::BTreeMap
+import id_effect::Exit
+import modsys::eval::{EvalError, Out, View, define, evaluate, module_of, no_declarations, value}
+import modsys::option::NORMAL
+import crate::COMMITTED
+import crate::generate::{all_modules, check, generated}
+import crate::options::{GROUPS, USERS, users_groups}
+import crate::types::{Group, system_user}
+
+run : Result<String, String>
+run =
+  case (generated ()).block_on () of
+    Exit::Success text -> Ok text
+    Exit::Failure c -> Err "#{c:?}"
+
+test "features/nixos/users/voltaic.json is what the modules generate (regenerate: cargo run -q > ../../../features/nixos/users/voltaic.json)"
+  text = run ()
+    |> .unwrap
+  assert! \-> text == COMMITTED
+
+test "every fragment evaluates together without a conflict"
+  reg = evaluate (&(all_modules ()))
+    |> .unwrap
+  groups = value (&reg) (&GROUPS)
+    |> .unwrap
+  assert_eq! \-> groups["data"].gid \-> Some 1111
+  assert_eq! \-> groups["games"].gid \-> Some 1112
+
+-- A second definition of the vci group, with a gid: a conflict with the vci fragment.
+rival_vci : &View -> &mut Out -> Result<(), EvalError>
+rival_vci _ out =
+  rival = Group {
+    gid = Some 4242,
+  }
+  define out (&GROUPS) NORMAL (BTreeMap::from ([(String::from "vci", rival)]))
+  Ok ()
+
+test "a fragment redefining another's entry differently is a conflict naming it"
+  mut modules = all_modules ()
+  modules.push (module_of "rival" (Vec::new ()) ([GROUPS.path].to_vec ()) no_declarations rival_vci)
+  shown = evaluate (&modules)
+    |> .err
+    |> .unwrap
+    |> .to_string
+  assert! \-> shown.contains "rival: `vci` is defined twice, differently"
+
+orphan : &View -> &mut Out -> Result<(), EvalError>
+orphan _ out =
+  define out (&USERS) NORMAL (BTreeMap::from ([(String::from "orphan", system_user "nobody-defines-this" "x")]))
+  Ok ()
+
+test "a system user whose primary group no fragment defines is refused"
+  modules = vec![users_groups(), module_of("orphan", Vec::new(), vec![USERS.path], no_declarations, orphan)]
+  reg = evaluate (&modules)
+    |> .unwrap
+  shown = check (&reg)
+    |> .unwrap_err
+    |> .to_string
+  expected = "invalid configuration: user `orphan` has primary group `nobody-defines-this`, which no fragment defines"
+  assert_eq! \-> shown \-> expected

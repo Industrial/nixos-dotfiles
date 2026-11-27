@@ -1,0 +1,58 @@
+-- JSON text for the generated subtree, written in the layout the repository's
+-- formatter (biome, via treefmt) gives a .json file, so the committed file is
+-- both generated and formatted: an object with members is expanded one member
+-- per line, an empty one is `{}`, and an array stays on one line when that
+-- line fits in 80 columns.
+
+const WIDTH : usize = 80
+
+export string : &str -> String
+string s =
+  body = s
+    |> .replace "\\" "\\\\"
+    |> .replace "\"" "\\\""
+    |> .replace "\n" "\\n"
+    |> .replace "\r" "\\r"
+    |> .replace "\t" "\\t"
+  "\"#{body}\""
+
+-- An object whose member lines start at column `indent + 2`; its closing
+-- brace sits at `indent`. Members are sorted by key.
+export object : usize -> Vec<(String, String)> -> String
+object indent members =
+  if members.is_empty ()
+    String::from "{}"
+  else
+    mut sorted = members
+    sorted.sort ()
+    pad = " ".repeat (indent + 2)
+    end = " ".repeat indent
+    lines = sorted
+      |> .iter
+      |> .map (\m -> "#{pad}#{string (&m.0)}: #{m.1}")
+      |> .collect : Vec<String>
+    open = "{"
+    close = "}"
+    "#{open}\n#{lines.join ",\n"}\n#{end}#{close}"
+
+-- An array of strings, the value of member `key` whose line starts at column
+-- `indent`: inline when the whole line (with a trailing comma) fits, else one
+-- item per line.
+export strings : usize -> &str -> &[String] -> String
+strings indent key items =
+  quoted = items
+    |> .iter
+    |> .map (\s -> string s)
+    |> .collect : Vec<String>
+  inline = "[#{quoted.join ", "}]"
+  width = indent + (string key).len () + 2 + inline.len () + 1
+  if items.is_empty () || width <= WIDTH
+    inline
+  else
+    pad = " ".repeat (indent + 2)
+    end = " ".repeat indent
+    lines = quoted
+      |> .iter
+      |> .map (\q -> "#{pad}#{q}")
+      |> .collect : Vec<String>
+    "[\n#{lines.join ",\n"}\n#{end}]"

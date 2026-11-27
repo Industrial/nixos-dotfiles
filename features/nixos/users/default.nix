@@ -23,6 +23,7 @@
 }: let
   cfg = config.features.hardening;
   user = settings.username;
+  voltaic = import ./voltaic.nix;
 
   # Hash of "test". It only applies when the account is first created (mutableUsers keeps an
   # existing /etc/shadow entry), so on an installed host it is long gone. Kept for fresh
@@ -153,46 +154,31 @@ in {
         };
     };
 
-    users = {
-      groups = {
-        data = {
-          gid = 1111;
-          members = [user];
+    # The records are Voltaic's (#457, rust/tools/nixos-users): the data and games gids,
+    # root's lock, and the operator's account (isNormalUser, uid, extraGroups). The parts
+    # that come from the host settings stay here. uid 1000 and gid 1111 are pinned, not
+    # allocated: NFS (sec=sys) authorises by number, so a client's ids must equal mimir's
+    # for /data ownership to mean the same user on both ends.
+    users = lib.mkMerge [
+      voltaic.fragments.users
+      # "!" is never a valid crypt(3) hash, so no password matches it. This replaces the
+      # old initialHashedPassword, which was the hash of "test".
+      (lib.mkIf cfg.lockRoot voltaic.fragments.root)
+      {
+        groups = {
+          data.members = [user];
+          games.members = [user];
         };
-        games = {
-          gid = 1112;
-          members = [user];
-        };
-      };
-      users = {
-        root = lib.mkIf cfg.lockRoot {
-          # "!" is never a valid crypt(3) hash, so no password matches it. This replaces the
-          # old initialHashedPassword, which was the hash of "test".
-          hashedPassword = "!";
-        };
-
-        ${user} = {
-          isNormalUser = true;
-          # Pinned, not allocated: NFS (sec=sys) authorises by number, so a client's uid must
-          # equal mimir's for /data ownership to mean the same user on both ends.
-          uid = 1000;
-          home = settings.userdir;
-          description = settings.userfullname;
-          extraGroups = [
-            "audio"
-            "networkmanager"
-            "plugdev"
-            "render"
-            "video"
-            "wheel"
-            "data"
-            "games"
-          ];
-          # Initial password is "test". Change it on first login. See initialOperatorHash.
-          initialHashedPassword = lib.mkForce initialOperatorHash;
-        };
-      };
-    };
+        users.${user} =
+          voltaic.operator
+          // {
+            home = settings.userdir;
+            description = settings.userfullname;
+            # Initial password is "test". Change it on first login. See initialOperatorHash.
+            initialHashedPassword = lib.mkForce initialOperatorHash;
+          };
+      }
+    ];
 
     # Mutable users keep an existing shadow entry, so declaring the hash above does not lock
     # an already-installed host's root. This does, once, and only while the operator still

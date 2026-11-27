@@ -43,12 +43,8 @@ in {
   config = {
     environment.systemPackages = [vexporter];
 
-    users.users.vexporter = {
-      isSystemUser = true;
-      group = "vexporter";
-      description = "vexporter, the Nix and fleet metrics";
-    };
-    users.groups.vexporter = {};
+    # The vexporter account and group are Voltaic's (#457): rust/tools/nixos-users.
+    users = (import ../../nixos/users/voltaic.nix).fragments.vexporter;
 
     systemd.services.vexporter = {
       description = "vexporter: the store, the generations and the deploy lag, into node_exporter";
