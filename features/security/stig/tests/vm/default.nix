@@ -18,6 +18,7 @@
     (import ./system.nix {inherit pkgs lib;})
     (import ./password.nix {inherit pkgs lib;})
     (import ./test-host.nix {inherit pkgs lib;})
+    (import ./pam.nix {inherit pkgs lib;})
   ];
 
   specs = builtins.concatLists specGroups;

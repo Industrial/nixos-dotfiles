@@ -22,7 +22,8 @@ let
     ++ import ./ssh.nix args
     ++ import ./system.nix args
     ++ import ./password.nix args
-    ++ import ./test-host.nix args;
+    ++ import ./test-host.nix args
+    ++ import ./pam.nix args;
 
   manifest = import ./../../lib/manifest.nix;
   ids = map (s: s.id) specs;
@@ -48,8 +49,9 @@ in
 
     # Every control a fielded host configures has a VM test: base-safe's 68 (mimir) and the 15
     # the test-host profile adds (muninn). That is the real exit criterion for runtime
-    # verification, asserted rather than counted by hand.
-    vmCoverageSoFar = assay.eq (builtins.length ids) 83;
+    # verification, asserted rather than counted by hand. The two PAM controls (./pam.nix) are
+    # tested for what they enforce before any host carries them.
+    vmCoverageSoFar = assay.eq (builtins.length ids) 85;
     totalControls = assay.eq manifest.count 103;
 
     coversEveryBaseSafeControl =
