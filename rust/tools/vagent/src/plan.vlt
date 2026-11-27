@@ -1,0 +1,231 @@
+-- The pure half of vagent: a session's names, its inputs, and the command lines
+-- that start, attach, export and stop it. Nothing here runs anything.
+--
+-- A slot n is the NixOS feature's `microvm-agent-n.service`, state directory
+-- `<state root>/agent-n` (features/ai/agent-vm). The launcher writes two files
+-- into its `session/` directory; the VM unit copies them into the guest's
+-- `/work/.session` before it boots:
+--
+--   authorized_keys  the public half of this session's key pair
+--   session.env      AGENT_REPO, AGENT_BASE, AGENT_BRANCH, AGENT_GIT_NAME,
+--                    AGENT_GIT_EMAIL: the guest clones the base and makes the branch
+--
+-- The host never runs git inside the guest's share. An export reads one file
+-- the guest wrote, `/work/.session/out.bundle`, and pushes it to
+-- `agent/<session>`: the guest never names the branch it lands on.
+
+-- The programs vagent runs; the NixOS feature passes absolute paths.
+export data Tools
+  { export systemctl String
+  , export ssh String
+  , export ssh_keygen String
+  , export ssh_proxy String
+  , export git String
+  , export cp String
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- One session, as planned from the command line.
+export data Session
+  { export slot u32
+  , export id String
+  , export branch String
+  , export base String
+  , export repo String
+  , export git_name String
+  , export git_email String
+  , export command Option<String>
+  , export export_branch bool
+  , export state String
+  , export runtime String
+  , export host_repo String
+  , export transcripts String
+  , export tools Tools
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export unit_of : u32 -> String
+unit_of slot = "microvm-agent-#{slot}.service"
+
+export state_of : &str -> u32 -> String
+state_of root slot = "#{root}/agent-#{slot}"
+
+-- The session's id: the slot and the start time, unique per host.
+export session_id : u32 -> u64 -> String
+session_id slot epoch = "s#{slot}-#{epoch}"
+
+-- Where the export lands. Fixed here, never chosen by the guest.
+export export_ref : &Session -> String
+export_ref s = "agent/#{s.id}"
+
+-- A branch or ref name a guest may be given: letters, digits and `-._/`, not
+-- starting with `-` or `/`, without `..`, `//` or a trailing `/` or `.lock`.
+export valid_ref : &str -> Result<(), String>
+valid_ref name =
+  ok_chars = name.chars () |> .all (\c -> c.is_ascii_alphanumeric () || "-._/".contains c)
+  if name.is_empty ()
+    Err (.to_string "a branch name is required")
+  else if !ok_chars
+    Err "#{name}: only letters, digits and -._/ are allowed"
+  else if name.starts_with "-" || name.starts_with "/" || name.ends_with "/" || name.ends_with ".lock" || name.contains ".." || name.contains "//"
+    Err "#{name}: not a valid branch name"
+  else
+    Ok ()
+
+-- A value for session.env: one line, no quote or backslash (systemd's
+-- EnvironmentFile quoting), so the guest's unit sees exactly this string.
+export valid_value : &str -> &str -> Result<(), String>
+valid_value key value =
+  if value.contains "\n" || value.contains "\"" || value.contains "\\" || value.contains "$"
+    Err "#{key}: newlines, quotes, backslashes and $ are not allowed"
+  else
+    Ok ()
+
+export valid_slot : u32 -> Result<(), String>
+valid_slot slot =
+  if std::ops::RangeInclusive::new 1 32 |> .contains (&slot)
+    Ok ()
+  else
+    Err "slot #{slot}: slots are 1 to 32"
+
+-- Everything a session's inputs must satisfy before anything starts.
+export validate : &Session -> Result<(), String>
+validate s =
+  (valid_slot s.slot)?
+  (valid_ref (&s.branch))?
+  (valid_ref (&s.base))?
+  (valid_value "AGENT_REPO" (&s.repo))?
+  (valid_value "AGENT_GIT_NAME" (&s.git_name))?
+  (valid_value "AGENT_GIT_EMAIL" (&s.git_email))?
+  if !(s.repo.starts_with "https://" || s.repo.starts_with "http://")
+    return Err "#{s.repo}: the guest clones over http(s) through its proxy"
+  Ok ()
+
+export env_file : &Session -> String
+env_file s =
+  "AGENT_REPO=\"#{s.repo}\"\nAGENT_BASE=\"#{s.base}\"\nAGENT_BRANCH=\"#{s.branch}\"\nAGENT_GIT_NAME=\"#{s.git_name}\"\nAGENT_GIT_EMAIL=\"#{s.git_email}\"\n"
+
+export key_path : &Session -> String
+key_path s = "#{s.runtime}/key"
+
+export keygen_command : &Session -> Vec<String>
+keygen_command s =
+  [s.tools.ssh_keygen.clone (), .to_string "-q", .to_string "-t", .to_string "ed25519", .to_string "-N", String::new (), .to_string "-C", "vagent-#{s.id}", .to_string "-f", key_path s].to_vec ()
+
+export start_command : &Session -> Vec<String>
+start_command s = [s.tools.systemctl.clone (), .to_string "start", unit_of s.slot].to_vec ()
+
+export stop_command : &Session -> Vec<String>
+stop_command s = [s.tools.systemctl.clone (), .to_string "stop", unit_of s.slot].to_vec ()
+
+-- ssh to the guest over its hybrid vsock (cloud-hypervisor's Unix socket,
+-- `notify.vsock` in the slot's state directory), through systemd-ssh-proxy.
+-- The guest's host key is made at its boot and the transport never leaves this
+-- host, so there is nothing to pin.
+export ssh_command : &Session -> Option<String> -> Vec<String>
+ssh_command s remote =
+  mut c = [ s.tools.ssh.clone ()
+          , .to_string "-i", key_path s
+          , .to_string "-o", .to_string "IdentitiesOnly=yes"
+          , .to_string "-o", .to_string "StrictHostKeyChecking=no"
+          , .to_string "-o", .to_string "UserKnownHostsFile=/dev/null"
+          , .to_string "-o", .to_string "LogLevel=ERROR"
+          , .to_string "-o", "ProxyCommand=#{s.tools.ssh_proxy} %h %p"
+          ].to_vec ()
+  case remote of
+    None ->
+      c.push (.to_string "-t")
+      c.push ("agent@vsock-mux/#{s.state}/notify.vsock")
+    Some cmd ->
+      c.push ("agent@vsock-mux/#{s.state}/notify.vsock")
+      c.push cmd
+  c
+
+-- The export: the guest bundles its branch into the one file the host reads,
+-- the host fetches that bundle into its own repository and pushes it.
+export bundle_remote : &Session -> String
+bundle_remote s = "git -C /work/repo bundle create /work/.session/out.bundle #{s.branch}"
+
+export bundle_path : &Session -> String
+bundle_path s = "#{s.state}/work/.session/out.bundle"
+
+export fetch_command : &Session -> Vec<String>
+fetch_command s =
+  [s.tools.git.clone (), .to_string "-C", s.host_repo.clone (), .to_string "fetch", .to_string "--no-tags", bundle_path s, "+refs/heads/#{s.branch}:refs/vagent/#{s.id}"].to_vec ()
+
+export push_command : &Session -> Vec<String>
+push_command s =
+  [s.tools.git.clone (), .to_string "-C", s.host_repo.clone (), .to_string "push", .to_string "origin", "refs/vagent/#{s.id}:refs/heads/#{export_ref s}"].to_vec ()
+
+-- The transcripts, copied without following any link the guest left.
+export transcripts_source : &Session -> String
+transcripts_source s = "#{s.state}/work/home/.claude/projects"
+
+export copy_transcripts_command : &Session -> Vec<String>
+copy_transcripts_command s =
+  [s.tools.cp.clone (), .to_string "-r", .to_string "--no-dereference", transcripts_source s, "#{s.transcripts}/#{s.id}"].to_vec ()
+
+#[cfg(test)]
+tools : Tools
+tools = Tools { systemctl = .to_string "/s/systemctl", ssh = .to_string "/o/ssh", ssh_keygen = .to_string "/o/ssh-keygen", ssh_proxy = .to_string "/s/systemd-ssh-proxy", git = .to_string "/g/git", cp = .to_string "/c/cp" }
+
+#[cfg(test)]
+export sample : Session
+sample = Session { slot = 2, id = .to_string "s2-100", branch = .to_string "feat/x", base = .to_string "main", repo = .to_string "https://github.com/o/r.git", git_name = .to_string "A B", git_email = .to_string "a@b", command = None, export_branch = false, state = .to_string "/var/lib/microvm-host/agent-2", runtime = .to_string "/run/user/1/vagent/s2-100", host_repo = .to_string "/h/repo", transcripts = .to_string "/h/t", tools = tools () }
+
+test "slot names follow the NixOS feature"
+  assert_eq! \-> unit_of 3 \-> "microvm-agent-3.service"
+  assert_eq! \-> state_of "/var/lib/microvm-host" 3 \-> "/var/lib/microvm-host/agent-3"
+  assert_eq! \-> session_id 3 7 \-> "s3-7"
+
+test "branch names: ordinary ones pass, option-like and path tricks do not"
+  assert! \-> valid_ref "feat/353-agent-vm" |> .is_ok
+  assert! \-> valid_ref "main" |> .is_ok
+  assert! \-> valid_ref "" |> .is_err
+  assert! \-> valid_ref "-x" |> .is_err
+  assert! \-> valid_ref "a/../b" |> .is_err
+  assert! \-> valid_ref "a b" |> .is_err
+  assert! \-> valid_ref "a;rm" |> .is_err
+  assert! \-> valid_ref "x.lock" |> .is_err
+
+test "env values cannot break out of systemd's quoting"
+  assert! \-> valid_value "K" "Tom Wieland" |> .is_ok
+  assert! \-> valid_value "K" "a\"b" |> .is_err
+  assert! \-> valid_value "K" "a\nB=c" |> .is_err
+  assert! \-> valid_value "K" "$HOME" |> .is_err
+
+test "a session validates its slot, refs, values and repository"
+  s = sample ()
+  assert! \-> validate (&s) |> .is_ok
+  mut bad = sample ()
+  bad.slot := 0
+  assert! \-> validate (&bad) |> .is_err
+  mut bad2 = sample ()
+  bad2.repo := .to_string "/home/tom/.dotfiles"
+  assert! \-> validate (&bad2) |> .is_err
+
+test "the env file names what the guest clones"
+  expected = .to_string "AGENT_REPO=\"https://github.com/o/r.git\"\nAGENT_BASE=\"main\"\nAGENT_BRANCH=\"feat/x\"\nAGENT_GIT_NAME=\"A B\"\nAGENT_GIT_EMAIL=\"a@b\"\n"
+  assert_eq! \-> env_file (&sample ()) \-> expected
+
+test "ssh goes over the slot's vsock socket with this session's key"
+  c = ssh_command (&sample ()) None
+  assert_eq! \-> c.last () |> .cloned \-> Some (.to_string "agent@vsock-mux//var/lib/microvm-host/agent-2/notify.vsock")
+  assert! \-> c.contains (&.to_string "/run/user/1/vagent/s2-100/key")
+  assert! \-> c.contains (&.to_string "ProxyCommand=/s/systemd-ssh-proxy %h %p")
+  assert! \-> c.contains (&.to_string "-t")
+  r = ssh_command (&sample ()) (Some (.to_string "true"))
+  assert_eq! \-> r.last () |> .cloned \-> Some (.to_string "true")
+  assert! \-> !(r.contains (&.to_string "-t"))
+
+test "the export lands under agent/ whatever the guest's branch is"
+  s = sample ()
+  assert_eq! \-> export_ref (&s) \-> "agent/s2-100"
+  assert_eq! \-> push_command (&s) |> .last |> .cloned \-> Some (.to_string "refs/vagent/s2-100:refs/heads/agent/s2-100")
+  assert_eq! \-> fetch_command (&s) |> .last |> .cloned \-> Some (.to_string "+refs/heads/feat/x:refs/vagent/s2-100")
+  assert_eq! \-> bundle_path (&s) \-> "/var/lib/microvm-host/agent-2/work/.session/out.bundle"
+
+test "transcripts are copied without following links"
+  c = copy_transcripts_command (&sample ())
+  assert! \-> c.contains (&.to_string "--no-dereference")
+  assert_eq! \-> c.last () |> .cloned \-> Some (.to_string "/h/t/s2-100")

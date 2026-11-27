@@ -1,0 +1,129 @@
+-- The command line.
+--
+--   vagent run --slot N --branch NAME [--base REF] [--repo URL] [--command CMD]
+--              [--export] [--host-repo DIR] [--git-name NAME] [--git-email EMAIL]
+--              [--state-root DIR] [--runtime-dir DIR] [--transcripts DIR] [TOOLS]
+--
+-- The NixOS feature's wrapper puts the host's absolute tool paths first.
+
+import crate::plan::Tools
+
+export const USAGE : &str = "usage: vagent run --slot N --branch NAME [--base REF] [--repo URL] [--command CMD] [--export] [--host-repo DIR] [--git-name NAME] [--git-email EMAIL] [--state-root DIR] [--runtime-dir DIR] [--transcripts DIR] [TOOLS]\nTOOLS: [--systemctl PROG] [--ssh PROG] [--ssh-keygen PROG] [--ssh-proxy PROG] [--git PROG] [--cp PROG]\n  run  start slot N's microVM for a session on a new branch NAME (cloned from REF, default main), attach a terminal (or run CMD), then tear it down; --export pushes the branch to agent/<session> from the host"
+
+export data Command
+  = Help
+  | Run (Box<Options>)
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Options
+  { export slot u32
+  , export branch String
+  , export base String
+  , export repo String
+  , export command Option<String>
+  , export export_branch bool
+  , export host_repo String
+  , export git_name Option<String>
+  , export git_email Option<String>
+  , export state_root String
+  , export runtime_dir Option<String>
+  , export transcripts Option<String>
+  , export tools Tools
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export default_tools : Tools
+default_tools = Tools { systemctl = .to_string "systemctl", ssh = .to_string "ssh", ssh_keygen = .to_string "ssh-keygen", ssh_proxy = .to_string "/run/current-system/sw/lib/systemd/systemd-ssh-proxy", git = .to_string "git", cp = .to_string "cp" }
+
+export defaults : Options
+defaults = Options { slot = 0, branch = String::new (), base = .to_string "main", repo = .to_string "https://github.com/Industrial/nixos-dotfiles.git", command = None, export_branch = false, host_repo = .to_string ".", git_name = None, git_email = None, state_root = .to_string "/var/lib/microvm-host", runtime_dir = None, transcripts = None, tools = default_tools () }
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+-- The parsed command line (argv without the program name).
+export parse_args : &[String] -> Result<Command, String>
+parse_args args =
+  mut o = defaults ()
+  mut verb = false
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "-h" ->
+        return Ok (Command::Help)
+      "--help" ->
+        return Ok (Command::Help)
+      "run" ->
+        verb := true
+      "--slot" ->
+        n = (value (it.next ()) "--slot")?
+        o.slot := (n.parse () : Result<u32, _> |> .map_err (\_ -> "--slot: #{n} is not a number"))?
+      "--branch" ->
+        o.branch := (value (it.next ()) "--branch")?
+      "--base" ->
+        o.base := (value (it.next ()) "--base")?
+      "--repo" ->
+        o.repo := (value (it.next ()) "--repo")?
+      "--command" ->
+        o.command := Some ((value (it.next ()) "--command")?)
+      "--export" ->
+        o.export_branch := true
+      "--host-repo" ->
+        o.host_repo := (value (it.next ()) "--host-repo")?
+      "--git-name" ->
+        o.git_name := Some ((value (it.next ()) "--git-name")?)
+      "--git-email" ->
+        o.git_email := Some ((value (it.next ()) "--git-email")?)
+      "--state-root" ->
+        o.state_root := (value (it.next ()) "--state-root")?
+      "--runtime-dir" ->
+        o.runtime_dir := Some ((value (it.next ()) "--runtime-dir")?)
+      "--transcripts" ->
+        o.transcripts := Some ((value (it.next ()) "--transcripts")?)
+      "--systemctl" ->
+        o.tools.systemctl := (value (it.next ()) "--systemctl")?
+      "--ssh" ->
+        o.tools.ssh := (value (it.next ()) "--ssh")?
+      "--ssh-keygen" ->
+        o.tools.ssh_keygen := (value (it.next ()) "--ssh-keygen")?
+      "--ssh-proxy" ->
+        o.tools.ssh_proxy := (value (it.next ()) "--ssh-proxy")?
+      "--git" ->
+        o.tools.git := (value (it.next ()) "--git")?
+      "--cp" ->
+        o.tools.cp := (value (it.next ()) "--cp")?
+      other ->
+        return Err "unknown argument: #{other}"
+  if !verb
+    return Err (.to_string "no command (run)")
+  if o.slot == 0
+    return Err (.to_string "--slot is required")
+  if o.branch.is_empty ()
+    return Err (.to_string "--branch is required")
+  Ok (Command::Run (Box::new o))
+
+#[cfg(test)]
+strs : &[&str] -> Vec<String>
+strs xs = xs.iter () |> .map (\x -> x.to_string ()) |> .collect
+
+test "run with the required options, tools first"
+  parsed = parse_args (&strs (&["--ssh", "/x/ssh", "run", "--slot", "2", "--branch", "feat/a", "--export"]))
+  case parsed of
+    Ok (Command::Run o) ->
+      assert_eq! \-> o.slot \-> 2
+      assert_eq! \-> o.branch \-> "feat/a"
+      assert_eq! \-> o.base \-> "main"
+      assert_eq! \-> o.tools.ssh \-> "/x/ssh"
+      assert! \-> o.export_branch
+    other -> panic! \-> "unexpected #{other:?}"
+
+test "missing slot, branch or verb is a usage error"
+  assert! \-> parse_args (&strs (&["run", "--branch", "a"])) |> .is_err
+  assert! \-> parse_args (&strs (&["run", "--slot", "1"])) |> .is_err
+  assert! \-> parse_args (&strs (&["--slot", "1", "--branch", "a"])) |> .is_err
+  assert! \-> parse_args (&strs (&["run", "--slot", "x", "--branch", "a"])) |> .is_err
+  assert! \-> parse_args (&strs (&["run", "--bogus"])) |> .is_err
+  assert_eq! \-> parse_args (&strs (&["--help"])) \-> Ok (Command::Help)

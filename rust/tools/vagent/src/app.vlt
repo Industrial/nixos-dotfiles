@@ -1,0 +1,205 @@
+-- The program: one session, as one acquire/use/release.
+--
+--   acquire  a private runtime directory and a key pair made for this session;
+--            the slot's inputs (authorized_keys, session.env)
+--   use      start the slot's VM (systemd waits for the guest's readiness over
+--            vsock), attach the terminal or run --command over ssh/vsock, and
+--            with --export: the guest bundles its branch, the host fetches the
+--            bundle and pushes it to agent/<session>
+--   release  however `use` ended (failure, Ctrl-C, a panic): stop the VM, copy
+--            the transcripts out, delete the key
+--
+-- `main` runs it under id_effect_cli's `run_main`: exit 0, or 1 with the error.
+
+import std::sync::Arc
+import id_effect::{Effect, HNil, Never, acquire_use_release, effect, fail, succeed, suspend}
+import crate::common::AgentError
+import crate::common::AgentError::{Start, Usage}
+import crate::cli::{Command, Options, USAGE, parse_args}
+import crate::plan::{Session, bundle_remote, copy_transcripts_command, env_file, export_ref, fetch_command, key_path, keygen_command, push_command, session_id, ssh_command, start_command, state_of, stop_command, unit_of, validate}
+import crate::world::{WorldTool, live}
+
+-- The session for parsed options, at start time `epoch`, with the operator's
+-- environment (`XDG_RUNTIME_DIR`, `HOME`) and git identity filled in.
+export session_of : Options -> u64 -> Option<String> -> Option<String> -> (String, String) -> Session
+session_of o epoch runtime_env home identity =
+  id = session_id o.slot epoch
+  run_root = o.runtime_dir.clone () |> .or (runtime_env |> .map (\r -> "#{r}/vagent")) |> .unwrap_or (.to_string "/tmp/vagent")
+  home_dir = home |> .unwrap_or (.to_string "/tmp")
+  transcripts = o.transcripts.clone () |> .unwrap_or ("#{home_dir}/.local/state/vagent/transcripts")
+  Session { slot = o.slot, id = id.clone (), branch = o.branch.clone (), base = o.base.clone (), repo = o.repo.clone (), git_name = o.git_name.clone () |> .unwrap_or (identity.0), git_email = o.git_email.clone () |> .unwrap_or (identity.1), command = o.command.clone (), export_branch = o.export_branch, state = state_of (&o.state_root) o.slot, runtime = "#{run_root}/#{id}", host_repo = o.host_repo.clone (), transcripts, tools = o.tools.clone () }
+
+-- The runtime directory, the key pair and the slot's inputs.
+prepared : WorldTool -> Session -> Effect<Session, AgentError, HNil>
+prepared w s =
+  effect!
+    ~w.0.private_dir(s.runtime.clone());
+    ~w.0.run(keygen_command(&s));
+    let public = ~w.0.read(format!("{}.pub", key_path(&s)));
+    ~w.0.write(format!("{}/session/authorized_keys", s.state), public);
+    ~w.0.write(format!("{}/session/session.env", s.state), env_file(&s));
+    s
+
+-- Start the VM, attach, export.
+used : WorldTool -> Session -> Effect<(), AgentError, HNil>
+used w s =
+  effect!
+    let t0 = ~w.0.now_ms();
+    ~w.0.say(format!("starting {} (session {})", unit_of(s.slot), s.id));
+    let unit = unit_of(s.slot);
+    ~w.0.run(start_command(&s)).map_err(move |e| Start(format!("{} did not start: {}", unit, e)));
+    let t1 = ~w.0.now_ms();
+    ~w.0.say(format!("slot {} ready in {} ms", s.slot, t1 - t0));
+    match s.command.clone() {
+      None => {
+        // An interactive session ends however the operator leaves it.
+        ~w.0.run(ssh_command(&s, None)).catch(|_| id_effect::succeed(()));
+      }
+      Some(c) => {
+        ~w.0.run(ssh_command(&s, Some(c)));
+      }
+    }
+    if s.export_branch {
+      ~w.0.run(ssh_command(&s, Some(bundle_remote(&s))));
+      ~w.0.run(fetch_command(&s));
+      ~w.0.run(push_command(&s));
+      ~w.0.say(format!("exported {} to {}", s.branch, export_ref(&s)));
+    }
+    ()
+
+-- However `used` ended: the VM stopped, the transcripts out, the key gone.
+released : WorldTool -> Session -> Effect<(), Never, HNil>
+released w s =
+  effect!
+    let unit = unit_of(s.slot);
+    ~w.0.run(stop_command(&s)).catch(move |e| { eprintln!("vagent: stopping {}: {}", unit, e); id_effect::succeed(()) });
+    ~w.0.run(copy_transcripts_command(&s)).catch(|_| id_effect::succeed(()));
+    ~w.0.remove_dir(s.runtime.clone());
+    ()
+
+-- One whole session against a World.
+export session : WorldTool -> Session -> Effect<(), AgentError, HNil>
+session w s =
+  case validate (&s) of
+    Err why -> fail (Usage why)
+    Ok _ ->
+      w1 = w.clone ()
+      w2 = w.clone ()
+      w3 = w.clone ()
+      acquire_use_release (prepared w1 s) (move \t -> used w2 t) (move \t _kind -> released w3 t)
+
+-- The operator's git identity, from the host repository's config.
+identity_of : &Options -> (String, String)
+identity_of o =
+  got = \key ->
+    std::process::Command::new (&o.tools.git) |> .args ([.to_string "-C", o.host_repo.clone (), .to_string "config", .to_string "--get", key].to_vec ()) |> .output () |> .ok |> .filter (\out -> out.status.success ()) |> .map (\out -> String::from_utf8_lossy (&out.stdout) |> .trim () |> .to_string) |> .unwrap_or (.to_string "vagent")
+  (got (.to_string "user.name"), got (.to_string "user.email"))
+
+epoch_now : u64
+epoch_now = std::time::SystemTime::now () |> .duration_since (std::time::UNIX_EPOCH) |> .map (\d -> d.as_secs ()) |> .unwrap_or 0
+
+-- The program for a parsed command line (or the usage error).
+export program : Result<Command, String> -> Effect<(), AgentError, HNil>
+program parsed =
+  case parsed of
+    Err why -> fail (Usage ("#{why}\n#{USAGE}"))
+    Ok (Command::Help) -> succeed (())
+    Ok (Command::Run o) ->
+      s = suspend (move \-> succeed (session_of ((*o).clone ()) (epoch_now ()) (std::env::var "XDG_RUNTIME_DIR" |> .ok) (std::env::var "HOME" |> .ok) (identity_of (&o))))
+      s |> .flat_map (move \sess -> session (WorldTool (Arc::new (live ()))) sess)
+
+-- On a fiber of the runtime's executor (as rust/tools/vswitch's app.vlt):
+-- `run_main` polls its root outside the executor's context.
+supervised : Effect<(), AgentError, HNil> -> Effect<(), AgentError, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  parsed = parse_args (&args)
+  if parsed == Ok (Command::Help)
+    println! \-> "#{USAGE}"
+    std::process::ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (supervised (program parsed)) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+import crate::world::{Scripted, log_of}
+#[cfg(test)]
+import crate::plan::sample
+#[cfg(test)]
+import std::sync::Mutex
+
+#[cfg(test)]
+ran_in : Scripted -> Session -> Result<(), String>
+ran_in w s = id_effect::testing::run_test (session (WorldTool (Arc::new w)) s) |> .into_result |> .map_err (\c -> "#{c:?}")
+
+#[cfg(test)]
+scripted : Vec<&str> -> Scripted
+scripted failing = Scripted { failing = failing.iter () |> .map (\f -> f.to_string ()) |> .collect, log = Arc::new (Mutex::new (Vec::new ())) }
+
+#[cfg(test)]
+index_of : &[String] -> &str -> usize
+index_of log needle = log.iter () |> .position (\l -> l.contains needle) |> .unwrap_or (usize::MAX)
+
+test "a session: key, inputs, start, attach, then stop, transcripts, key gone"
+  w = scripted (Vec::new ())
+  r = ran_in (w.clone ()) (sample ())
+  assert! \-> r.is_ok ()
+  log = log_of (&w)
+  assert! \-> index_of (&log) "ssh-keygen" < index_of (&log) "authorized_keys"
+  assert! \-> index_of (&log) "session.env" < index_of (&log) "systemctl start microvm-agent-2.service"
+  assert! \-> index_of (&log) "systemctl start" < index_of (&log) "notify.vsock"
+  assert! \-> index_of (&log) "notify.vsock" < index_of (&log) "systemctl stop"
+  assert! \-> index_of (&log) "systemctl stop" < index_of (&log) "rmdir /run/user/1/vagent/s2-100"
+  assert! \-> index_of (&log) "--no-dereference" < usize::MAX
+  assert_eq! \-> index_of (&log) "git -C" \-> usize::MAX
+
+test "a slot that does not start is still stopped and its key deleted"
+  w = scripted ([("systemctl start")].to_vec ())
+  r = ran_in (w.clone ()) (sample ())
+  assert! \-> r.is_err ()
+  log = log_of (&w)
+  assert! \-> index_of (&log) "systemctl stop" < usize::MAX
+  assert! \-> index_of (&log) "rmdir" < usize::MAX
+  assert_eq! \-> index_of (&log) "notify.vsock" \-> usize::MAX
+
+test "a failing --command fails the session and still tears it down"
+  mut s = sample ()
+  s.command := Some (.to_string "false-probe")
+  w = scripted ([("false-probe")].to_vec ())
+  assert! \-> ran_in (w.clone ()) s |> .is_err
+  assert! \-> index_of (&log_of (&w)) "systemctl stop" < usize::MAX
+
+test "an interactive session that exits non-zero is still a session"
+  w = scripted ([("vsock-mux")].to_vec ())
+  assert! \-> ran_in (w.clone ()) (sample ()) |> .is_ok
+
+test "--export: the guest bundles, the host fetches and pushes to agent/<session>"
+  mut s = sample ()
+  s.export_branch := true
+  w = scripted (Vec::new ())
+  assert! \-> ran_in (w.clone ()) s |> .is_ok
+  log = log_of (&w)
+  assert! \-> index_of (&log) "bundle create /work/.session/out.bundle feat/x" < index_of (&log) "fetch --no-tags"
+  assert! \-> index_of (&log) "fetch --no-tags" < index_of (&log) "refs/heads/agent/s2-100"
+  assert! \-> index_of (&log) "refs/heads/agent/s2-100" < index_of (&log) "systemctl stop"
+
+test "an invalid session starts nothing"
+  mut s = sample ()
+  s.branch := .to_string "-rf"
+  w = scripted (Vec::new ())
+  assert! \-> ran_in (w.clone ()) s |> .is_err
+  assert! \-> log_of (&w) |> .is_empty
+
+test "the session's names come from the options and the environment"
+  o = crate::cli::Options { slot = 1, branch = .to_string "b", ...crate::cli::defaults () }
+  s = session_of o 9 (Some (.to_string "/run/user/5")) (Some (.to_string "/home/u")) ((.to_string "N", .to_string "e@x"))
+  assert_eq! \-> s.runtime \-> "/run/user/5/vagent/s1-9"
+  assert_eq! \-> s.transcripts \-> "/home/u/.local/state/vagent/transcripts"
+  assert_eq! \-> s.state \-> "/var/lib/microvm-host/agent-1"
+  assert_eq! \-> s.git_name \-> "N"

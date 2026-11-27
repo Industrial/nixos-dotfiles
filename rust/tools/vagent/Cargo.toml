@@ -1,0 +1,31 @@
+[package]
+name = "vagent"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "One microVM per agent session (ADR-0009, #353): start a slot, attach over vsock, export the branch, tear down"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly (never 0.2.0: it miscompiles).
+[build-dependencies]
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"
+
+[lib]
+name = "vagent"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vagent"
+path = "src/main.rs"
