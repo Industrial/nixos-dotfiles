@@ -1,0 +1,430 @@
+-- The tab tree: which tab was opened from which, in order. Pure values, no
+-- effects: every operation takes a tree and returns a new one, so the tree
+-- before a change stays valid (`select_after_close` reads it) and a refused
+-- operation leaves the caller's tree untouched. The Tabs service holds one of
+-- these; the GTK sidebar renders `depth_first` indented by `depth_of`.
+--
+--   roots         top-level tabs, in sidebar order
+--   per node      its parent (None for a root) and its children, in order
+--   next_id       the next TabId: ids start at 1, only grow, never reused
+--
+-- Closing a tab promotes its children, in order, into its place in its
+-- parent's child list (or the roots).
+
+import std::collections::BTreeMap
+import crate::ui::TabId
+
+-- One tab's place in the tree.
+export data Node { export parent Option<TabId>, export children Vec<TabId> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data TabTree { nodes BTreeMap<TabId, Node>, roots Vec<TabId>, next_id u64 }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- What the tree can refuse: an operation on a tab it does not hold.
+export data TreeError
+  = Unknown TabId
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display TreeError
+  fmt : &self -> &mut std::fmt::Formatter<'_> -> std::fmt::Result
+  fmt self f = case self of
+    TreeError::Unknown tab -> write! \-> f \-> "no tab with id #{tab.id}"
+
+-- No tabs; the first one opened is TabId 1.
+export empty : TabTree
+empty = TabTree { nodes = BTreeMap::new (), roots = Vec::new (), next_id = 1 }
+
+-- A new tab with `parent` (None: a root), and the tree's next id spent on it.
+adopt : &TabTree -> Option<TabId> -> (TabTree, TabId)
+adopt tree parent =
+  mut t = tree.clone ()
+  id = TabId { id = t.next_id }
+  t.next_id += 1
+  t.nodes.insert id (Node { parent, children = Vec::new () })
+  (t, id)
+
+-- A new top-level tab, after the existing ones.
+export open_root : &TabTree -> (TabTree, TabId)
+open_root tree =
+  (t, id) = adopt tree None
+  mut out = t
+  out.roots.push id
+  (out, id)
+
+-- A new tab opened from `parent`, as its last child.
+export open_child : &TabTree -> TabId -> Result<(TabTree, TabId), TreeError>
+open_child tree parent =
+  if !tree.nodes.contains_key (&parent)
+    Err (TreeError::Unknown parent)
+  else
+    (t, id) = adopt tree (Some parent)
+    mut out = t
+    if out.nodes.get_mut (&parent) is Some p
+      p.children.push id
+    Ok ((out, id))
+
+-- `list` with `gone` replaced by `promoted`, in order.
+splice : &[TabId] -> TabId -> &[TabId] -> Vec<TabId>
+splice list gone promoted =
+  mut out = Vec::new () : Vec<TabId>
+  for x in list
+    if *x == gone
+      out.extend_from_slice promoted
+    else
+      out.push (*x)
+  out
+
+-- The tree without `id`, whose node is `node`: its children take its place.
+detach : &TabTree -> TabId -> Node -> TabTree
+detach tree id node =
+  mut t = tree.clone ()
+  t.nodes.remove (&id)
+  for child in node.children.iter ()
+    if t.nodes.get_mut child is Some c
+      c.parent := node.parent
+  case node.parent of
+    Some p ->
+      if t.nodes.get_mut (&p) is Some pn
+        pn.children := splice (&pn.children) id (&node.children)
+    None ->
+      t.roots := splice (&t.roots) id (&node.children)
+  t
+
+-- The tree without `id`; its children are promoted into its place, in order.
+export close : &TabTree -> TabId -> Result<TabTree, TreeError>
+close tree id =
+  found = tree.nodes.get (&id) |> .cloned
+  case found of
+    None -> Err (TreeError::Unknown id)
+    Some node -> Ok (detach tree id node)
+
+export contains : &TabTree -> TabId -> bool
+contains tree id = tree.nodes.contains_key (&id)
+
+-- The tab `id` was opened from; None for a root or a tab the tree lacks.
+export parent_of : &TabTree -> TabId -> Option<TabId>
+parent_of tree id = tree.nodes.get (&id) |> .and_then (\n -> n.parent)
+
+-- `id`'s children in order; empty for a leaf or a tab the tree lacks.
+export children_of : &TabTree -> TabId -> Vec<TabId>
+children_of tree id = tree.nodes.get (&id) |> .map (\n -> n.children.clone ()) |> .unwrap_or_default
+
+-- The top-level tabs, in order.
+export roots : &TabTree -> Vec<TabId>
+roots tree = tree.roots.clone ()
+
+export len : &TabTree -> usize
+len tree = tree.nodes.len ()
+
+export is_empty : &TabTree -> bool
+is_empty tree = tree.nodes.is_empty ()
+
+-- Every tab in sidebar order: each tab, then its children's subtrees.
+export depth_first : &TabTree -> Vec<TabId>
+depth_first tree =
+  mut out = Vec::new () : Vec<TabId>
+  mut stack = tree.roots |> .iter |> .rev |> .copied |> .collect : Vec<TabId>
+  while stack.pop () is Some id
+    out.push id
+    if tree.nodes.get (&id) is Some n
+      for c in n.children.iter ().rev ()
+        stack.push (*c)
+  out
+
+-- The tab after (`forward`) or before `id` in depth-first order, wrapping.
+-- None for a tab the tree lacks.
+wrapped : &TabTree -> TabId -> bool -> Option<TabId>
+wrapped tree id forward =
+  order = depth_first tree
+  n = order.len ()
+  at = order |> .iter |> .position (\x -> *x == id)
+  case at of
+    None -> None
+    Some i ->
+      if forward
+        Some (order[(i + 1) % n])
+      else
+        Some (order[(i + n - 1) % n])
+
+-- The tab after `id` in depth-first order; the last wraps to the first.
+export next : &TabTree -> TabId -> Option<TabId>
+next tree id = wrapped tree id true
+
+-- The tab before `id` in depth-first order; the first wraps to the last.
+export prev : &TabTree -> TabId -> Option<TabId>
+prev tree id = wrapped tree id false
+
+-- `parent`'s children, or the roots.
+siblings_of : &TabTree -> Option<TabId> -> Vec<TabId>
+siblings_of tree parent = case parent of
+  None -> tree.roots.clone ()
+  Some p -> children_of tree p
+
+-- The tab to select once `closed` is closed, read from the tree before the
+-- close: its first child (which takes its place), else the next sibling, else
+-- the previous sibling, else the parent; None when the tree becomes empty or
+-- `closed` is not in it.
+export select_after_close : &TabTree -> TabId -> Option<TabId>
+select_after_close tree closed =
+  found = tree.nodes.get (&closed)
+  case found of
+    None -> None
+    Some node -> successor tree closed node
+
+successor : &TabTree -> TabId -> &Node -> Option<TabId>
+successor tree closed node =
+  siblings = siblings_of tree node.parent
+  at = siblings |> .iter |> .position (\x -> *x == closed) |> .unwrap_or 0
+  if !node.children.is_empty ()
+    Some (node.children[0])
+  else if at + 1 < siblings.len ()
+    Some (siblings[at + 1])
+  else if at > 0
+    Some (siblings[at - 1])
+  else
+    node.parent
+
+-- How many ancestors `id` has (0 for a root); None for a tab the tree lacks.
+export depth_of : &TabTree -> TabId -> Option<usize>
+depth_of tree id =
+  if !contains tree id
+    None
+  else
+    mut d = 0 : usize
+    mut at = parent_of tree id
+    while at is Some p
+      d += 1
+      at := parent_of tree p
+    Some d
+
+-- Tests.
+
+#[cfg(test)]
+import std::collections::BTreeSet
+
+#[cfg(test)]
+tab : u64 -> TabId
+tab n = TabId { id = n }
+
+#[cfg(test)]
+tabs : Vec<u64> -> Vec<TabId>
+tabs ns = ns |> .into_iter |> .map tab |> .collect
+
+-- Roots 1 and 2; 1 has children 3 and 4; 3 has child 5.
+--   1
+--     3
+--       5
+--     4
+--   2
+#[cfg(test)]
+sample : TabTree
+sample =
+  (a, _) = open_root (&(empty ()))
+  (b, _) = open_root (&a)
+  (c, _) = (open_child (&b) (tab 1)).unwrap ()
+  (d, _) = (open_child (&c) (tab 1)).unwrap ()
+  (e, _) = (open_child (&d) (tab 3)).unwrap ()
+  e
+
+-- The invariants every reachable tree keeps.
+#[cfg(test)]
+invariants : &TabTree -> ()
+invariants tree =
+  order = depth_first tree
+  seen = order |> .iter |> .copied |> .collect : BTreeSet<TabId>
+  -- every id reachable from the roots exactly once
+  assert_eq! \-> seen.len () \-> order.len ()
+  assert_eq! \-> order.len () \-> len tree
+  for id in order.iter ()
+    assert! \-> contains tree (*id)
+    assert! \-> id.id < tree.next_id
+  -- parent links agree with the child lists
+  for r in tree.roots.iter ()
+    assert_eq! \-> parent_of tree (*r) \-> None
+  for id in tree.nodes.keys ()
+    for c in (children_of tree (*id)).iter ()
+      assert_eq! \-> parent_of tree (*c) \-> Some (*id)
+    -- next and prev are inverse
+    back = next tree (*id) |> .and_then (\n -> prev tree n)
+    assert_eq! \-> back \-> Some (*id)
+  ()
+
+-- A deterministic 64-bit LCG (Knuth's MMIX constants).
+#[cfg(test)]
+lcg : u64 -> u64
+lcg s = s |> .wrapping_mul 6364136223846793005 |> .wrapping_add 1442695040888963407
+
+-- A number below `n` (0 when n is 0) from `r`.
+#[cfg(test)]
+below : u64 -> usize -> usize
+below r n =
+  if n == 0
+    0
+  else
+    m = u64::try_from n |> .unwrap_or 1
+    usize::try_from (r % m) |> .unwrap_or 0
+
+-- One random operation on `tree`, checked as it goes: the new tree, and how
+-- many tabs it opened and closed.
+#[cfg(test)]
+random_step : &TabTree -> u64 -> (TabTree, usize, usize)
+random_step tree r =
+  ids = depth_first tree
+  choice = r % 6
+  pick = below (r / 6) (ids.len ())
+  fresh = tab tree.next_id
+  if choice == 0 || ids.is_empty ()
+    (t, id) = open_root tree
+    assert_eq! \-> id \-> fresh
+    (t, 1, 0)
+  else if choice <= 2
+    (t, id) = (open_child tree (ids[pick])).unwrap ()
+    assert_eq! \-> id \-> fresh
+    assert_eq! \-> parent_of (&t) id \-> Some (ids[pick])
+    (t, 1, 0)
+  else if choice == 3
+    assert_eq! \-> open_child tree fresh \-> Err (TreeError::Unknown fresh)
+    assert_eq! \-> close tree fresh \-> Err (TreeError::Unknown fresh)
+    (tree.clone (), 0, 0)
+  else
+    gone = ids[pick]
+    chosen = select_after_close tree gone
+    t = (close tree gone).unwrap ()
+    assert! \-> !contains (&t) gone
+    case chosen of
+      Some c -> assert! \-> contains (&t) c
+      None -> assert! \-> is_empty (&t)
+    (t, 0, 1)
+
+test "the empty tree has no tabs"
+  t = empty ()
+  assert_eq! \-> len (&t) \-> 0
+  assert! \-> is_empty (&t)
+  assert_eq! \-> depth_first (&t) \-> Vec::new ()
+  assert! \-> !contains (&t) (tab 1)
+  assert_eq! \-> next (&t) (tab 1) \-> None
+
+test "open_root appends roots with ids from 1 up"
+  (a, one) = open_root (&(empty ()))
+  (b, two) = open_root (&a)
+  assert_eq! \-> one \-> tab 1
+  assert_eq! \-> two \-> tab 2
+  assert_eq! \-> roots (&b) \-> tabs (.to_vec ([1, 2]))
+  assert_eq! \-> parent_of (&b) two \-> None
+  assert_eq! \-> len (&b) \-> 2
+  -- persistent: the tree before is unchanged
+  assert_eq! \-> roots (&a) \-> tabs (.to_vec ([1]))
+
+test "open_child appends the child last under its parent"
+  t = sample ()
+  assert_eq! \-> children_of (&t) (tab 1) \-> tabs (.to_vec ([3, 4]))
+  assert_eq! \-> children_of (&t) (tab 3) \-> tabs (.to_vec ([5]))
+  assert_eq! \-> parent_of (&t) (tab 5) \-> Some (tab 3)
+  assert_eq! \-> roots (&t) \-> tabs (.to_vec ([1, 2]))
+  (u, six) = (open_child (&t) (tab 1)).unwrap ()
+  assert_eq! \-> six \-> tab 6
+  assert_eq! \-> children_of (&u) (tab 1) \-> tabs (.to_vec ([3, 4, 6]))
+
+test "open_child under an unknown parent is refused"
+  t = sample ()
+  assert_eq! \-> open_child (&t) (tab 99) \-> Err (TreeError::Unknown (tab 99))
+  assert_eq! \-> open_child (&(empty ())) (tab 1) \-> Err (TreeError::Unknown (tab 1))
+
+test "close of a leaf removes it from its parent"
+  t = (close (&(sample ())) (tab 4)).unwrap ()
+  assert_eq! \-> children_of (&t) (tab 1) \-> tabs (.to_vec ([3]))
+  assert! \-> !contains (&t) (tab 4)
+  assert_eq! \-> len (&t) \-> 4
+
+test "close of an unknown or already-closed tab is refused"
+  t = sample ()
+  assert_eq! \-> close (&t) (tab 99) \-> Err (TreeError::Unknown (tab 99))
+  u = (close (&t) (tab 2)).unwrap ()
+  assert_eq! \-> close (&u) (tab 2) \-> Err (TreeError::Unknown (tab 2))
+
+test "close promotes the children, in order, into the closed tab's place"
+  -- under a parent: 1 [3 [5 6] 4] -> close 3 -> 1 [5 6 4]
+  (t, _) = (open_child (&(sample ())) (tab 3)).unwrap ()
+  u = (close (&t) (tab 3)).unwrap ()
+  assert_eq! \-> children_of (&u) (tab 1) \-> tabs (.to_vec ([5, 6, 4]))
+  assert_eq! \-> parent_of (&u) (tab 5) \-> Some (tab 1)
+  assert_eq! \-> parent_of (&u) (tab 6) \-> Some (tab 1)
+  -- at the roots: [1 [3 4] 2] -> close 1 -> [3 4 2], now roots
+  v = (close (&(sample ())) (tab 1)).unwrap ()
+  assert_eq! \-> roots (&v) \-> tabs (.to_vec ([3, 4, 2]))
+  assert_eq! \-> parent_of (&v) (tab 3) \-> None
+  assert_eq! \-> children_of (&v) (tab 3) \-> tabs (.to_vec ([5]))
+  assert_eq! \-> depth_first (&v) \-> tabs (.to_vec ([3, 5, 4, 2]))
+
+test "ids are never reused after a close"
+  (a, one) = open_root (&(empty ()))
+  b = (close (&a) one).unwrap ()
+  (_, two) = open_root (&b)
+  assert_eq! \-> two \-> tab 2
+
+test "depth_first lists each tab before its children's subtrees"
+  assert_eq! \-> depth_first (&(sample ())) \-> tabs (.to_vec ([1, 3, 5, 4, 2]))
+
+test "next and prev follow depth-first order and wrap around"
+  t = sample ()
+  assert_eq! \-> next (&t) (tab 1) \-> Some (tab 3)
+  assert_eq! \-> next (&t) (tab 5) \-> Some (tab 4)
+  assert_eq! \-> next (&t) (tab 2) \-> Some (tab 1)
+  assert_eq! \-> prev (&t) (tab 1) \-> Some (tab 2)
+  assert_eq! \-> prev (&t) (tab 4) \-> Some (tab 5)
+  assert_eq! \-> next (&t) (tab 99) \-> None
+  assert_eq! \-> prev (&t) (tab 99) \-> None
+  (one, _) = open_root (&(empty ()))
+  assert_eq! \-> next (&one) (tab 1) \-> Some (tab 1)
+  assert_eq! \-> prev (&one) (tab 1) \-> Some (tab 1)
+
+test "select_after_close prefers the next sibling"
+  (a, _) = open_root (&(empty ()))
+  (b, _) = open_root (&a)
+  assert_eq! \-> select_after_close (&b) (tab 1) \-> Some (tab 2)
+  (t, _) = (open_child (&(sample ())) (tab 1)).unwrap ()
+  assert_eq! \-> select_after_close (&t) (tab 4) \-> Some (tab 6)
+
+test "select_after_close falls back to the previous sibling"
+  assert_eq! \-> select_after_close (&(sample ())) (tab 4) \-> Some (tab 3)
+  assert_eq! \-> select_after_close (&(sample ())) (tab 2) \-> Some (tab 1)
+
+test "select_after_close falls back to the parent of an only child"
+  assert_eq! \-> select_after_close (&(sample ())) (tab 5) \-> Some (tab 3)
+
+test "select_after_close is None when the last tab closes"
+  (one, _) = open_root (&(empty ()))
+  assert_eq! \-> select_after_close (&one) (tab 1) \-> None
+  assert_eq! \-> select_after_close (&(sample ())) (tab 99) \-> None
+
+test "select_after_close chooses the first promoted child"
+  assert_eq! \-> select_after_close (&(sample ())) (tab 1) \-> Some (tab 3)
+  assert_eq! \-> select_after_close (&(sample ())) (tab 3) \-> Some (tab 5)
+
+test "depth_of counts ancestors"
+  t = sample ()
+  assert_eq! \-> depth_of (&t) (tab 1) \-> Some 0
+  assert_eq! \-> depth_of (&t) (tab 3) \-> Some 1
+  assert_eq! \-> depth_of (&t) (tab 5) \-> Some 2
+  assert_eq! \-> depth_of (&t) (tab 99) \-> None
+
+test "TreeError displays the tab id"
+  assert_eq! \-> (TreeError::Unknown (tab 7)).to_string () \-> .to_string "no tab with id 7"
+
+test "random op sequences keep every invariant (seeded LCG, 64 runs of 300 ops)"
+  for run in 0 .. 64
+    mut t = empty ()
+    mut opens = 0 : usize
+    mut closes = 0 : usize
+    mut s = lcg (run + 1)
+    for _ in 0 .. 300
+      s := lcg s
+      (stepped, o, c) = random_step (&t) (s / 4294967296)
+      t := stepped
+      opens += o
+      closes += c
+      invariants (&t)
+      assert_eq! \-> len (&t) \-> opens - closes
+      assert_eq! \-> depth_first (&t) |> .len \-> len (&t)
+  ()
