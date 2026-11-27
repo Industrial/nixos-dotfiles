@@ -80,4 +80,7 @@
   # /etc is the upstream overlay, with the host's stateful files carried in and out (GH-185;
   # gate: etc-overlay-live-switch). Rollback: lib.mkForce false copies the state back out.
   features.nixos.etc-overlay.enable = true;
+  # vwebbrowser 0.x (Voltaic, WebKitGTK), installed beside librewolf, which stays the
+  # default browser; searches go to the local SearXNG. Rollback: remove this line.
+  features.network.vwebbrowser.enable = true;
 }
