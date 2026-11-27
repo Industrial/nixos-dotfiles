@@ -118,3 +118,10 @@ features/nix/vci
 # nix-tree: vwhy took over in profiles/cli-core.nix (GH-182). A host that sets
 # `features.cli.nix-tree.enable = true;` has it back (profiles/cli-core.assay.nix).
 features/cli/nix-tree
+
+# --- Retired by a take-over, not a rollback. ----------------------------------------
+# nh: vswitch took over in profiles/cli-core.nix (GH-241). vswitch's rollback lands on
+# nixos-rebuild, not nh (profiles/cli-core.assay.nix, rollbackLandsOnNixosRebuild); nh is
+# kept as an opt-in, `features.cli.nh.enable = true;` on a host. Remove this entry when
+# features/cli/nh is deleted.
+features/cli/nh
