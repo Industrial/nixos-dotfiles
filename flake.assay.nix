@@ -96,7 +96,7 @@ in
       fleet = import ./common/fleet.nix;
       vdeployHosts = builtins.filter (fleet.hasRole "vdeploy") hosts;
     in
-      assay.eq (map (h: [h (outputs.deploy.nodes.${h}.profiles ? system)]) vdeployHosts) [["drakkar" true] ["mimir" true]];
+      assay.eq (map (h: [h (outputs.deploy.nodes.${h}.profiles ? system)]) vdeployHosts) [["drakkar" true] ["mimir" true] ["muninn" true]];
     # The dbus monitor behind magic rollback can time out while systemd restarts mid-switch.
     rollbackFeaturesAreOff =
       assay.eq [node.profiles.system.magicRollback node.profiles.system.autoRollback] [false false];

@@ -33,9 +33,9 @@ in
     noRelay = assay.eq (has "fleet.remote-desktop-relay") false;
     # Work laptop: no personal files, so no NFS client for mimir's /data.
     noNfsClient = assay.eq (has "storage.nfs-client") false;
-    # vdeploy observes next to comin (#437): it plans, comin still switches.
-    vdeployObservesNextToComin =
-      assay.eq [(has "nix.vdeploy") host.features.nix.vdeploy.mode (has "fleet.comin")] [true "observe" true];
+    # vdeploy deploys muninn (#437): the vdeploy role, deploy mode, comin gone.
+    deploysWithVdeploy =
+      assay.eq [(has "nix.vdeploy") host.features.nix.vdeploy.mode (has "fleet.comin") ((import ../../common/fleet.nix).hasRole "vdeploy" "muninn")] [true "deploy" false true];
 
     # muninn is the STIG test host (ADR-0008): every one of the 103 controls is configured,
     # excluded in writing, or covered by external evidence, each exactly once.

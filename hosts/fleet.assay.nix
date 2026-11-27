@@ -56,28 +56,32 @@ in
       assay.eq (forAll (c: c.services.rustdesk-server.enable)) (onAll false // {mimir = true;});
 
     # Pull convergence (ADR-0002) on every host, each tracking its own configuration: comin,
-    # except where vdeploy took over (the `vdeploy` role, GH-160: drakkar).
+    # except where vdeploy took over (the `vdeploy` role, GH-160: drakkar, mimir; muninn #437).
     cominEverywhere = assay.eq (forAll (c: c.services.comin.enable)) (onAll true
       // {
         drakkar = false;
         mimir = false;
+        muninn = false;
       });
     vdeployDeploysDrakkar = assay.eq (forAll (c: c.features.nix.vdeploy.mode)) (onAll "observe"
       // {
         drakkar = "deploy";
         mimir = "deploy";
+        muninn = "deploy";
       });
     # comin is gone where vdeploy deploys (GH-225): no comin.service at all, not even the
-    # take-over's tombstone. huginn and muninn (offline) still run the real comin.
+    # take-over's tombstone. huginn (offline) still runs the real comin.
     cominUnitOnlyWhereCominRuns = assay.eq (forAll (c: c.systemd.services ? comin)) (onAll true
       // {
         drakkar = false;
         mimir = false;
+        muninn = false;
       });
     cominIsTheRealOneWhereItRuns = assay.eq (forAll (c: c.systemd.services.comin.serviceConfig.Restart or null)) (onAll "always"
       // {
         drakkar = null;
         mimir = null;
+        muninn = null;
       });
     cominTracksOwnHost = assay.eq (forAll (c: c.services.comin.hostname)) (lib.genAttrs hosts (h: h));
 

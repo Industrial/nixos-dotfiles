@@ -62,6 +62,7 @@ in
     mimirWatchesPasswd = assay.eq (builtins.elem "/etc/passwd" mimir.facts.auditWatches) true;
     # vhealth only where the host runs it, as its own user (muninn since #437).
     vhealthPerHost = assay.eq (map (g: [g.facts.vhealth (g.base.users.users ? vhealth)]) all) [[true true] [true true] [false false] [true true]];
-    # Units a VM cannot run: vcache (tailnet) on drakkar, comin (GitHub) on huginn and muninn.
-    offlineUnits = assay.eq (map (g: g.facts.offline) all) [["vcache.service"] [] ["comin.service"] ["comin.service"]];
+    # Units a VM cannot run: vcache (tailnet) on drakkar, comin (GitHub) on huginn. muninn is
+    # deployed by vdeploy since #437.
+    offlineUnits = assay.eq (map (g: g.facts.offline) all) [["vcache.service"] [] ["comin.service"] []];
   }
