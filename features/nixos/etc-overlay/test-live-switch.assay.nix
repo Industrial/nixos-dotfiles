@@ -54,9 +54,11 @@ in
       assay.eq drakkar.facts.sshKeys ["ssh/ssh_host_rsa_key" "ssh/ssh_host_ed25519_key" "ssh/ssh_host_mldsa44_ed25519_key"];
     userDbPerHost = assay.eq (map (g: g.facts.userDb) all) ["userborn" "update-users-groups.pl" "update-users-groups.pl" "update-users-groups.pl"];
     networkManagerEverywhere = assay.eq (map (g: g.facts.networkmanager) all) [true true true true];
-    # Only mimir carries the STIG identity watches, so only its gate checks the audit trail.
-    auditWatchesOnMimirOnly =
-      assay.eq (map (g: g.facts.auditWatches != []) all) [false true false false];
+    # mimir (base-safe) and muninn (test-host, ADR-0008) carry the STIG identity watches, so
+    # only their gates check the audit trail.
+    auditWatchesOnMimirAndMuninn =
+      assay.eq (map (g: g.facts.auditWatches != []) all) [false true false true];
+    muninnWatchesPasswd = assay.eq (builtins.elem "/etc/passwd" muninn.facts.auditWatches) true;
     mimirWatchesPasswd = assay.eq (builtins.elem "/etc/passwd" mimir.facts.auditWatches) true;
     # vhealth only where the host runs it, as its own user.
     vhealthPerHost = assay.eq (map (g: [g.facts.vhealth (g.base.users.users ? vhealth)]) all) [[true true] [true true] [false false] [false false]];

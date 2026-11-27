@@ -13,7 +13,7 @@ are read off each control's fix text, not from having applied it to a host.
 | Class | Meaning | Target |
 |---|---|---|
 | `zero-cost` | No user-visible change on a desktop daily driver | `profiles/base-safe.nix` → `hosts/mimir` only (ADR-0004) |
-| `disruptive` | Changes interactive behaviour, or needs site infrastructure that does not exist yet | `profiles/full.nix` only — never a fielded host |
+| `disruptive` | Changes interactive behaviour, or needs site infrastructure that does not exist yet | `profiles/full.nix` for VM targets. On muninn, the STIG test host, `profiles/test-host.nix` configures 15 of them and excludes the rest in writing (ADR-0008) |
 | `n-a` | Not applicable to this fleet; needs a written justification in the report | excluded via `security.stig.exclude` |
 
 ## Distribution
@@ -27,6 +27,15 @@ are read off each control's fix text, not from having applied it to a host.
 
 So wave 1 lands **68 of 103** controls with no interactive cost, and the
 remaining 35 wait for `profiles/full.nix` or a written exclusion.
+
+The Target column is the classification, and it is the same on every host. What one host
+does with a control is in its report (`nix build .#stigReport.<host>`). muninn is the STIG
+test host (ADR-0008): `profiles/test-host.nix` carries the 68 `base` controls and 15 of the
+`full` ones, excludes 19 with a written reason each (the two `n-a` rows and 17 `full` rows),
+and `V-268144` is credited from external evidence. That accounts for all 103, so muninn's
+report has no `Not Implemented` row. Two of the 19, `V-268081` and `V-268170`, are excluded
+because their modules render a PAM line that does not enforce the requirement; they return
+once the modules are reworked and have a VM test.
 
 ## Controls
 

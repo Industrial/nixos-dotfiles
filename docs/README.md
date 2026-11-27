@@ -14,6 +14,7 @@ Numbered, append-only. A superseded decision keeps its file and says what replac
 | [0003](adr/0003-kernel-hardening-single-source.md) | The STIG baseline is the single source of kernel hardening | Accepted |
 | [0004](adr/0004-stig-baseline-mimir-only.md) | The STIG baseline applies to mimir only | Accepted |
 | [0005](adr/0005-shell-strategy.md) | Nushell is the login shell; fish is a fallback with one writer | Accepted |
+| [0008](adr/0008-stig-full-set-on-muninn-test-host.md) | muninn is the STIG test host and accounts for all 103 controls | Accepted; amends 0004 for muninn |
 
 ## Principles (`principles/`)
 

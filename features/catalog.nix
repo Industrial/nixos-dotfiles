@@ -216,6 +216,7 @@
   ./security/stig
   ./security/stig/profiles/base-safe.nix
   ./security/stig/profiles/external-evidence.nix
+  ./security/stig/profiles/test-host.nix
   ./security/veracrypt
   ./security/yubikey
 

@@ -47,11 +47,14 @@
     };
 
     profile = lib.mkOption {
-      type = lib.types.enum ["none" "fleet-baseline" "base-safe" "full"];
+      type = lib.types.enum ["none" "fleet-baseline" "base-safe" "test-host" "full"];
       default = "none";
       description = ''
         Which baseline this host carries. "fleet-baseline" is the subset safe on interactive
-        hosts too (ADR-0007). "base-safe" is the subset with no interactive cost;
+        hosts too (ADR-0007). "base-safe" is the subset with no interactive cost.
+        "test-host" is base-safe plus the controls from the rest of the benchmark that a real
+        machine can carry,
+        with every other control excluded in writing (ADR-0008; muninn only).
         "full" is all 103 controls and is intended for VM-test targets, not for workstations.
       '';
     };

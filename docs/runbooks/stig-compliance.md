@@ -5,7 +5,11 @@ V1R3 (103 controls, 11 CAT I / 91 CAT II / 1 CAT III) as its hardening baseline.
 nixpkgs' `profiles/hardened.nix`, removed in 26.05 for lacking "a consistent and transparent
 baseline or standard" — see [ADR-0003](../adr/0003-kernel-hardening-single-source.md).
 
-drakkar, huginn and muninn deliberately carry **no** controls:
+**muninn** is the STIG test host
+([ADR-0008](../adr/0008-stig-full-set-on-muninn-test-host.md)). It accounts for all 103
+controls: 83 configured, 19 excluded with a written reason, 1 covered by external evidence.
+
+drakkar and huginn deliberately carry **no** controls:
 [ADR-0004](../adr/0004-stig-baseline-mimir-only.md) narrowed the baseline to the one host
 with no interactive user, because the audit set is not free on a machine somebody is typing
 at. They still build a report, and it reads `1/103`: `V-268144` (CAT I, confidentiality at
@@ -22,7 +26,7 @@ Everything below exists because there is nothing off the shelf.
 nix build .#stigReport.mimir     # or any host: drakkar, huginn, muninn
 cat result/report.md        # the assessor-facing table
 jq . result/report.json     # same data, stable-sorted, for tooling
-cat result/summary.txt       # one line: "<host>: <n>/103 compliant" (1/103 on the three hosts without controls)
+cat result/summary.txt       # one line: "<host>: <n>/103 compliant" (1/103 on the two hosts without controls)
 ```
 
 Status is derived from the evaluated configuration, never hand-maintained. Six values, and
@@ -59,6 +63,7 @@ audit rules — the report cannot see a failed `audit-rules-nixos.service`.
 | Profile | Controls | Where |
 |---|---|---|
 | `base-safe` | 68 — nothing a user would notice | `hosts/mimir/configuration.nix`, that host only |
+| `test-host` | 83 configured (`base-safe` plus 15), 19 excluded in writing | `hosts/muninn/configuration.nix`, that host only (ADR-0008) |
 | `full` | all 103 | VM test targets only, **never** a fielded host |
 | none | 0 — option surface only, so the host still reports | `profiles/base.nix`, so every host |
 
@@ -66,15 +71,25 @@ Membership is decided by [`docs/security/stig-triage.md`](../security/stig-triag
 `base-safe.assay.nix` parses that table and asserts the profile carries exactly the controls
 classified `base`. A disruptive control cannot drift onto a fielded host.
 
-**Only mimir carries controls.** drakkar, huginn and muninn import the option surface alone
+**mimir and muninn carry controls.** muninn's `test-host` profile leaves no control
+`Not Implemented`: what it does not configure it excludes, and the reasons are in
+`features/security/stig/profiles/test-host.nix`. Two of its exclusions are CAT I
+(`V-268146`, `V-268168`); ADR-0008 records that ruling. None of the 15 controls it adds to
+`base-safe` has a VM test yet. Two more, `V-268081` and `V-268170`, are excluded because
+their modules render a PAM line that does not enforce the requirement; they return once the
+modules are reworked and have a VM test. Until `V-268170` returns, the pwquality.conf
+settings (`V-268126`..`V-268129`, `V-268134`, `V-268145`, `V-268169`) are written on muninn
+but not enforced by PAM.
+
+drakkar and huginn import the option surface alone
 and therefore score `1/103` against profile `none`, with every control `Not Implemented`
 except `V-268144`, which `features/security/stig/profiles/external-evidence.nix` credits on all four hosts.
 That is a deliberate posture decision, not a regression — see
 [ADR-0004](../adr/0004-stig-baseline-mimir-only.md). `bin/ci/stig` encodes the same
 distinction: a CAT I control whose status is `Not Implemented` is a documented decision and
 passes the gate, while any other non-compliant status on a CAT I control fails it. So the
-gate still catches a control that *breaks* on mimir, and no longer objects to the three hosts
-that deliberately carry none.
+gate still catches a control that *breaks* on mimir or muninn, and no longer objects to the
+two hosts that deliberately carry none.
 
 ## Adding a justified exclusion
 

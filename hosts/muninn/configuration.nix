@@ -25,4 +25,14 @@
   features.monitoring.prometheus-exporter.enable = true;
   features.monitoring.prometheus.enable = true;
   features.nixos.graphics.amd.enable = true;
+
+  # Anduril NixOS STIG V1R3, test-host. muninn is the fleet's STIG test host (ADR-0008): it
+  # accounts for all 103 controls. The profile switches on base-safe's 68, configures 15
+  # more, and excludes the rest in writing; the list and each reason are in
+  # features/security/stig/profiles/test-host.nix. No other host enables it.
+  #
+  # Like mimir, two controls need a REBOOT, not just a switch: V-268092 (audit=1) and
+  # V-268093 (audit_backlog_limit=65536) are kernel command line parameters. The report
+  # renders them "Configured (pending reboot)" until muninn restarts.
+  features.security.stig.profiles.test-host.enable = true;
 }
