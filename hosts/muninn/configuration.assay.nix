@@ -14,7 +14,10 @@ let
   # The STIG posture is read off the full evaluated host, built through lib/mk-host.nix as
   # flake.nix does: the selection above cannot see what a profile's imports switch on.
   mkHost = import ../../lib/mk-host.nix {inputs = nixos.flakeInputs;};
-  host = (mkHost "muninn").config;
+  muninn = mkHost "muninn";
+  host = muninn.config;
+  # The one-option rollback: the same host with Secure Boot turned off again.
+  rolledBack = (muninn.extendModules {modules = [{features.hardening.secureBoot.enable = nixos.lib.mkForce false;}];}).config;
   inherit (host.security) stig;
   manifest = import ../../features/security/stig/lib/manifest.nix;
   accountedFor = stig.implemented ++ builtins.attrNames stig.exclude ++ builtins.attrNames stig.satisfiedExternally;
@@ -61,6 +64,17 @@ in
     noFaillockLineInLoginOrSshd = assay.eq (map (s: hasPamLine s "pam_faillock") ["login" "sshd"]) [false false];
     noPwqualityLineInPasswordStacks = assay.eq (map (s: hasPamLine s "pam_pwquality") ["passwd" "chpasswd" "sudo"]) [false false false];
     noFipsOnTheKernelCommandLine = assay.eq (builtins.elem "fips=1" host.boot.kernelParams) false; # V-268168
+    # GH-184: muninn boots through lanzaboote (signed UKIs), not the Python systemd-boot
+    # installer, through our all-profiles install hook (comin's system-profiles/comin).
+    secureBootOn = assay.eq host.features.hardening.secureBoot.enable true;
+    bootsThroughLanzaboote =
+      assay.eq [host.boot.lanzaboote.enable host.boot.loader.systemd-boot.enable host.boot.loader.external.enable] [true false true];
+    lanzabooteUsesTheAllProfilesHook =
+      assay.eq (builtins.match ".*/bin/lzbt-all-profiles" host.boot.loader.external.installHook != null) true;
+    lanzabooteKeysInSbctl = assay.eq host.boot.lanzaboote.pkiBundle "/var/lib/sbctl";
+    # Rollback is one option: off again, and the Python installer is back, lanzaboote gone.
+    secureBootRollsBackWithOneOption =
+      assay.eq [rolledBack.boot.loader.systemd-boot.enable rolledBack.boot.lanzaboote.enable rolledBack.boot.loader.external.enable] [true false false];
     timeServersAreNotPinned = assay.eq (builtins.any (s: builtins.match ".*navy\\.mil" s != null) host.networking.timeServers) false; # V-268149
 
     # /etc on the overlay, mutable, state carried across (GH-185).

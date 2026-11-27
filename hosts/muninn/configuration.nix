@@ -38,4 +38,13 @@
   # /etc is the upstream overlay, with the host's stateful files carried in and out (GH-185;
   # gate: etc-overlay-live-switch-muninn). Rollback: lib.mkForce false copies the state back out.
   features.nixos.etc-overlay.enable = true;
+
+  # Secure Boot through lanzaboote (GH-184, ADR-0007 "Runbook: Secure Boot"). muninn goes
+  # first, before drakkar (#208). lzbt replaces the Python systemd-boot installer and writes
+  # signed UKIs; Secure Boot itself stays off in firmware until the keys are enrolled at the
+  # machine. comin switches on merge, and lzbt fails that switch unless the keys already
+  # exist in /var/lib/sbctl (`sudo sbctl create-keys`, by the operator, before the merge).
+  # Rollback is this one line: off again, and the Python installer takes the ESP back.
+  # checks.x86_64-linux.lanzaboote-vm runs this path on muninn's profile layout.
+  features.hardening.secureBoot.enable = true;
 }
