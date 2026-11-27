@@ -289,8 +289,10 @@ configuration, with no new key material beyond the Secure Boot keys and no passp
   the same keys at the next start of the unit.
 - **Off-host copies** (unprivileged, from drakkar, after the first switch):
   `mkdir -p ~/backups/sbctl && scp tom@muninn:/var/lib/sbctl-backup/sbctl-muninn.tar.age ~/backups/sbctl/`,
-  and a second copy onto mimir's `/data` over drakkar's NFS mount (a file write only:
-  nothing on mimir is restarted or reconfigured).
+  and a second copy onto mimir's `/data`, which drakkar mounts over NFS at `/mnt/mimir`
+  (tom is in group `data`):
+  `mkdir -p /mnt/mimir/backups/sbctl && cp ~/backups/sbctl/sbctl-muninn.tar.age /mnt/mimir/backups/sbctl/`.
+  A file write only: nothing on mimir is restarted or reconfigured, and no root anywhere.
 - **Recovery**, on the host, with any operator key (one command):
   `age -d -i ~/.ssh/id_ed25519 sbctl-<host>.tar.age | sudo tar -C /var/lib -xf -`
   This restores `/var/lib/sbctl` (keys, GUID) exactly; check with
