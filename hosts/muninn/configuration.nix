@@ -12,6 +12,11 @@
   profiles.ai.enable = true;
   profiles.base.enable = true;
   profiles.communication.enable = true;
+  # vfetch (Voltaic, #437, as drakkar GH-155): the concurrent closure fetcher, as a CLI, and
+  # vfetch serve as the first substituter, so every substitution here fetches through it.
+  # Rollback: delete these two lines, and Nix substitutes directly.
+  features.cli.vfetch.enable = true;
+  features.nix.vfetch.enable = true;
   # profiles.creative.enable = true;
   profiles.desktop.enable = true;
   profiles.development.enable = true;
