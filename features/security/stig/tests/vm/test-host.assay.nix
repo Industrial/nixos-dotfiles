@@ -67,6 +67,8 @@ in
 
     # Settings in a file are also asked of the daemon that reads the file.
     idleLockIsReadFromLogind = assay.eq (scriptHas "V-268086" "busctl get-property") true;
+    # The dconf key is locked, and a user's own write is shown not to take.
+    idleDelayLockIsAsserted = assay.eq [(scriptHas "V-268086" "dconf list-locks") (scriptHas "V-268086" "after a user's write, idle-delay reads")] [true true];
     sudoTimeoutIsReadFromSudo = assay.eq (scriptHas "V-268155" "sudo -V") true;
     sudoTimeoutIsExercised = assay.eq (scriptHas "V-268155" "sudo -S .*! sudo -n true") true;
     nixDaemonRefusalIsExercised = assay.eq (scriptHas "V-268152" "not allowed to connect to the Nix daemon") true;

@@ -22,8 +22,9 @@
 #
 #   V-268132  PASS_MIN_DAYS is in login.defs and the check passes, but shadow 4.20 no longer
 #             implements a minimum password age, so no account is held to it.
-#   V-268086  the dconf lock on idle-delay is declared without its leading slash and is
+#   V-268086  the dconf lock on idle-delay was declared without its leading slash and was
 #             not in effect. The check does not ask for the lock; the control's module does.
+#             Corrected since, and the spec now asserts the lock.
 {lib, ...}: let
   profile = ./../../profiles/test-host.nix;
 
@@ -162,13 +163,25 @@ in [
     assert idle.startswith("uint32 "), f"idle-delay is not set in the user dconf profile: {idle!r}"
     seconds = int(idle.split()[1])
     assert 0 < seconds <= 600, f"idle-delay is {seconds}; must be between 1 and 600"
-    # The check does not ask whether the key is LOCKED against a user's own setting, and this
-    # does not assert it. For the record, it is not: the control declares the lock without
-    # the leading slash dconf requires, so `dconf list-locks` comes back empty. Printed, so
-    # the log of this test shows the state either way.
-    print("dconf locks under /org/gnome/desktop/session/:", repr(machine.succeed(
-        "dconf list-locks /org/gnome/desktop/session/"
-    )))
+    # The check does not ask whether the key is LOCKED against a user's own setting. The
+    # control declares that it is, so it is asserted: a value a user can change back to 0
+    # (never) is a default and not a setting. The lock was once declared without the leading
+    # slash dconf requires, and `dconf list-locks` came back empty while the key read 600.
+    locks = machine.succeed("dconf list-locks /org/gnome/desktop/session/").split()
+    print("dconf locks under /org/gnome/desktop/session/:", locks)
+    assert "/org/gnome/desktop/session/idle-delay" in locks, (
+        f"idle-delay is set and not locked, so a user can turn the idle lock off: {locks}"
+    )
+    # And a user's own write does not take: the locked value still reads back.
+    machine.succeed("useradd --create-home idleprobe")
+    attempt = machine.execute(
+        "su idleprobe -c 'dbus-run-session dconf write /org/gnome/desktop/session/idle-delay \"uint32 0\"' 2>&1"
+    )
+    print("a user's attempt to set idle-delay to 0:", attempt)
+    theirs = machine.succeed(
+        "su idleprobe -c 'dbus-run-session dconf read /org/gnome/desktop/session/idle-delay'"
+    ).strip()
+    assert theirs == "uint32 600", f"after a user's write, idle-delay reads {theirs!r} for that user"
 
     # Leg 2: `grep IdleAction /etc/systemd/logind.conf`.
     import re

@@ -39,7 +39,10 @@
   programs.dconf.profiles.user.databases = lib.mkBefore [
     {
       settings."org/gnome/desktop/session".idle-delay = lib.gvariant.mkUint32 600;
-      locks = ["org/gnome/desktop/session/idle-delay"];
+      # A lock is a dconf PATH and starts with a slash, unlike the `settings` key above.
+      # Without it the lock file holds a line dconf ignores: the key read 600 and a user
+      # could set it back to 0 (GH-349). The VM spec asserts `dconf list-locks`.
+      locks = ["/org/gnome/desktop/session/idle-delay"];
     }
   ];
 }
