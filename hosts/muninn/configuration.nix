@@ -10,6 +10,10 @@
   ];
 
   profiles.ai.enable = true;
+  # vbuild (Voltaic) replaces build-remote as the Nix build hook (#437, as drakkar GH-156).
+  # muninn has no remote builders, so its visible effect is an immediate decline.
+  # Rollback: delete this line; Nix's default build hook comes back.
+  features.fleet.vbuild.enable = true;
   profiles.base.enable = true;
   profiles.communication.enable = true;
   # profiles.creative.enable = true;
