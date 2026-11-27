@@ -42,12 +42,13 @@
   # Secure Boot through lanzaboote (GH-184, ADR-0007 "Runbook: Secure Boot"). muninn goes
   # first, before drakkar (#208). lzbt replaces the Python systemd-boot installer and writes
   # signed UKIs; Secure Boot itself stays off in firmware until the keys are enrolled at the
-  # machine. comin switches on merge; createKeys makes the install hook create the keys in
-  # /var/lib/sbctl (root, 0700) before lzbt signs, never over existing ones, and
-  # sbctl-keys.service writes the age backup /var/lib/sbctl-backup/sbctl-muninn.tar.age,
+  # machine. The deployer (vdeploy, after #437) applies it on merge. createKeys creates the
+  # keys in /var/lib/sbctl (root, 0700) before lzbt signs, never over existing ones:
+  # sbctl-keys.service in vdeploy's `test` step, the install hook as a guard in its `boot`
+  # step. The unit writes the age backup /var/lib/sbctl-backup/sbctl-muninn.tar.age,
   # encrypted to the operator ssh keys (common/fleet.nix). Rollback is the first line: off
   # again, and the Python installer takes the ESP back (keys and backup stay).
-  # checks.x86_64-linux.lanzaboote-vm runs this path on muninn's profile layout.
+  # Gate: checks.x86_64-linux.lanzaboote-vdeploy-vm-muninn (muninn's layout and hardening).
   features.hardening.secureBoot.enable = true;
   features.hardening.secureBoot.createKeys.enable = true;
 }
