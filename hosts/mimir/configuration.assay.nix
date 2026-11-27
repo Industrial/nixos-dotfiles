@@ -48,4 +48,18 @@ in
       on = f: builtins.elem f (features.enabledFeatures off);
     in
       assay.eq [(on "nix.vdeploy") (on "fleet.comin")] [false false];
+    # /etc on the overlay, mutable, state carried across (GH-185).
+    etcOnTheOverlay = assay.eq (has "nixos.etc-overlay") true;
+    # Rollback: lib.mkForce false turns it off; that generation carries the state back out
+    # (features/nixos/etc-overlay/default.assay.nix rollbackCarriesOut, and the VM gate).
+    etcOverlayRollsBack = let
+      off = features.evalSelection {
+        modules = [
+          ./configuration.nix
+          {disabledModules = [./disko.nix ./filesystems.nix ./hardware.nix];}
+          {features.nixos.etc-overlay.enable = nixos.lib.mkForce false;}
+        ];
+      };
+    in
+      assay.eq (builtins.elem "nixos.etc-overlay" (features.enabledFeatures off)) false;
   }

@@ -62,4 +62,9 @@
   # features.media.transmission.enable = true;
   # features.media.seerr.enable = true;
   # features.media.invidious.enable = true;
+
+  # /etc is the upstream overlay, with the host's stateful files carried in and out (GH-185;
+  # gate: etc-overlay-live-switch-mimir). The STIG audit rules reload on the switch, so their
+  # /etc watches follow the mount. Rollback: lib.mkForce false copies the state back out.
+  features.nixos.etc-overlay.enable = true;
 }
