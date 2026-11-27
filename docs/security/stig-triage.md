@@ -13,7 +13,7 @@ are read off each control's fix text, not from having applied it to a host.
 | Class | Meaning | Target |
 |---|---|---|
 | `zero-cost` | No user-visible change on a desktop daily driver | `profiles/base-safe.nix` → `hosts/mimir` only (ADR-0004) |
-| `disruptive` | Changes interactive behaviour, or needs site infrastructure that does not exist yet | `profiles/full.nix` for VM targets. On muninn, the STIG test host, `profiles/test-host.nix` configures 15 of them and excludes the rest in writing (ADR-0008) |
+| `disruptive` | Changes interactive behaviour, or needs site infrastructure that does not exist yet | `profiles/full.nix` for VM targets. On muninn, the STIG test host, `profiles/test-host.nix` configures 16 of them and excludes the rest in writing (ADR-0008) |
 | `n-a` | Not applicable to this fleet; needs a written justification in the report | excluded via `security.stig.exclude` |
 
 ## Distribution
@@ -30,12 +30,13 @@ remaining 35 wait for `profiles/full.nix` or a written exclusion.
 
 The Target column is the classification, and it is the same on every host. What one host
 does with a control is in its report (`nix build .#stigReport.<host>`). muninn is the STIG
-test host (ADR-0008): `profiles/test-host.nix` carries the 68 `base` controls and 15 of the
-`full` ones, excludes 19 with a written reason each (the two `n-a` rows and 17 `full` rows),
+test host (ADR-0008): `profiles/test-host.nix` carries the 68 `base` controls and 16 of the
+`full` ones, excludes 18 with a written reason each (the two `n-a` rows and 16 `full` rows),
 and `V-268144` is credited from external evidence. That accounts for all 103, so muninn's
-report has no `Not Implemented` row. Two of the 19, `V-268081` and `V-268170`, are excluded
-because their modules render a PAM line that does not enforce the requirement; they return
-once the modules are reworked and have a VM test.
+report has no `Not Implemented` row. `V-268081` and `V-268170` were excluded there while
+their modules rendered a PAM line that enforced nothing; both were reworked, have a VM test
+of what they enforce, and are carried. `V-268132` is excluded there for the same reason:
+its check passes and nothing enforces a minimum password age.
 
 ## Controls
 
@@ -44,12 +45,12 @@ once the modules are reworked and have a VM test.
 | `V-268078` | CAT II | NixOS must enable the built-in firewall. | `zero-cost` | `base` | `networking.firewall.enable = true` — already on via features/nixos/networking/firewall.nix |
 | `V-268079` | CAT II | NixOS emergency or temporary user accounts must be provisioned with an expiration time of 72 hours or less. | `n-a` | `excluded` | No emergency or temporary accounts exist on any host. Justification must be re-asserted if one is ever created |
 | `V-268080` | CAT II | NixOS must enable the audit daemon. | `zero-cost` | `base` | `security.auditd.enable` / `security.audit.enable`; cost is log volume only |
-| `V-268081` | CAT II | NixOS must enforce the limit of three consecutive invalid logon attempts by a user during a 15-minute time period. | `disruptive` | `full` | Three failed logons in 15 minutes locks the account — a mistyped password can lock you out of your own desktop |
+| `V-268081` | CAT II | NixOS must enforce the limit of three consecutive invalid logon attempts by a user during a 15-minute time period. | `disruptive` | `full` | Three failed logons in 15 minutes locks the account until an administrator runs `faillock --reset` — a mistyped password can lock you out of your own desktop. SSH with a key is not locked. VM-proven (`stig-V-268081`) |
 | `V-268082` | CAT II | NixOS must be configured to display the Standard Mandatory DoW Notice and Consent Banner before granting local or remote access to the system via a command line user logon. | `disruptive` | `full` | Prints the full DoW consent banner before every console/CLI login |
 | `V-268083` | CAT II | NixOS must be configured to display the Standard Mandatory DoW Notice and Consent Banner before granting local or remote access to the system via an SSH logon. | `disruptive` | `full` | Prints the full DoW consent banner before every SSH login — hits fleet automation and scripted ssh |
 | `V-268084` | CAT II | NixOS must be configured to display the Standard Mandatory DoW Notice and Consent Banner before granting local or remote access to the system via a graphical user logon. | `disruptive` | `full` | Prints the full DoW consent banner on the graphical greeter |
 | `V-268085` | CAT III | NixOS must be configured to limit the number of concurrent sessions to 10 for all accounts and/or account types. | `zero-cost` | `base` | `maxlogins` hard limit of 10; never reached in normal desktop use |
-| `V-268086` | CAT II | NixOS must initiate a session lock after a 10-minute period of inactivity for graphical user logon. | `disruptive` | `full` | Forces a 10-minute idle screen lock via dconf, and the fix text assumes GDM/GNOME — this repo runs Hyprland |
+| `V-268086` | CAT II | NixOS must initiate a session lock after a 10-minute period of inactivity for graphical user logon. | `disruptive` | `full` | Forces a 10-minute idle screen lock via logind and a locked dconf key; the fix text assumes GDM/GNOME, which muninn runs and the Hyprland hosts do not |
 | `V-268087` | CAT II | NixOS must provide the capability for users to directly initiate a session lock for all connection types. | `zero-cost` | `base` | Only requires that a user-initiated lock exists |
 | `V-268088` | CAT II | NixOS must monitor remote access methods. | `zero-cost` | `base` | `services.openssh.logLevel = "VERBOSE"` |
 | `V-268089` | CAT I | NixOS must implement DoW-approved encryption to protect the confidentiality of remote access sessions. | `zero-cost` | `base` | Restricts SSH ciphers/MACs/KEX to the approved set; modern clients unaffected |
@@ -95,7 +96,7 @@ once the modules are reworked and have a VM test.
 | `V-268129` | CAT II | NixOS must require the change of at least 50 percent of the total number of characters when passwords are changed. | `zero-cost` | `base` | Requires 50% of characters to change on password change |
 | `V-268130` | CAT I | NixOS must store only encrypted representations of passwords. | `zero-cost` | `base` | `ENCRYPT_METHOD = SHA512` — already the NixOS default |
 | `V-268131` | CAT I | NixOS must not have the telnet package installed. | `zero-cost` | `base` | telnet package absent — nothing in this repo installs it |
-| `V-268132` | CAT II | NixOS must enforce 24 hours/one day as the minimum password lifetime. | `disruptive` | `full` | `PASS_MIN_DAYS = 1` blocks changing a password twice in one day — breaks the fix-a-typo-immediately workflow |
+| `V-268132` | CAT II | NixOS must enforce 24 hours/one day as the minimum password lifetime. | `disruptive` | `full` | `PASS_MIN_DAYS = 1` is meant to block changing a password twice in one day. Not enforced: shadow 4.20 no longer implements a minimum age, so the check passes and nothing happens (`stig-V-268132`); excluded on muninn |
 | `V-268133` | CAT II | NixOS must enforce a 180-day maximum password lifetime restriction. | `disruptive` | `full` | `PASS_MAX_DAYS = 180` forces password expiry every 180 days on a personal machine |
 | `V-268134` | CAT II | NixOS must enforce a minimum 15-character password length. | `disruptive` | `full` | 15-character minimum invalidates any shorter existing password at next change |
 | `V-268135` | CAT II | NixOS must uniquely identify and must authenticate organizational users (or processes acting on behalf of organizational users). | `disruptive` | `full` | Unique identification and authentication of organizational users — requires an identity source |
@@ -132,7 +133,7 @@ once the modules are reworked and have a VM test.
 | `V-268167` | CAT II | NixOS must generate audit records for all account creations, modifications, disabling, and termination events. | `zero-cost` | `base` | Audit rule: account create/modify/disable/terminate |
 | `V-268168` | CAT I | NixOS must implement NIST FIPS-validated cryptography for the following: to provision digital signatures, to generate cryptographic hashes, and to protect unclassified information requiring confidentiality and cryptographic protection in accordance with applicable federal laws, Executive Orders, directives, policies, regulations, and standards. | `disruptive` | `full` | `boot.kernelParams = [ "fips=1" ]` — FIPS mode on NixOS is partial and breaks common crypto paths; highest-risk control in the set |
 | `V-268169` | CAT II | NixOS must prevent the use of dictionary words for passwords. | `zero-cost` | `base` | pwquality: reject dictionary words |
-| `V-268170` | CAT II | NixOS must enable the use of pwquality. | `disruptive` | `full` | wires pam_pwquality into the passwd/chpasswd/sudo PAM stacks — a bad PAM line breaks password changes, so this needs VM proof first |
+| `V-268170` | CAT II | NixOS must enable the use of pwquality. | `disruptive` | `full` | wires pam_pwquality into the passwd/chpasswd/sudo PAM stacks ahead of pam_unix, so `passwd` refuses a password that fails pwquality.conf. VM-proven (`stig-V-268170`) |
 | `V-268171` | CAT II | NixOS must enforce a delay of at least four seconds between logon prompts following a failed logon attempt. | `zero-cost` | `base` | `FAIL_DELAY = 4` — four-second pause after a failed logon |
 | `V-268172` | CAT I | NixOS must not allow an unattended or automatic logon to the system via the console. | `disruptive` | `full` | Disables autologin entirely; any host relying on greeter autologin starts requiring a password |
 | `V-268173` | CAT II | NixOS must be configured to use AppArmor. | `zero-cost` | `base` | `security.apparmor.enable` — already on via features/security/apparmor |

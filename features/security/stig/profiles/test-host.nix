@@ -12,7 +12,7 @@
 # for the control to be applied.
 #
 # Composition: base-safe's 68 controls by import, never by a second copy of its list, plus the
-# 15 below. `implemented` is a list, so the two profiles' contributions concatenate.
+# 16 below. `implemented` is a list, so the two profiles' contributions concatenate.
 {lib, ...}: let
   baseSafeProfile = ./base-safe.nix;
 
@@ -23,7 +23,16 @@
     ../controls/V-268083.nix # SSH
     ../controls/V-268084.nix # graphical greeter
 
-    # Logon controls. V-268081 (three-strike lockout) is excluded below, not carried.
+    # Logon controls.
+    #
+    # V-268081 locks an account after three failed logons and does not unlock it by itself.
+    # On this host that reaches the console, the GDM greeter and the lock screen (gdm-password
+    # is `auth substack login`). It does not reach SSH: sshd here takes keys only, a key
+    # logon never runs the auth stack, and the operator's sudo rule needs no password. So a
+    # locked operator comes back in over SSH and runs `sudo faillock --user <name> --reset`;
+    # failing that, a reboot clears the tally (/run/faillock). Proven on this host's own
+    # configuration by ../tests/test-host-logon.nix.
+    ../controls/V-268081.nix # three-strike lockout, released by an administrator
     ../controls/V-268086.nix # 10-minute idle lock
     ../controls/V-268172.nix # no console autologin (CAT I, assertion)
     ../controls/V-268174.nix # disable accounts after 35 days idle
@@ -32,11 +41,12 @@
     ../controls/V-268101.nix # notify at 75% volume
     ../controls/V-268102.nix # notify at 90% volume
 
-    # Password policy beyond complexity. V-268170 (pam_pwquality in the PAM password stack)
-    # is excluded below, not carried.
-    ../controls/V-268132.nix # PASS_MIN_DAYS 1
+    # Password policy beyond complexity. V-268170 is what makes pwquality.conf (base-safe's
+    # six settings and minlen below) apply when a user changes a password. V-268132
+    # (PASS_MIN_DAYS 1) is excluded below, not carried: nothing enforces it.
     ../controls/V-268133.nix # PASS_MAX_DAYS 180
     ../controls/V-268134.nix # minlen 15
+    ../controls/V-268170.nix # pam_pwquality ahead of pam_unix in passwd, chpasswd, sudo
 
     # Accounts and privilege.
     ../controls/V-268135.nix # unique interactive UIDs (assertion)
@@ -54,19 +64,21 @@ in {
     # report reads this label to say which baseline a host carries.
     profile = lib.mkForce "test-host";
 
-    # base-safe's 68 plus these 15. Derived from the import list, never hand-listed.
+    # base-safe's 68 plus these 16. Derived from the import list, never hand-listed.
     implemented = map idOf testHostModules;
 
-    # `requiresReboot` and `deferredVerification` come from base-safe unchanged. None of the 15
+    # `requiresReboot` and `deferredVerification` come from base-safe unchanged. None of the 16
     # controls above is a kernel parameter or runtime-only state, and an excluded control has
     # nothing to defer.
 
     # Not applied on this host, each with the reason. The first three are the benchmark's
-    # procedural controls and are excluded wherever the benchmark is carried. Fourteen are
-    # decisions about this machine, and the ones that wait on the owner say so. The last two
-    # are controls whose module renders a PAM line that does not enforce the requirement: a
-    # control that is present and not in effect must not be reported as compliant, and an
-    # untested PAM line does not go into the login stacks of a real machine.
+    # procedural controls and are excluded wherever the benchmark is carried. The other
+    # fourteen are decisions about this machine, and the ones that wait on the owner say so.
+    #
+    # One more, V-268132, is here under ADR-0008's decision 4: a control whose module is
+    # present and not in effect is not reported as compliant, and a PAM line without a VM
+    # test of what it enforces does not go into the login stacks of a real machine. That rule
+    # kept V-268081 and V-268170 in this list until their modules were reworked.
     exclude =
       import ../lib/procedural-exclusions.nix
       // {
@@ -88,9 +100,8 @@ in {
         "V-268177" = "Not applied. The fix is security.pam.p11.enable = true, which authenticates against a certificate on a PKCS#11 token. No such token is issued to the operator and the fleet has no PKI to issue one (V-268124), so enabling pam_p11 would add a module to the login stacks with nothing to verify.";
         "V-268179" = "Not applied. The control caches certificate revocation data for PKI authentication through pam_p11. With no PKI authentication on this host (V-268124, V-268177) there are no certificates to validate and no revocation data to cache.";
 
-        # --- modules that render but do not enforce ---
-        "V-268081" = "Not applied until the control module is reworked and has a VM test. The module adds one pam_faillock.so line to the login and sshd auth stacks with none of the preauth, authfail or authsucc arguments. pam_faillock then only checks the tally and never records a failed attempt, so no account is ever locked. Carrying it would report a three-attempt lockout that does not exist.";
-        "V-268170" = "Not applied until the control module is reworked and has a VM test. The module adds pam_pwquality.so to the passwd, chpasswd and sudo password stacks after a 'sufficient' pam_unix.so, so a successful pam_unix ends the stack and pam_pwquality is never reached. The pwquality.conf settings of V-268126, V-268127, V-268128, V-268129, V-268134, V-268145 and V-268169 are written to /etc/security/pwquality.conf on this host, but PAM does not enforce them until this control returns.";
+        # --- a module that renders and does not enforce (decision 4) ---
+        "V-268132" = "Not applied: nothing on this system enforces a minimum password age, so carrying the control would report one that does not exist. The fix writes PASS_MIN_DAYS 1 to /etc/login.defs and the published check, a grep of that file, passes. shadow 4.20.3 no longer implements the setting: useradd leaves the minimum-age field of a new account empty, chage has no --mindays and passwd no -n, and NixOS has no option that sets the field for a declared user. Written into /etc/shadow by hand the field is honoured by pam_unix, which keeps the old password and says 'You must wait longer to change your password', but passwd then prints 'password updated successfully' and exits 0, because pam_unix is 'sufficient' in the password stack nixpkgs renders. The VM test stig-V-268132 pins each of these observations; the control returns when one of them changes.";
 
         # --- integrity, devices, accounts, network ---
         "V-268153" = "Not applied. The control mails AIDE integrity reports to designated personnel, and this host has no mail transport and no address to deliver to (security.stig.aideMailTo has no default by design). Unauthorised change to the system closure is prevented by the read-only Nix store with signature checking (V-268154). No scheduled integrity check runs on this host: features/nix/vverify, the fleet's store verifier, is not enabled here.";

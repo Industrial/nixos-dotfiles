@@ -22,7 +22,8 @@ let
     ++ import ./ssh.nix args
     ++ import ./system.nix args
     ++ import ./password.nix args
-    ++ import ./test-host.nix args;
+    ++ import ./test-host.nix args
+    ++ import ./pam.nix args;
 
   manifest = import ./../../lib/manifest.nix;
   ids = map (s: s.id) specs;
@@ -48,14 +49,16 @@ in
 
     # Every control a fielded host configures has a VM test: base-safe's 68 (mimir) and the 15
     # the test-host profile adds (muninn). That is the real exit criterion for runtime
-    # verification, asserted rather than counted by hand.
-    vmCoverageSoFar = assay.eq (builtins.length ids) 83;
+    # verification, asserted rather than counted by hand. Two more (./pam.nix) are the PAM
+    # controls, tested for what they enforce. One of the 85, V-268132, is a control muninn
+    # excludes: its test is the evidence that nothing enforces it.
+    vmCoverageSoFar = assay.eq (builtins.length ids) 85;
     totalControls = assay.eq manifest.count 103;
 
     coversEveryBaseSafeControl =
       assay.eq (builtins.filter (id: !builtins.elem id ids) (controlsOf (import ./../../profiles/base-safe.nix {}))) [];
 
-    # test-host imports base-safe and lists its own 15. Its own list is checked here and
+    # test-host imports base-safe and lists its own 16. Its own list is checked here and
     # base-safe's above, so the two together are everything muninn configures.
     coversEveryTestHostControl = let
       own = controlsOf (import ./../../profiles/test-host.nix {lib = nixpkgsLib;});
@@ -64,7 +67,7 @@ in
         count = builtins.length own;
         untested = builtins.filter (id: !builtins.elem id ids) own;
       } {
-        count = 15;
+        count = 16;
         untested = [];
       };
 

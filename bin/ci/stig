@@ -9,7 +9,7 @@
 #   2. Fail on a CAT I regression. Any high-severity control that is neither compliant nor
 #      carrying a written justification fails the build, named by id.
 #   3. Run the VM tests, which boot a machine per control. Skipped unless STIG_VM=1, because
-#      83 VM boots do not belong in every PR run; main schedules it.
+#      85 VM boots do not belong in every PR run; main schedules it.
 #
 # Usage:
 #   bin/ci/stig            reports + CAT I gate

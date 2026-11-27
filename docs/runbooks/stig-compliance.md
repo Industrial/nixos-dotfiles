@@ -7,7 +7,7 @@ baseline or standard" — see [ADR-0003](../adr/0003-kernel-hardening-single-sou
 
 **muninn** is the STIG test host
 ([ADR-0008](../adr/0008-stig-full-set-on-muninn-test-host.md)). It accounts for all 103
-controls: 83 configured, 19 excluded with a written reason, 1 covered by external evidence.
+controls: 84 configured, 18 excluded with a written reason, 1 covered by external evidence.
 
 drakkar and huginn deliberately carry **no** controls:
 [ADR-0004](../adr/0004-stig-baseline-mimir-only.md) narrowed the baseline to the one host
@@ -63,7 +63,7 @@ audit rules — the report cannot see a failed `audit-rules-nixos.service`.
 | Profile | Controls | Where |
 |---|---|---|
 | `base-safe` | 68 — nothing a user would notice | `hosts/mimir/configuration.nix`, that host only |
-| `test-host` | 83 configured (`base-safe` plus 15), 19 excluded in writing | `hosts/muninn/configuration.nix`, that host only (ADR-0008) |
+| `test-host` | 84 configured (`base-safe` plus 16), 18 excluded in writing | `hosts/muninn/configuration.nix`, that host only (ADR-0008) |
 | `full` | all 103 | VM test targets only, **never** a fielded host |
 | none | 0 — option surface only, so the host still reports | `profiles/base.nix`, so every host |
 
@@ -74,14 +74,34 @@ classified `base`. A disruptive control cannot drift onto a fielded host.
 **mimir and muninn carry controls.** muninn's `test-host` profile leaves no control
 `Not Implemented`: what it does not configure it excludes, and the reasons are in
 `features/security/stig/profiles/test-host.nix`. Two of its exclusions are CAT I
-(`V-268146`, `V-268168`); ADR-0008 records that ruling. Each of the 15 controls it adds to
-`base-safe` has a VM test that boots the profile
-(`features/security/stig/tests/vm/test-host.nix`).
-Two more, `V-268081` and `V-268170`, are excluded because
-their modules render a PAM line that does not enforce the requirement; they return once the
-modules are reworked and have a VM test. Until `V-268170` returns, the pwquality.conf
-settings (`V-268126`..`V-268129`, `V-268134`, `V-268145`, `V-268169`) are written on muninn
-but not enforced by PAM.
+(`V-268146`, `V-268168`); ADR-0008 records that ruling. Each of the 16 controls it adds to
+`base-safe` has a VM test: 14 boot the profile and run the control's check
+(`features/security/stig/tests/vm/test-host.nix`), and the two that edit the PAM stacks are
+tested for what they enforce (`tests/vm/pam.nix`): `V-268081` (three-strike lockout) and
+`V-268170` (pam_pwquality). Both were excluded until their modules were reworked, because
+the earlier modules rendered a PAM line that did nothing. `V-268132` (minimum password age)
+went the other way: its check passes and nothing enforces it, so muninn excludes it, and
+its VM test is kept as the evidence. With `V-268170` carried, the pwquality.conf settings (`V-268126`..`V-268129`,
+`V-268134`, `V-268145`, `V-268169`) are enforced on muninn when a user changes a password.
+On mimir (`base-safe`) they are still a file that nothing in PAM reads.
+
+### A locked account on muninn
+
+`V-268081` locks an account after three wrong passwords within 15 minutes, at the console,
+the GDM greeter or the lock screen, and the lock does not expire (`unlock_time=0`). SSH is
+not affected: sshd on muninn takes keys only, and a key logon is neither refused by the lock
+nor clears it. To see and release a lock:
+
+```bash
+faillock --user <name>                # the recorded failures
+sudo faillock --user <name> --reset   # release
+```
+
+The operator does this over SSH with a key; the operator's sudo rule needs no password. With
+no second machine to hand, a reboot also clears the lock, because the tally is in
+`/run/faillock`. Root's password is locked on muninn, so the root console is not a way in.
+`nix build .#checks.x86_64-linux.stig-test-host-logon` walks exactly this on muninn's own
+configuration, and is the gate to run before changing anything in its logon stacks.
 
 drakkar and huginn import the option surface alone
 and therefore score `1/103` against profile `none`, with every control `Not Implemented`
@@ -137,7 +157,7 @@ mechanism standing between a release bump and undetected drift.
 | `moon run test` | every commit (prek) | control modules declare what their control requires |
 | `bin/assay-coverage-check` | every commit | a `.nix` file with no colocated suite |
 | `bin/ci/stig` | PR and main | report builds; **CAT I regression fails the build** |
-| `moon run stig-vm-test` | main (`STIG_VM=1`) | 83 booted machines, one per control: `base-safe`'s 68 and the 15 `test-host` adds |
+| `moon run stig-vm-test` | main (`STIG_VM=1`) | 85 booted machines, one per control: `base-safe`'s 68, the 15 from the `full` set first put on `test-host`, and the two PAM controls |
 
 The VM tests are the only gate that proves the runtime half. They have already caught things
 no amount of static analysis would:
@@ -150,10 +170,12 @@ no amount of static analysis would:
   `nixos-firewall-tool`.
 - `V-268132`'s check passes and enforces nothing: `PASS_MIN_DAYS 1` is in `login.defs`, but
   shadow 4.20 no longer implements a minimum password age, so a new account's shadow entry
-  has no minimum. The test pins that, so it fails the day shadow honours the key again.
-- `V-268086` declares a dconf lock on `idle-delay` without the leading slash dconf requires,
-  so the key is set and not locked. The check does not ask for the lock, and the test prints
-  the state without asserting it; the module is not corrected yet.
+  has no minimum and no tool can set one. muninn excludes the control for that reason
+  (ADR-0008, amendment 2), and the test pins what was observed, so it fails the day shadow
+  honours the key again.
+- `V-268086` declared a dconf lock on `idle-delay` without the leading slash dconf requires,
+  so the key was set and a user could change it back. Corrected; the test asserts
+  `dconf list-locks` and that a user's own write is refused.
 
 ## ⚠ The CI gate does not gate deployment
 

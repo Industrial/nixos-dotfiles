@@ -16,9 +16,14 @@ in
     # inert under Hyprland — acceptable here because an unused dconf key is ignored, unlike
     # V-268165's audit watch on a missing path which aborts the entire rule file.
     setsGnomeIdleDelay = assay.eq (builtins.length mod.programs.dconf.profiles.user.databases.content) 1;
+    # A dconf lock is a path with a leading slash. This suite once pinned the path without
+    # it, which dconf ignores: the key was set and not locked.
     locksTheGnomeKey =
-      assay.eq (builtins.head (builtins.head mod.programs.dconf.profiles.user.databases.content).locks)
-      "org/gnome/desktop/session/idle-delay";
+      assay.eq (builtins.head mod.programs.dconf.profiles.user.databases.content).locks
+      ["/org/gnome/desktop/session/idle-delay"];
+    # mkBefore: the first database wins in a dconf profile, so a host's own desktop settings
+    # cannot shadow this one.
+    comesFirstInTheProfile = assay.eq mod.programs.dconf.profiles.user.databases.priority 500;
 
     # xautolock is deliberately NOT used: it is X11-only and does nothing under Wayland, so
     # enabling it would be compliance theatre.

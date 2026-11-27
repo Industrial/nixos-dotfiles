@@ -21,9 +21,11 @@
 # And writing them found two things the suites could not, both recorded in the specs:
 #
 #   V-268132  PASS_MIN_DAYS is in login.defs and the check passes, but shadow 4.20 no longer
-#             implements a minimum password age, so no account is held to it.
-#   V-268086  the dconf lock on idle-delay is declared without its leading slash and is
+#             implements a minimum password age, so no account is held to it. The profile
+#             excludes the control for that reason, and its spec here is the evidence.
+#   V-268086  the dconf lock on idle-delay was declared without its leading slash and was
 #             not in effect. The check does not ask for the lock; the control's module does.
+#             Corrected since, and the spec now asserts the lock.
 {lib, ...}: let
   profile = ./../../profiles/test-host.nix;
 
@@ -162,13 +164,25 @@ in [
     assert idle.startswith("uint32 "), f"idle-delay is not set in the user dconf profile: {idle!r}"
     seconds = int(idle.split()[1])
     assert 0 < seconds <= 600, f"idle-delay is {seconds}; must be between 1 and 600"
-    # The check does not ask whether the key is LOCKED against a user's own setting, and this
-    # does not assert it. For the record, it is not: the control declares the lock without
-    # the leading slash dconf requires, so `dconf list-locks` comes back empty. Printed, so
-    # the log of this test shows the state either way.
-    print("dconf locks under /org/gnome/desktop/session/:", repr(machine.succeed(
-        "dconf list-locks /org/gnome/desktop/session/"
-    )))
+    # The check does not ask whether the key is LOCKED against a user's own setting. The
+    # control declares that it is, so it is asserted: a value a user can change back to 0
+    # (never) is a default and not a setting. The lock was once declared without the leading
+    # slash dconf requires, and `dconf list-locks` came back empty while the key read 600.
+    locks = machine.succeed("dconf list-locks /org/gnome/desktop/session/").split()
+    print("dconf locks under /org/gnome/desktop/session/:", locks)
+    assert "/org/gnome/desktop/session/idle-delay" in locks, (
+        f"idle-delay is set and not locked, so a user can turn the idle lock off: {locks}"
+    )
+    # And a user's own write does not take: the locked value still reads back.
+    machine.succeed("useradd --create-home idleprobe")
+    attempt = machine.execute(
+        "su idleprobe -c 'dbus-run-session dconf write /org/gnome/desktop/session/idle-delay \"uint32 0\"' 2>&1"
+    )
+    print("a user's attempt to set idle-delay to 0:", attempt)
+    theirs = machine.succeed(
+        "su idleprobe -c 'dbus-run-session dconf read /org/gnome/desktop/session/idle-delay'"
+    ).strip()
+    assert theirs == "uint32 600", f"after a user's write, idle-delay reads {theirs!r} for that user"
 
     # Leg 2: `grep IdleAction /etc/systemd/logind.conf`.
     import re
@@ -216,30 +230,61 @@ in [
     machine.succeed("systemctl is-active auditd.service | grep -qx active")
   '')
 
-  (spec "V-268132" "login.defs declares a one-day minimum password lifetime" ''
-    # The check, verbatim. This is what the control is scored on, and it passes.
-    import re
-    defs = machine.succeed("grep PASS_MIN_DAYS /etc/login.defs")
-    m = re.search(r"(?m)^\s*PASS_MIN_DAYS\s+(\d+)\s*$", defs)
-    assert m, f"PASS_MIN_DAYS is missing or commented out:\n{defs}"
-    assert int(m.group(1)) == 1, f"PASS_MIN_DAYS is {m.group(1)}, expected 1"
+  # V-268132 is NOT carried by the profile: it is excluded there (ADR-0008, decision 4),
+  # because the check passes and nothing enforces the requirement. This spec is the evidence
+  # for that exclusion. It adds the control's module to the profile, runs the check, and then
+  # pins each observation the exclusion text makes. When one of these assertions fails, the
+  # reason for the exclusion has changed and the control should be looked at again.
+  ((spec "V-268132" "a one-day minimum password lifetime is declared and not enforced" ''
+      # The check, verbatim. With the control's module imported, it passes.
+      import re
+      defs = machine.succeed("grep PASS_MIN_DAYS /etc/login.defs")
+      m = re.search(r"(?m)^\s*PASS_MIN_DAYS\s+(\d+)\s*$", defs)
+      assert m, f"PASS_MIN_DAYS is missing or commented out:\n{defs}"
+      assert int(m.group(1)) == 1, f"PASS_MIN_DAYS is {m.group(1)}, expected 1"
 
-    ${newAccountAging}
-    # Field 4 of a shadow entry is the minimum age in days, and it is EMPTY: the setting the
-    # check greps for has no consumer. shadow 4.20 (the version this nixpkgs ships) no longer
-    # implements a minimum password age. useradd writes sp_min = -1 unconditionally where it
-    # used to read PASS_MIN_DAYS, and the login.defs manual no longer documents the key. So
-    # the line is in the file, the published check passes, and no account is held to it.
-    #
-    # Pinned as observed rather than left out, for the same reason V-268078 pins the missing
-    # firewall-panic: a test that only ran the grep would report a one-day minimum that does
-    # not exist. If this assertion ever fails, shadow honours the key again and it should
-    # become `== "1"`.
-    assert fields[3] == "", (
-        f"a new account's minimum password age is {fields[3]!r}; shadow was expected to leave "
-        "it unset (see the comment above this assertion)"
-    )
-  '')
+      # 1. The setting has no consumer. Field 4 of a shadow entry is the minimum age in days,
+      #    and a new account's is EMPTY: shadow 4.20 no longer implements a minimum password
+      #    age, and useradd no longer reads PASS_MIN_DAYS.
+      ${newAccountAging}
+      assert fields[3] == "", (
+          f"a new account's minimum password age is {fields[3]!r}; shadow was expected to leave "
+          "it unset. If shadow honours PASS_MIN_DAYS again, V-268132 can be carried."
+      )
+
+      # 2. No tool sets the field either. chage lost --mindays and passwd lost -n, and chage
+      #    no longer reports a minimum.
+      for command in ["chage --mindays 1 stigprobe", "chage -m 1 stigprobe", "passwd -n 1 stigprobe"]:
+          status, out = machine.execute(command + " 2>&1")
+          assert status != 0, f"`{command}` is accepted again:\n{out}"
+      assert "inimum" not in machine.succeed("chage -l stigprobe"), "chage reports a minimum age again"
+      assert machine.succeed("getent shadow stigprobe").strip().split(":")[3] == ""
+
+      # 3. Written into /etc/shadow by hand, the field IS honoured by pam_unix: a second
+      #    change on the same day leaves the stored password as it was. But passwd reports
+      #    that change as a success. pam_unix is `sufficient` in the password stack, so its
+      #    refusal is dropped and the stack's result is pam_pwquality's (V-268170).
+      first, second = "aB3$fG6&jK9)mN2!qR", "9vK#mQ2$xLp7!Wz@4Ns"
+      machine.succeed(f"echo 'stigprobe:{first}' | chpasswd")
+      machine.succeed(
+          "awk -F: -v OFS=: '$1 == \"stigprobe\" { $4 = 1 } 1' /etc/shadow > /root/shadow.new",
+          "cat /root/shadow.new > /etc/shadow",
+          "rm /root/shadow.new",
+      )
+      before = machine.succeed("getent shadow stigprobe").strip()
+      assert before.split(":")[3] == "1", before
+      status, out = machine.execute(
+          f"printf '%s\\n' '{first}' '{second}' '{second}' | su stigprobe -c passwd 2>&1"
+      )
+      print(f"a second change on the same day, minimum age 1: exit {status}\n{out}")
+      assert "You must wait longer to change your password" in out, out
+      assert machine.succeed("getent shadow stigprobe").strip() == before, "the password changed"
+      assert status == 0 and "password updated successfully" in out, (
+          "passwd now reports the refused change as a failure. A hand-set minimum age would "
+          f"then be usable, and V-268132's exclusion should be reconsidered:\n{out}"
+      )
+    '')
+    // {modules = [profile ./../../controls/V-268132.nix];})
 
   (spec "V-268133" "a password expires after 180 days" ''
     import re
