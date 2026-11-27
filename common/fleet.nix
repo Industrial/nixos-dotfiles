@@ -140,7 +140,8 @@ let
       attestationRoot = null;
       # Never "nfs-client": a work machine holds no personal files, so it neither
       # mounts mimir's /data nor appears in its export list.
-      roles = ["laptop" "work" "builder" "monitoring"];
+      # vdeploy: vdeploy deploys this host instead of comin (#437), the test host first.
+      roles = ["laptop" "work" "builder" "monitoring" "vdeploy"];
       operatorKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAC/xRRyQ1Om1ChkxfeqfK8HjvAgzg1d+bfgU9ALxgYx tom@muninn";
       builder = {
         maxJobs = 4;

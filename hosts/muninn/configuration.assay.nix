@@ -24,14 +24,18 @@ in
   assay.suite "configuration" {
     enablesFleetAccess = assay.eq (has "fleet.remote-access") true;
     enablesAi = assay.eq cfg.profiles.ai.enable true;
+    # vhealth runs its probes here (#437), and the vhealth user may use the Nix daemon that
+    # the STIG profile restricts (allowed-users), or the nix-daemon probe is down.
+    vhealthProbesAsAnAllowedNixUser =
+      assay.eq [(has "nix.vhealth") (builtins.elem "vhealth" host.nix.settings.allowed-users) (host.environment.etc ? "vhealth/probes.json")] [true true true];
     # muninn is the monitoring standby for when mimir is down.
     monitoringStandby = assay.eq [(has "monitoring.prometheus") (has "monitoring.grafana")] [true true];
     noRelay = assay.eq (has "fleet.remote-desktop-relay") false;
     # Work laptop: no personal files, so no NFS client for mimir's /data.
     noNfsClient = assay.eq (has "storage.nfs-client") false;
-    # vdeploy observes next to comin (#437): it plans, comin still switches.
-    vdeployObservesNextToComin =
-      assay.eq [(has "nix.vdeploy") host.features.nix.vdeploy.mode (has "fleet.comin")] [true "observe" true];
+    # vdeploy deploys muninn (#437): the vdeploy role, deploy mode, comin gone.
+    deploysWithVdeploy =
+      assay.eq [(has "nix.vdeploy") host.features.nix.vdeploy.mode (has "fleet.comin") ((import ../../common/fleet.nix).hasRole "vdeploy" "muninn")] [true "deploy" false true];
 
     # muninn is the STIG test host (ADR-0008): every one of the 103 controls is configured,
     # excluded in writing, or covered by external evidence, each exactly once.
