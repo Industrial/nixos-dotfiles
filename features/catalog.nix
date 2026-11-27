@@ -226,6 +226,9 @@
   ./storage/nfs-server
   ./storage/qdirstat
 
+  # virtualisation
+  ./virtualisation/microvm-host
+
   # window-manager
   ./window-manager/alacritty
   ./window-manager/ghostty
