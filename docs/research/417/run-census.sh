@@ -9,7 +9,9 @@ shift || true
 hosts=("$@")
 [ ${#hosts[@]} -gt 0 ] || hosts=(drakkar mimir huginn muninn)
 mkdir -p "$out"
-ref="git+file://$root"
+# shellcheck source=bin/lib/flake-ref.sh
+. "$root/bin/lib/flake-ref.sh"
+ref=$(git_flake_ref "$root")
 timev=/run/current-system/sw/bin/time
 for h in "${hosts[@]}"; do
     echo "== $h: toplevel eval" >&2

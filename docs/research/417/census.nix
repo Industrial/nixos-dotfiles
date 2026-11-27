@@ -15,7 +15,9 @@
   flakeRef,
   host,
 }: let
-  flake = builtins.getFlake flakeRef;
+  # Only git+file refs: getFlake on a directory copies all of it into the store (#266).
+  flake = assert builtins.substring 0 11 flakeRef == "git+file://";
+    builtins.getFlake flakeRef; # flake-ref: git-tracked (run-census.sh builds it with git_flake_ref)
   nixos = flake.nixosConfigurations.${host};
   inherit (flake.inputs.nixpkgs) lib;
 
