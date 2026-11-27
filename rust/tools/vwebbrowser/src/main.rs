@@ -12,7 +12,7 @@ fn main() -> ExitCode {
             println!("{}", app::USAGE);
             ExitCode::SUCCESS
         }
-        Ok(Start::Browse(url)) => vwebbrowser::gtk_edge::run(url),
+        Ok(Start::Browse(address)) => vwebbrowser::gtk_edge::run(address),
         // Usage errors exit 2, before anything starts.
         Err(e) => {
             eprintln!("vwebbrowser: {e}");

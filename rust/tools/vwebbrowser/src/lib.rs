@@ -3,7 +3,8 @@
 //! The source is Voltaic (`src/*.vlt`); `build.rs` compiles it into `OUT_DIR`
 //! and these `include!`s are the library's Voltaic modules. `ui` is the seam
 //! (plain-data commands and events, the `Ui` and `UiEvents` capabilities),
-//! `app` the root program over it, `error` the typed failures.
+//! `tabs` the service that keeps the tabs, `app` the root program over
+//! them, `error` the typed failures.
 //!
 //! The seam rule (.maestro/specs/vwebbrowser.md): id_effect owns the program;
 //! GTK owns one thread. `gtk_edge` is the only Rust that names a widget, and
@@ -42,5 +43,6 @@ voltaic!(settings);
 voltaic!(log);
 voltaic!(tabtree);
 voltaic!(omnibox);
+voltaic!(tabs);
 
 pub mod gtk_edge;

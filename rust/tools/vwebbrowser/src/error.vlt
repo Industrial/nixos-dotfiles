@@ -1,6 +1,15 @@
 -- vwebbrowser's typed failures. Plain enums with hand-written Display (an
 -- `errors` block names its fields `_0`, which trips
 -- clippy::just_underscores_and_digits, and drops derives: voltaic#15).
+--
+-- Each layer's error lives with its layer (NavError in nav, SettingsError in
+-- settings, LogError in log, TabsError in tabs); AppError is the one
+-- boundary they all widen into.
+
+import crate::log::LogError
+import crate::nav::NavError
+import crate::settings::SettingsError
+import crate::tabs::TabsError
 
 -- What the UI edge can refuse: a command it could not hand to the GTK thread.
 export data UiError
@@ -17,6 +26,10 @@ instance std::fmt::Display UiError
 export data AppError
   = Usage String
   | Ui UiError
+  | Nav NavError
+  | Settings SettingsError
+  | Log LogError
+  | Tabs TabsError
   deriving (Debug, Clone, PartialEq, Eq)
 
 instance std::fmt::Display AppError
@@ -24,7 +37,27 @@ instance std::fmt::Display AppError
   fmt self f = case self of
     AppError::Usage why -> write! \-> f \-> "#{why}"
     AppError::Ui e -> write! \-> f \-> "#{e}"
+    AppError::Nav e -> write! \-> f \-> "#{e}"
+    AppError::Settings e -> write! \-> f \-> "#{e}"
+    AppError::Log e -> write! \-> f \-> "#{e}"
+    AppError::Tabs e -> write! \-> f \-> "#{e}"
 
 instance From UiError AppError
   from : UiError -> Self
   from e = AppError::Ui e
+
+instance From NavError AppError
+  from : NavError -> Self
+  from e = AppError::Nav e
+
+instance From SettingsError AppError
+  from : SettingsError -> Self
+  from e = AppError::Settings e
+
+instance From LogError AppError
+  from : LogError -> Self
+  from e = AppError::Log e
+
+instance From TabsError AppError
+  from : TabsError -> Self
+  from e = AppError::Tabs e
