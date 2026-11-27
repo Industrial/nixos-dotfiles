@@ -85,7 +85,9 @@ in
           ];
         };
     in {
-      imports = [./default.nix ../../security/stig/profiles/test-host.nix];
+      # muninn's /etc is the overlay since #438 (features/nixos/etc-overlay); every generation
+    # here carries it, as muninn's do.
+    imports = [./default.nix ../../security/stig/profiles/test-host.nix ../etc-overlay/default.nix];
 
       options.vmtest.secureBootGeneration = lib.mkEnableOption "the Secure Boot generation of this test";
 
