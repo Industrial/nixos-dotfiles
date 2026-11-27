@@ -376,6 +376,8 @@
       # apply on drakkar's, including the boot step failing for missing keys.
       // {lanzaboote-vm = import ./features/nixos/boot/test.nix {inherit pkgs inputs;};}
       // {lanzaboote-vdeploy-vm = import ./features/nixos/boot/test-vdeploy.nix {inherit pkgs inputs;};}
+      # ... and muninn's gate once it is on vdeploy (#437): createKeys, keys before lzbt.
+      // {lanzaboote-vdeploy-vm-muninn = import ./features/nixos/boot/test-vdeploy-muninn.nix {inherit pkgs inputs;};}
       # features/nix/vdaemon-proxy in a VM (#157).
       // {vdaemon-proxy-vm = import ./features/nix/vdaemon-proxy/test.nix {inherit pkgs;};}
       # ... and switched into and out of a running system.
