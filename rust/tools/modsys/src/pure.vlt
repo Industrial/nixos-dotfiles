@@ -1,0 +1,59 @@
+-- Evaluation as an id_effect program whose environment holds no IO
+-- capability. `evaluated` is `Effect<A, EvalError, HNil>`: nothing to read
+-- from `R`, so no `~Fetch` can appear in it, and rustc rejects one. A pinned
+-- fetch is the one IO a configuration may need, and it is a separate effect
+-- whose `R` names the `Fetch` capability, so a caller that runs it has to
+-- provide one, visibly.
+--
+-- What `R` does NOT do: it tracks the capabilities a program asks for, not
+-- ambient authority. A `suspend` or `effect!` body at `R = HNil` can still
+-- call `std::fs` or `std::process` (vcache's `load_signer` does exactly that,
+-- legitimately). Purity therefore needs a second fence around the crate that
+-- holds the configuration: clippy's `disallowed-methods` / `disallowed-types`
+-- over std's IO surface, denied in CI (see this crate's clippy.toml).
+
+import std::sync::Arc
+import id_effect::{Effect, HCons, HNil, effect, fail, succeed, suspend}
+import crate::eval::{EvalError, Module, Registry, evaluate}
+
+-- Result to Effect.
+lifted : given <A: Send + 'static> Result<A, EvalError> -> Effect<A, EvalError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- Evaluate a configuration and project what the caller wants from it, with
+-- nothing in the environment.
+export evaluated : given <A: Send + 'static> fn() -> Vec<Module> -> fn(&Registry) -> Result<A, EvalError> -> Effect<A, EvalError, HNil>
+evaluated modules project =
+  suspend (move \-> lifted (project_from (modules ()) project))
+
+project_from : given <A> Vec<Module> -> fn(&Registry) -> Result<A, EvalError> -> Result<A, EvalError>
+project_from modules project =
+  reg = (evaluate (&modules))?
+  project (&reg)
+
+-- The pinned-fetch capability: a URL and its expected hash in, a store path
+-- out. Production would be vfetch; a test provides a table.
+export class Fetcher
+  fetch : &self -> &str -> &str -> Result<String, String>
+
+export newtype Fetch = Fetch (export Arc<dyn Fetcher + Send + Sync>)
+
+export type WithFetch = HCons<Fetch, HNil>
+
+export errors FetchError
+  Failed String  "pinned fetch failed: #{0}"
+
+export fetch_pinned : String -> String -> Effect<String, FetchError, WithFetch>
+fetch_pinned url sha256 =
+  effect!
+    let fetcher = ~Fetch;
+    ~lifted_fetch(fetcher.0.fetch(&url, &sha256))
+
+lifted_fetch : Result<String, String> -> Effect<String, FetchError, WithFetch>
+lifted_fetch r =
+  case r of
+    Ok path -> succeed path
+    Err e -> fail (Failed e)
