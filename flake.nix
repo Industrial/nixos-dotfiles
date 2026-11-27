@@ -363,6 +363,10 @@
       {}
       hosts
       // (builtins.removeAttrs self.stigVmTests ["passthru"])
+      # The STIG test host's own configuration (muninn, ADR-0008): the operator logs on, three
+      # wrong passwords lock the account at the console and through GDM's PAM service, and the
+      # operator gets back in over SSH with a key and releases it (GH-349).
+      // {stig-test-host-logon = import ./features/security/stig/tests/test-host-logon.nix {inherit pkgs inputs;};}
       # features/nix/vverify's VM test: a corrupted store path is reported.
       // {vverify-vm = import ./features/nix/vverify/test.nix {inherit pkgs;};}
       # features/nixos/users' VM test (GH-187): accounts, locked root, operator SSH, sudo and

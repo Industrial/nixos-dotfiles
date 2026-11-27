@@ -15,6 +15,7 @@ let
   manifest = import ./../../lib/manifest.nix;
   banner = import ./../../lib/dow-banner.nix;
   ids = map (s: s.id) specs;
+  pamIds = map (s: s.id) (import ./pam.nix {});
   specOf = id: builtins.head (builtins.filter (s: s.id == id) specs);
   scriptHas = id: pattern: builtins.match ".*${pattern}.*" (specOf id).script != null;
 
@@ -34,12 +35,14 @@ in
     specCount = assay.eq (builtins.length specs) 15;
 
     # Exactly the controls the profile adds: one spec each, none missing, none for a control
-    # the profile does not carry.
+    # the profile does not carry. The two that live in the PAM stacks (V-268081, V-268170)
+    # have their specs in ./pam.nix, where the control is tested for what it enforces.
     specsAreTheProfilesOwnControls =
-      assay.eq (builtins.sort builtins.lessThan ids) (builtins.sort builtins.lessThan profileControls);
+      assay.eq (builtins.sort builtins.lessThan (ids ++ pamIds)) (builtins.sort builtins.lessThan profileControls);
+    pamSpecsAreElsewhere = assay.eq [pamIds (builtins.filter (id: builtins.elem id ids) pamIds)] [["V-268081" "V-268170"] []];
 
     # Each test boots the profile muninn carries, not the control alone, so it also proves
-    # the 83 controls compose into a machine that boots.
+    # the 85 controls compose into a machine that boots.
     everySpecUsesTheRealProfile =
       assay.eq (builtins.all (s: builtins.any (m: builtins.match ".*test-host\\.nix" (toString m) != null) s.modules) specs) true;
 

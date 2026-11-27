@@ -17,7 +17,7 @@ let
   procedural = import ./../lib/procedural-exclusions.nix;
   manifest = import ./../lib/manifest.nix;
 
-  stig = mod.security.stig;
+  inherit (mod.security) stig;
   baseIds = baseSafe.security.stig.implemented;
   ownIds = stig.implemented;
   fullOnlyIds = full.security.stig.implemented;
@@ -56,12 +56,13 @@ in
     # --- composition ---
     buildsOnBaseSafe = assay.eq (builtins.elem "base-safe.nix" (map baseName mod.imports)) true;
     addsOnlyWhatBaseSafeLacks = assay.eq (builtins.filter (id: builtins.elem id baseIds) ownIds) [];
-    # The 15 are drawn from the `full` set, and are pinned so that adding or dropping one is
+    # The 17 are drawn from the `full` set, and are pinned so that adding or dropping one is
     # a deliberate edit here and in ADR-0008.
     addsOnlyControlsFromFull = assay.eq (builtins.filter (id: !builtins.elem id fullOnlyIds) ownIds) [];
-    addsExactlyTheFifteen =
+    addsExactlyTheSeventeen =
       assay.eq (sorted ownIds)
       [
+        "V-268081"
         "V-268082"
         "V-268083"
         "V-268084"
@@ -75,47 +76,45 @@ in
         "V-268136"
         "V-268152"
         "V-268155"
+        "V-268170"
         "V-268172"
         "V-268174"
       ];
-    carriesEightyThree = assay.eq (builtins.length carried) 83;
+    carriesEightyFive = assay.eq (builtins.length carried) 85;
     # mkForce-wrapped, because base-safe also labels the profile.
     declaresProfileName = assay.eq stig.profile.content "test-host";
     overridesTheBaseLabel = assay.eq (stig.profile._type or null) "override";
     everyImportExists = assay.eq (builtins.all builtins.pathExists mod.imports) true;
-    # Nothing excluded has a reboot to wait for, and none of the 15 is a kernel parameter:
+    # Nothing excluded has a reboot to wait for, and none of the 17 is a kernel parameter:
     # both registries are base-safe's, untouched.
     addsNoRebootOrDeferredEntries = assay.eq [(stig ? requiresReboot) (stig ? deferredVerification)] [false false];
 
     # --- the exclusions must be justified, not blank ---
-    excludesNineteen = assay.eq (builtins.length excluded) 19;
+    excludesSeventeen = assay.eq (builtins.length excluded) 17;
     everyExclusionIsJustified =
       assay.eq (builtins.filter (id: builtins.stringLength stig.exclude.${id} <= 80) excluded) [];
     # The three procedural controls carry the shared text, so `full` and this profile give an
     # assessor the same reason.
     proceduralExclusionsAreShared =
       assay.eq (lib.filterAttrs (id: _: procedural ? ${id}) stig.exclude) procedural;
-    # The 16 that are not procedural say that they were not applied.
+    # The 14 that are not procedural say that they were not applied.
     hostExclusionsSayNotApplied =
       assay.eq (builtins.filter (id: !(procedural ? ${id}) && builtins.match "Not applied.*" stig.exclude.${id} == null) excluded) [];
     # Exclusions that wait on the owner say so in the text an assessor reads.
     ownerDecisionsAreMarked =
       assay.eq (map (id: builtins.match ".*(owner|#340).*" stig.exclude.${id} != null) ["V-268147" "V-268139" "V-268138"]) [true true true];
-    # Two control modules render a PAM line that does not enforce the requirement (ADR-0008).
-    # They are excluded, not carried, so the report cannot call them compliant; each text
-    # names the defect and says the control returns with a reworked module and a VM test.
-    nonEnforcingPamControlsAreNotCarried =
-      assay.eq (builtins.filter (id: builtins.elem id carried) ["V-268081" "V-268170"]) [];
-    nonEnforcingPamExclusionsNameTheDefect = assay.eq [
-      (builtins.match ".*preauth, authfail or authsucc.*never records.*" stig.exclude."V-268081" != null)
-      (builtins.match ".*after a 'sufficient' pam_unix.so.*never reached.*" stig.exclude."V-268170" != null)
-    ] [true true];
-    nonEnforcingPamExclusionsSayWhenTheyReturn =
-      assay.eq (map (id: builtins.match ".*reworked and has a VM test.*" stig.exclude.${id} != null) ["V-268081" "V-268170"]) [true true];
-    # The pwquality.conf settings stay configured; the V-268170 text says PAM does not
-    # enforce them yet, so their "compliant" rows are not read as enforcement.
-    pwqualityExclusionSaysSettingsAreNotEnforced =
-      assay.eq (builtins.match ".*V-268126.*V-268134.*V-268169.*PAM does not enforce them.*" stig.exclude."V-268170" != null) true;
+    # V-268081 and V-268170 sat in `exclude` while their modules rendered a PAM line that
+    # enforced nothing (ADR-0008, decision 4). They are carried now, and the condition that
+    # decision set is pinned here: each has a VM spec, and tests/vm/pam.assay.nix pins that
+    # the spec asserts what the machine refuses, not what /etc/pam.d contains.
+    pamControlsAreCarried =
+      assay.eq [(builtins.filter (id: !builtins.elem id ownIds) ["V-268081" "V-268170"]) (builtins.filter (id: stig.exclude ? ${id}) ["V-268081" "V-268170"])] [[] []];
+    pamControlsHaveAVmSpec =
+      assay.eq (builtins.filter (id: !builtins.elem id (map (s: s.id) (import ./../tests/vm/pam.nix {}))) ["V-268081" "V-268170"]) [];
+    # ... and a gate on this host's own configuration (flake check stig-test-host-logon; its
+    # node and script are pinned by ../tests/test-host-logon.assay.nix).
+    testHostLogonGateExists = assay.eq (builtins.pathExists ./../tests/test-host-logon.nix) true;
+    # The pwquality.conf settings V-268170 makes PAM apply are all carried with it.
     pwqualitySettingsStayCarried =
       assay.eq (builtins.filter (id: !builtins.elem id carried) ["V-268126" "V-268127" "V-268128" "V-268129" "V-268134" "V-268145" "V-268169"]) [];
     # The site-input controls are excluded, not carried: carried without their inputs they

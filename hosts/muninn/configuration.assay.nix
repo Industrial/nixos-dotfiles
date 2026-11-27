@@ -15,11 +15,14 @@ let
   # flake.nix does: the selection above cannot see what a profile's imports switch on.
   mkHost = import ../../lib/mk-host.nix {inputs = nixos.flakeInputs;};
   host = (mkHost "muninn").config;
-  stig = host.security.stig;
+  inherit (host.security) stig;
   manifest = import ../../features/security/stig/lib/manifest.nix;
   accountedFor = stig.implemented ++ builtins.attrNames stig.exclude ++ builtins.attrNames stig.satisfiedExternally;
   sorted = builtins.sort (a: b: a < b);
-  hasPamLine = service: module: builtins.match ".*${module}.*" host.security.pam.services.${service}.text != null;
+  # The rendered PAM file of a service matches a regex. `[^\n]*` keeps a match on one line,
+  # so a pattern spanning "\n" pins that two lines are adjacent and in that order.
+  pamMatches = service: regex: builtins.match regex host.security.pam.services.${service}.text != null;
+  faillockPolicy = "deny=3 fail_interval=900";
 in
   assay.suite "configuration" {
     enablesFleetAccess = assay.eq (has "fleet.remote-access") true;
@@ -35,8 +38,8 @@ in
     enablesStigTestHost = assay.eq (has "security.stig.profiles.test-host") true;
     stigProfileIsTestHost = assay.eq [stig.enable stig.profile] [true "test-host"];
     stigAccountsForExactlyTheManifest = assay.eq (sorted accountedFor) (sorted manifest.ids);
-    stigCountsAre83Configured19Excluded1External =
-      assay.eq [(builtins.length stig.implemented) (builtins.length (builtins.attrNames stig.exclude)) (builtins.attrNames stig.satisfiedExternally)] [83 19 ["V-268144"]];
+    stigCountsAre85Configured17Excluded1External =
+      assay.eq [(builtins.length stig.implemented) (builtins.length (builtins.attrNames stig.exclude)) (builtins.attrNames stig.satisfiedExternally)] [85 17 ["V-268144"]];
     stigExclusionsAreWritten =
       assay.eq (builtins.filter (id: builtins.stringLength stig.exclude.${id} <= 80) (builtins.attrNames stig.exclude)) [];
 
@@ -56,10 +59,38 @@ in
     usersStayMutable = assay.eq host.users.mutableUsers true; # V-268138
     noUsbguardWithoutAPolicy = assay.eq host.services.usbguard.enable false; # V-268139
     noTokenModuleInTheLoginStacks = assay.eq host.security.pam.p11.enable false; # V-268177, V-268179
-    # V-268081 and V-268170 are excluded because their PAM lines do not enforce anything
-    # (ADR-0008). The rendered stacks carry neither line until the modules are reworked.
-    noFaillockLineInLoginOrSshd = assay.eq (map (s: hasPamLine s "pam_faillock") ["login" "sshd"]) [false false];
-    noPwqualityLineInPasswordStacks = assay.eq (map (s: hasPamLine s "pam_pwquality") ["passwd" "chpasswd" "sudo"]) [false false false];
+    # V-268081 and V-268170 are carried (ADR-0008). What is pinned is the lines that ENFORCE,
+    # in the order that makes them enforce: a pam_faillock or pam_pwquality line being present
+    # is what these controls once had while doing nothing. That the stacks below lock an
+    # account and refuse a weak password on this host's configuration is the VM gate
+    # features/security/stig/tests/test-host-logon.nix.
+    #
+    # login: preauth ahead of the first pam_unix; authfail directly behind the `sufficient`
+    # pam_unix, ending the stack; the account line that clears the tally after a success.
+    loginRefusesALockedAccountBeforeAskingForAPassword = assay.eq [
+      (pamMatches "login" ".*\nauth required [^\n]*pam_faillock\\.so preauth audit ${faillockPolicy} silent unlock_time=0[^\n]*\nauth [^\n]*pam_unix\\.so.*")
+      # No pam_unix auth line anywhere ahead of it.
+      (pamMatches "login" ".*\nauth [^\n]*pam_unix\\.so.*\nauth required [^\n]*pam_faillock\\.so preauth.*")
+    ] [true false];
+    loginRecordsAFailureRightBehindPamUnix =
+      assay.eq (pamMatches "login" ".*\nauth sufficient [^\n]*pam_unix\\.so[^\n]*\nauth \\[default=die] [^\n]*pam_faillock\\.so authfail audit ${faillockPolicy} unlock_time=0[^\n]*\n.*") true;
+    loginClearsTheTallyOnSuccess =
+      assay.eq (pamMatches "login" ".*\naccount required [^\n]*pam_faillock\\.so[^\n]*\naccount required [^\n]*pam_unix\\.so.*") true;
+    # The greeter and the lock screen get all of that through `login`, and add nothing.
+    graphicalLogonUsesTheLoginStack =
+      assay.eq [(pamMatches "gdm-password" ".*\nauth substack login[^\n]*\n.*") (pamMatches "gdm-password" ".*\naccount include login[^\n]*\n.*") (pamMatches "gdm-password" ".*pam_faillock.*")] [true true false];
+    # sshd carries the same lines, and its auth stack has no pam_unix: a password is never
+    # accepted over SSH, a key logon does not run the auth stack, and so the lock cannot
+    # shut the operator out of SSH (sshStaysKeyOnlyWithTheOperatorKeys above).
+    sshdAuthStackTakesNoPassword =
+      assay.eq [(pamMatches "sshd" ".*\nauth required [^\n]*pam_faillock\\.so preauth [^\n]*\n.*") (pamMatches "sshd" ".*\nauth [^\n]*pam_unix\\.so.*")] [true false];
+    # passwd, chpasswd, sudo: pam_pwquality directly AHEAD of the `sufficient` pam_unix, which
+    # stores the password that was checked.
+    passwordStacksCheckQualityBeforePamUnixStores =
+      assay.eq (map (s: pamMatches s ".*\npassword requisite [^\n]*pam_pwquality\\.so[^\n]*\npassword sufficient [^\n]*pam_unix\\.so [^\n]*use_authtok[^\n]*\n.*") ["passwd" "chpasswd" "sudo"]) [true true true];
+    # ... and never behind it, which is where the line sat when it enforced nothing.
+    noQualityLineBehindPamUnix =
+      assay.eq (map (s: pamMatches s ".*pam_unix\\.so[^\n]*\npassword [^\n]*pam_pwquality.*") ["passwd" "chpasswd" "sudo"]) [false false false];
     noFipsOnTheKernelCommandLine = assay.eq (builtins.elem "fips=1" host.boot.kernelParams) false; # V-268168
     timeServersAreNotPinned = assay.eq (builtins.any (s: builtins.match ".*navy\\.mil" s != null) host.networking.timeServers) false; # V-268149
   }
