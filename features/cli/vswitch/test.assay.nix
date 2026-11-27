@@ -23,4 +23,7 @@ in
     probesAsVhealth = assay.eq (lib.hasInfix "--health-as vhealth" wrapper.text) true;
     # A non-root operator, elevated by sudo only for the activation.
     aliceInWheel = assay.eq (builtins.elem "wheel" m.users.users.alice.extraGroups) true;
+    # The real STIG base-safe profile (#241), as on mimir: audit on, signatures required, and
+    # sudo asks wheel for a password (V-268156); the test answers it on a terminal.
+    stigBaseSafe = assay.eq [m.security.auditd.enable m.nix.settings.require-sigs m.security.sudo.wheelNeedsPassword] [true true true];
   }
