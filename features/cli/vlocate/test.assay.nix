@@ -14,5 +14,7 @@ in
     # cowsay is in the system's closure but not installed: what a hint is for.
     cowsayInClosureNotOnPath = assay.eq [(builtins.elem pkgs.cowsay m.system.extraDependencies) (builtins.elem pkgs.cowsay m.environment.systemPackages)] [true false];
     allThreeShells = assay.eq [m.programs.fish.enable m.programs.zsh.enable (builtins.elem pkgs.nushell m.environment.systemPackages)] [true true true];
+    # Hardened as mimir is (STIG base-safe: auditd is one of its controls).
+    stigBaseSafe = assay.eq m.security.auditd.enable true;
     aFleetRoot = assay.eq (lib.any (r: lib.hasInfix "/var/lib/vci/roots/main-mimir" r) m.systemd.tmpfiles.rules) true;
   }
