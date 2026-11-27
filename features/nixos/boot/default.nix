@@ -41,9 +41,13 @@
   # sbctl-keys.service at boot and on every switch.
   ensureKeys = pkgs.writeShellApplication {
     name = "sbctl-ensure-keys";
-    runtimeInputs = [pkgs.sbctl pkgs.coreutils];
+    runtimeInputs = [pkgs.sbctl pkgs.coreutils pkgs.util-linux];
     text = ''
       bundle=${lib.escapeShellArg sb.pkiBundle}
+      # One at a time: under vdeploy the unit starts in the `test` step and the hook runs in
+      # the `boot` step; neither may see the other's half-written keys/.
+      exec 9>/run/sbctl-ensure-keys.lock
+      flock 9
       if [ -s "$bundle/keys/db/db.key" ]; then
         exit 0
       fi
