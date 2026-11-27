@@ -15,8 +15,9 @@ command_ok name =
 export data Hit { export path String, export systems Vec<String> }
   deriving (Debug, Clone, PartialEq, Eq)
 
--- The answer for one name.
-export data Found { export name String, export hits Vec<Hit>, export nixpkgs Vec<String> }
+-- The answer for one name. `nixpkgs_error` is set when nix-locate ran and failed: the
+-- nixpkgs half is unknown then, which is not the same as no hits there (GH-442).
+export data Found { export name String, export hits Vec<Hit>, export nixpkgs Vec<String>, export nixpkgs_error Option<String> }
   deriving (Debug, Clone, PartialEq, Eq)
 
 -- `/nix/store/<hash>-hello-2.12` -> `hello-2.12`.
@@ -55,7 +56,9 @@ attrs_of text =
   out
 
 -- The hint the shells print for a command that was not found, or None when
--- nothing anywhere ships it (then the shell's own message is all there is).
+-- nothing anywhere ships it (then the shell's own message is all there is). A failed
+-- nix-locate degrades it: the fleet's part still prints, with one line saying nixpkgs
+-- was not searched; with nothing in the fleet there is no hint.
 export hint_of : &Found -> Option<String>
 hint_of f =
   if f.hits.is_empty () && f.nixpkgs.is_empty ()
@@ -67,6 +70,8 @@ hint_of f =
       for h in &f.hits
         line = "    #{package_of (&h.path)}  (#{h.systems.join ", "})  #{h.path}/bin/#{f.name}\n"
         out.push_str (&line)
+    if f.nixpkgs_error.is_some ()
+      out.push_str "  In nixpkgs: not searched (nix-locate failed; see vlocate --json)\n"
     if !(f.nixpkgs.is_empty ())
       shown = f.nixpkgs.iter () |> .take 5 |> .map (\a -> "nixpkgs##{a}") |> .collect : Vec<String>
       more = if f.nixpkgs.len () > 5
@@ -79,7 +84,7 @@ hint_of f =
       out.push_str (&comma)
     Some out
 
--- The answer as JSON (schema 1).
+-- The answer as JSON (schema 1). `nixpkgs_error` is null, or nix-locate's failure.
 export json_of : &Found -> String
 json_of f =
   mut m = Map::new ()
@@ -88,6 +93,7 @@ json_of f =
   hits = f.hits.iter () |> .map (\h -> hit_json h) |> .collect : Vec<Value>
   m.insert (.to_string "fleet") (Value::Array hits)
   m.insert (.to_string "nixpkgs") (Value::Array (f.nixpkgs.iter () |> .map (\a -> Value::from (a.clone ())) |> .collect))
+  m.insert (.to_string "nixpkgs_error") (f.nixpkgs_error.clone () |> .map (\e -> Value::from e) |> .unwrap_or Value::Null)
   Value::Object m |> .to_string
 
 hit_json : &Hit -> Value
@@ -121,7 +127,7 @@ test "nix-locate's attributes, once each, without the output"
 
 test "the hint names the fleet's paths, nixpkgs and comma; nothing found is no hint"
   hit = Hit { path = .to_string "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello-2.12", systems = .to_vec ([.to_string "drakkar", .to_string "mimir"]) }
-  f = Found { name = .to_string "hello", hits = .to_vec ([hit]), nixpkgs = .to_vec ([.to_string "hello"]) }
+  f = Found { name = .to_string "hello", hits = .to_vec ([hit]), nixpkgs = .to_vec ([.to_string "hello"]), nixpkgs_error = None }
   h = hint_of (&f) |> .expect "hint"
   assert! \-> h.starts_with "hello: command not found.\n"
   assert! \-> h.contains "    hello-2.12  (drakkar, mimir)  /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello-2.12/bin/hello\n"
@@ -130,4 +136,14 @@ test "the hint names the fleet's paths, nixpkgs and comma; nothing found is no h
   assert! \-> hint_of (&many) |> .map (\t -> t.contains "(+3 more)" && !(t.contains "fleet")) |> .unwrap_or false
   assert_eq! \-> hint_of (&Found { hits = Vec::new (), nixpkgs = Vec::new (), ...f.clone () }) \-> None
   j = json_of (&f)
-  assert! \-> j.contains "\"package\":\"hello-2.12\"" && j.contains "\"schema\":1"
+  assert! \-> j.contains "\"package\":\"hello-2.12\"" && j.contains "\"schema\":1" && j.contains "\"nixpkgs_error\":null"
+
+test "a failed nix-locate: the fleet's part still prints, nixpkgs marked not searched, and JSON says why"
+  hit = Hit { path = .to_string "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello-2.12", systems = .to_vec ([.to_string "this host"]) }
+  why = .to_string "nix-locate exited 2: error: unexpected argument '--top-level' found"
+  f = Found { name = .to_string "hello", hits = .to_vec ([hit]), nixpkgs = Vec::new (), nixpkgs_error = Some why }
+  h = hint_of (&f) |> .expect "hint"
+  assert! \-> h.contains "(this host)" && h.contains "  In nixpkgs: not searched" && !(h.contains "Try it once")
+  assert! \-> json_of (&f) |> .contains "\"nixpkgs_error\":\"nix-locate exited 2: error: unexpected argument '--top-level' found\""
+  -- Nothing in the fleet: no hint, the shell's own message.
+  assert_eq! \-> hint_of (&Found { hits = Vec::new (), ...f.clone () }) \-> None

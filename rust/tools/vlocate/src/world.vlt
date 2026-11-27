@@ -6,7 +6,8 @@
 --   closure   a system's closure, from the store database (read-only);
 --   present   which of some store paths ship `bin/<name>`;
 --   nixpkgs   nix-locate's answer from its prebuilt nixpkgs-wide database
---             (nothing when there is no nix-locate).
+--             (nothing when there is no nix-locate; a failed nix-locate is an
+--             error, not "no hits": GH-442).
 --
 -- Each live step is one short blocking read inside `suspend`: vlocate is one
 -- lookup, with no fiber beside it.
@@ -23,7 +24,7 @@ export class World
   systems : &self -> Effect<Vec<(String, String)>, Never, HNil>
   closure : &self -> String -> Effect<Vec<String>, String, HNil>
   present : &self -> Vec<String> -> String -> Effect<Vec<String>, Never, HNil>
-  nixpkgs : &self -> String -> Effect<Vec<String>, Never, HNil>
+  nixpkgs : &self -> String -> Effect<Vec<String>, String, HNil>
 
 export newtype WorldTool = WorldTool (export Arc<dyn World + Send + Sync>)
 
@@ -66,19 +67,34 @@ export with_bin : &[String] -> &str -> Vec<String>
 with_bin paths name =
   paths.iter () |> .filter (\p -> Path::new (p.as_str ()) |> .join "bin" |> .join name |> .exists) |> .cloned |> .collect
 
-located : &Option<String> -> &str -> Vec<String>
+-- nix-locate's arguments for `bin/<name>` at a package's root. nix-index 0.1.11 has no
+-- `--top-level`: top-level packages only is its default (`--all` turns that off), and an
+-- unknown flag is a usage error, exit 2 (GH-442).
+export locate_args : &str -> Vec<String>
+locate_args name = .to_vec ([.to_string "--minimal", .to_string "--whole-name", .to_string "--at-root", "/bin/#{name}"])
+
+-- The first line nix-locate wrote to stderr, for the error.
+first_line : &[u8] -> String
+first_line bytes = String::from_utf8_lossy bytes |> .lines |> .map (\l -> l.trim ()) |> .find (\l -> !(l.is_empty ())) |> .unwrap_or "no message" |> .to_string
+
+-- No nix-locate (none configured, or not installed) is no nixpkgs answer. A nix-locate
+-- that runs and fails is an error: no hits is exit 0 with nothing printed.
+export located : &Option<String> -> &str -> Result<Vec<String>, String>
 located program name =
   case program of
-    None -> Vec::new ()
+    None -> Ok (Vec::new ())
     Some p ->
-      want = "/bin/#{name}"
-      out = Command::new p |> .args ([.to_string "--minimal", .to_string "--top-level", .to_string "--whole-name", .to_string "--at-root", want]) |> .stdin (Stdio::null ()) |> .stderr (Stdio::null ()) |> .output ()
+      out = Command::new p |> .args (locate_args name) |> .stdin (Stdio::null ()) |> .stdout (Stdio::piped ()) |> .stderr (Stdio::piped ()) |> .output ()
       case out of
         Ok o -> if o.status.success ()
-          attrs_of (&String::from_utf8_lossy (&o.stdout))
+          Ok (attrs_of (&String::from_utf8_lossy (&o.stdout)))
         else
-          Vec::new ()
-        Err _ -> Vec::new ()
+          code = o.status.code () |> .map (\c -> c.to_string ()) |> .unwrap_or (.to_string "a signal")
+          Err "nix-locate exited #{code}: #{first_line (&o.stderr)}"
+        Err e -> if e.kind () == std::io::ErrorKind::NotFound
+          Ok (Vec::new ())
+        else
+          Err "running #{p}: #{e}"
 
 instance World Live
   systems : &self -> Effect<Vec<(String, String)>, Never, HNil>
@@ -93,10 +109,10 @@ instance World Live
   present : &self -> Vec<String> -> String -> Effect<Vec<String>, Never, HNil>
   present self paths name =
     suspend (move \-> succeed (with_bin (&paths) (&name)))
-  nixpkgs : &self -> String -> Effect<Vec<String>, Never, HNil>
+  nixpkgs : &self -> String -> Effect<Vec<String>, String, HNil>
   nixpkgs self name =
     program = self.nix_locate.clone ()
-    suspend (move \-> succeed (located (&program) (&name)))
+    suspend (move \-> done_or (located (&program) (&name)))
 
 done_or : Result<Vec<String>, String> -> Effect<Vec<String>, String, HNil>
 done_or r =
@@ -106,13 +122,14 @@ done_or r =
 
 -- A scripted host, for tests: `systems` and their `closures` (a system whose
 -- root is in `broken` fails to read), the paths that ship the command, and
--- nix-locate's attributes. Every call is logged.
+-- nix-locate's attributes (or its failure, `nixpkgs_error`). Every call is logged.
 export data Scripted
   { export systems Vec<(String, String)>
   , export closures Vec<(String, Vec<String>)>
   , export broken Vec<String>
   , export with_bin Vec<String>
   , export nixpkgs Vec<String>
+  , export nixpkgs_error Option<String>
   , export log Arc<Mutex<Vec<String>>>
   }
   deriving (Clone, Default)
@@ -141,10 +158,12 @@ instance World Scripted
   present self paths name =
     noted (&self.log) ("present #{paths.len ()} #{name}")
     succeed (paths.into_iter () |> .filter (\p -> self.with_bin.contains p) |> .collect)
-  nixpkgs : &self -> String -> Effect<Vec<String>, Never, HNil>
+  nixpkgs : &self -> String -> Effect<Vec<String>, String, HNil>
   nixpkgs self name =
     noted (&self.log) ("nixpkgs #{name}")
-    succeed (self.nixpkgs.clone ())
+    case &self.nixpkgs_error of
+      Some e -> fail (e.clone ())
+      None -> succeed (self.nixpkgs.clone ())
 
 test "the systems: this host first, then the fleet's vci results by name; other roots ignored"
   dir = std::env::temp_dir () |> .join ("vlocate-systems-#{std::process::id ()}")
@@ -182,5 +201,36 @@ test "a path ships the command when bin/<name> exists, as a file or a link"
   fs::remove_dir_all (&dir) |> .ok
 
 test "no nix-locate: no nixpkgs answer, never an error"
-  assert! \-> located (&None) "hello" |> .is_empty
-  assert! \-> located (&Some (.to_string "/nonexistent/nix-locate")) "hello" |> .is_empty
+  assert_eq! \-> located (&None) "hello" \-> Ok (Vec::new ())
+  assert_eq! \-> located (&Some (.to_string "/nonexistent/nix-locate")) "hello" \-> Ok (Vec::new ())
+
+-- A stand-in nix-locate that parses its arguments as nix-index 0.1.11 does: an unknown
+-- flag is `error: unexpected argument '<flag>' found` and exit 2.
+#[cfg(test)]
+script : &Path -> &str -> String
+script dir body =
+  p = dir.join "nix-locate"
+  fs::write (&p) body |> .expect "write the script"
+  mut perms = fs::metadata (&p) |> .expect "stat" |> .permissions ()
+  std::os::unix::fs::PermissionsExt::set_mode (&mut perms) 493
+  fs::set_permissions (&p) perms |> .expect "chmod"
+  p.to_string_lossy () |> .to_string
+
+#[cfg(test)]
+const NIX_LOCATE_0_1_11 : &str = "#!/bin/sh\nfor a in \"$@\"; do\n  case \"$a\" in\n    --minimal|--whole-name|--at-root|--all|--no-group) ;;\n    -*) echo \"error: unexpected argument '$a' found\" >&2; exit 2 ;;\n  esac\ndone\neval \"last=\\${$#}\"\ncase \"$last\" in\n  /bin/hello) printf 'hello.out\\npkgsStatic.hello.out\\n' ;;\nesac\nexit 0\n"
+
+test "a scripted nix-locate: a real hit, no hit, and an argument error"
+  dir = std::env::temp_dir () |> .join ("vlocate-nix-locate-#{std::process::id ()}")
+  fs::remove_dir_all (&dir) |> .ok
+  fs::create_dir_all (dir.join "ok") |> .ok
+  fs::create_dir_all (dir.join "bad") |> .ok
+  ok = script (&dir.join "ok") NIX_LOCATE_0_1_11
+  -- The argv vlocate sends parses, and a hit is the attributes.
+  assert_eq! \-> located (&Some (ok.clone ())) "hello" \-> Ok (.to_vec ([.to_string "hello", .to_string "pkgsStatic.hello"]))
+  -- No hit is exit 0 with nothing printed: no attributes, not an error.
+  assert_eq! \-> located (&Some (ok.clone ())) "no-such-command-anywhere" \-> Ok (Vec::new ())
+  -- A usage error (the old `--top-level` argv) is an error with nix-locate's message.
+  bad = script (&dir.join "bad") "#!/bin/sh\necho \"error: unexpected argument '--top-level' found\" >&2\necho >&2\necho 'Usage: nix-locate [OPTIONS] <PATTERN>' >&2\nexit 2\n"
+  assert_eq! \-> located (&Some bad) "hello" \-> Err (.to_string "nix-locate exited 2: error: unexpected argument '--top-level' found")
+  assert! \-> !(locate_args "hello" |> .contains (&.to_string "--top-level"))
+  fs::remove_dir_all (&dir) |> .ok

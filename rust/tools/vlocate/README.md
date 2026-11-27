@@ -13,7 +13,8 @@ Written in Voltaic 0.3.0 (`src/*.vlt`, compiled by `build.rs`) with id_effect 0.
 nix-store-core's read-only store database.
 
 ```
-vlocate [bin] NAME [--json]      where NAME comes from; exit 1 when nowhere
+vlocate [bin] NAME [--json]      where NAME comes from; exit 1 when nowhere, 2 when nowhere
+                                 and nix-locate failed (nixpkgs unknown, see nixpkgs_error)
 vlocate hint NAME                the shells' hint on stdout; exit 1 when there is none (nushell)
 vlocate not-found NAME           the hint on stderr, always exit 127 (fish, zsh)
 options: [--current PATH] [--roots DIR] [--db FILE] [--nix-locate PROG | --no-nixpkgs]
@@ -34,9 +35,13 @@ cowsay: command not found.
 2. **Closures:** each system's closure from `/nix/var/nix/db/db.sqlite`, opened read-only,
    one after another. A system that can't be read is skipped with a note.
 3. **Paths:** which paths of their union have `bin/<name>`, as a file or a link.
-4. **nixpkgs:** `nix-locate --minimal --top-level --whole-name --at-root /bin/<name>`, the
-   prebuilt database features/cli/nix-index installs. With no nix-locate this half is
-   empty, never an error.
+4. **nixpkgs:** `nix-locate --minimal --whole-name --at-root /bin/<name>`, the prebuilt
+   database features/cli/nix-index installs. nix-index 0.1.11 has no `--top-level` (top-level
+   only is its default), and passing it was a silent miss until GH-442. With no nix-locate
+   this half is empty, never an error. A nix-locate that runs and fails is an error, not "no
+   hits": `--json` carries it as `nixpkgs_error` (null otherwise), `bin` notes it on stderr,
+   and the hint keeps the fleet's part with "In nixpkgs: not searched". Each lookup pays for
+   the nix-locate call: about 1.1 s on drakkar, 6 s on muninn under load (2026-11-27).
 
 A name that a shell could not have meant is refused without a lookup: empty, `.`, `..`, a
 slash, or whitespace. Measured in the VM test at 0.11 s per lookup, `su` included.
