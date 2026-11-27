@@ -72,6 +72,11 @@ in
     lanzabooteUsesTheAllProfilesHook =
       assay.eq (builtins.match ".*/bin/lzbt-all-profiles" host.boot.loader.external.installHook != null) true;
     lanzabooteKeysInSbctl = assay.eq host.boot.lanzaboote.pkiBundle "/var/lib/sbctl";
+    # The keys are created on muninn (GH-343), backed up encrypted to the operators.
+    createsItsKeys = assay.eq [host.features.hardening.secureBoot.createKeys.enable (host.systemd.services ? sbctl-keys)] [true true];
+    backupGoesToTheOperators = assay.eq (builtins.length host.features.hardening.secureBoot.createKeys.recipients > 0) true;
+    # Rolled back, the key unit goes too (the keys and the backup stay on disk).
+    rollbackDropsTheKeyUnit = assay.eq (rolledBack.systemd.services ? sbctl-keys) false;
     # Rollback is one option: off again, and the Python installer is back, lanzaboote gone.
     secureBootRollsBackWithOneOption =
       assay.eq [rolledBack.boot.loader.systemd-boot.enable rolledBack.boot.lanzaboote.enable rolledBack.boot.loader.external.enable] [true false false];
