@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Fold the per-host census-<host>.json and time-*.txt from run-census.sh into the committed,
-# compact docs/research/417/s1-options.json.
+# docs/research/417/s1-options.json. CI formats JSON with biome, so run
+# `bin/ci/lint docs/research/417/s1-options.json` afterwards.
 # Usage: docs/research/417/summarise.sh [indir] > docs/research/417/s1-options.json
 set -euo pipefail
 in=${1:-$(git rev-parse --show-toplevel)/.tmp/census}
