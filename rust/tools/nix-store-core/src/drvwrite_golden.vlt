@@ -1,0 +1,63 @@
+-- The `.drv` writer against C++ Nix:
+--
+-- - every golden derivation (tests/fixtures/drvs.json, 56 `.drv` files) is
+--   written back byte for byte from its parse, and its store path recomputed;
+-- - a derivation built from scratch over a package-index entry (bash) has the
+--   path, output path and ATerm that Nix gives for the same `derivation { … }`
+--   (drvwrite-oracle.nix, checked on the pinned nixpkgs by
+--   drvwrite-oracle.assay.nix). Moved from the #417 S1b spike's host oracle.
+
+import serde_json::Value
+import std::path::Path
+import crate::drv
+import crate::drvwrite::{Pkg, aterm, drv_path, emit}
+
+derivations : Vec<Value>
+derivations =
+  file = Path::new (env!("CARGO_MANIFEST_DIR")) |> .join "tests/fixtures/drvs.json"
+  body = std::fs::read_to_string (&file) |> .expect "the drvs fixture"
+  v = (serde_json::from_str (&body) : serde_json::Result<Value>) |> .expect "JSON"
+  v["derivations"].as_array () |> .cloned |> .unwrap_or_default
+
+-- `/nix/store/<hash>-<name>.drv` to `<name>`.
+name_of : &str -> String
+name_of path =
+  base = path.rsplit ('/') |> .next |> .unwrap_or ""
+  stem = base.strip_suffix ".drv" |> .unwrap_or base
+  stem[33 .. stem.len ()].to_string ()
+
+test "every golden derivation is written back byte for byte, with its store path"
+  all = derivations ()
+  assert! \-> all.len () >= 50
+  for d in all
+    path = d["path"].as_str () |> .unwrap_or ""
+    text = d["aterm"].as_str () |> .unwrap_or ""
+    parsed = drv::parse text |> .expect "a golden .drv parses"
+    written = aterm (&parsed)
+    assert_eq! \-> written \-> text
+    recomputed = drv_path (&parsed) (&name_of path)
+    assert_eq! \-> recomputed \-> path
+
+-- bash from the pinned nixpkgs, as a package index entry (gen-index wrote it).
+const BASH : Pkg = Pkg {
+  attr = "bash",
+  drv = "/nix/store/kflvs7jxvlz0ipa80jxkn0dpgngnn53s-bash-interactive-5.3p20.drv",
+  out = "/nix/store/lfm00fnq66xfgbn099vqckabyl5jllz6-bash-interactive-5.3p20",
+  modulo = "e954676b5db2ebe562d336f53c9177642799a913adb8b67f83026c9fda0b2e20",
+}
+
+const NIX_DRV_PATH : &str = "/nix/store/4aadlf2xrqfx10yfkkrzdr7ihbhcnlhy-s1b-hello.drv"
+
+const NIX_OUT_PATH : &str = "/nix/store/p65cg6592lrxg822n2inhxlbvdjazy3z-s1b-hello"
+
+const NIX_ATERM : &str = r#"Derive([("out","/nix/store/p65cg6592lrxg822n2inhxlbvdjazy3z-s1b-hello","","")],[("/nix/store/kflvs7jxvlz0ipa80jxkn0dpgngnn53s-bash-interactive-5.3p20.drv",["out"])],[],"x86_64-linux","/nix/store/lfm00fnq66xfgbn099vqckabyl5jllz6-bash-interactive-5.3p20/bin/bash",["-c","echo \"hi\" > $out"],[("builder","/nix/store/lfm00fnq66xfgbn099vqckabyl5jllz6-bash-interactive-5.3p20/bin/bash"),("name","s1b-hello"),("out","/nix/store/p65cg6592lrxg822n2inhxlbvdjazy3z-s1b-hello"),("system","x86_64-linux")])"#
+
+test "a derivation emitted over the package index is the one Nix writes"
+  builder = "#{BASH.out}/bin/bash"
+  args = [String::from "-c", String::from "echo \"hi\" > $out"].to_vec ()
+  e = emit "s1b-hello" "x86_64-linux" builder args (Vec::new ()) (&[BASH])
+    |> .expect "emits"
+  out = e.derivation.outputs["out"].path.clone ()
+  assert_eq! \-> out \-> NIX_OUT_PATH
+  assert_eq! \-> e.text \-> NIX_ATERM
+  assert_eq! \-> e.path \-> NIX_DRV_PATH

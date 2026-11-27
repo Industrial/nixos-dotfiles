@@ -1,7 +1,7 @@
-# The oracle for host/src/oracle.vlt: the same derivation as the spike host's
-# toplevel, instantiated by Nix on the nixpkgs this repository pins.
-# oracle.assay.nix evaluates it with the flake.lock's nixpkgs and checks the
-# paths that host/src/oracle.vlt expects.
+# The oracle for src/drvwrite_golden.vlt: the derivation that test emits,
+# instantiated by Nix on the nixpkgs this repository pins.
+# drvwrite-oracle.assay.nix evaluates it with the flake.lock's nixpkgs and checks
+# the paths that src/drvwrite_golden.vlt expects.
 {pkgs}: let
   d = derivation {
     name = "s1b-hello";

@@ -97,3 +97,20 @@ mod worker_live {
 pub mod veval {
     include!(concat!(env!("OUT_DIR"), "/veval.rs"));
 }
+
+// Writing `.drv`s (#457): ATerm, hashDerivationModulo, output and .drv store paths,
+// the inverse of `drv`. Moved from the #417 S1b spike. Voltaic 0.3.0 has no `^=`, so
+// the XOR fold is `x := x ^ y`.
+#[allow(
+    clippy::assign_op_pattern,
+    clippy::redundant_closure,
+    clippy::just_underscores_and_digits
+)]
+pub mod drvwrite {
+    include!(concat!(env!("OUT_DIR"), "/drvwrite.rs"));
+}
+
+#[cfg(test)]
+mod drvwrite_golden {
+    include!(concat!(env!("OUT_DIR"), "/drvwrite_golden.rs"));
+}

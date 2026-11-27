@@ -1,6 +1,7 @@
--- Emitting a `.drv`: the ATerm text, the output paths and the derivation's
--- own store path, computed the way libstore computes them, so the result can
--- be checked byte-for-byte against `nix eval … .drvPath`.
+-- Writing a `.drv`: the ATerm text, the output paths and the derivation's
+-- own store path, computed the way libstore computes them, so the result is
+-- byte-for-byte what `nix eval … .drvPath` gives. The inverse of `drv`'s
+-- parser, moved here from the #417 S1b spike (rust/spikes/voltaic-modules).
 --
 -- - ATerm: `Derive(outputs, inputDrvs, inputSrcs, system, builder, args, env)`,
 --   every list sorted the way libstore writes it (BTreeMap/BTreeSet order).
@@ -14,10 +15,10 @@
 -- handles carry it), so emitting a derivation reads no file.
 
 import std::collections::{BTreeMap, BTreeSet}
-import nix_store_core::drv::{Derivation, Output}
-import nix_store_core::hash::{Sha256, digest, to_base16}
-import nix_store_core::nixbase32::encode
-import nix_store_core::storepath::STORE_DIR
+import crate::drv::{Derivation, Output, read}
+import crate::hash::{Sha256, digest, to_base16}
+import crate::nixbase32::encode
+import crate::storepath::STORE_DIR
 
 -- A package from the pinned index: what a derivation needs to depend on it.
 export data Pkg {
@@ -183,3 +184,31 @@ emit name system builder args env inputs =
     text = aterm (&full),
     derivation = full,
   })
+
+-- The modulo hash (base16) of a `.drv` in the store and, memoised, of its
+-- whole input closure: what a `Pkg` carries. This is the one function here
+-- that reads files; it runs when the package index is generated (once per
+-- lock bump), never while a configuration is evaluated.
+export modulo_of : &str -> &mut BTreeMap<String, String> -> Result<String, String>
+modulo_of path memo =
+  case memo.get path of
+    Some m -> Ok (m.clone ())
+    None -> computed path memo
+
+computed : &str -> &mut BTreeMap<String, String> -> Result<String, String>
+computed path memo =
+  d = (read (std::path::Path::new path))?
+  mut inputs = BTreeMap::new ()
+  for p in d.input_drvs.keys ()
+    m = (modulo_of p memo)?
+    inputs.insert (p.clone ()) m
+  m = to_base16 (&(hash_modulo (&d) (&inputs))?)
+  memo.insert (path.to_string ()) (m.clone ())
+  Ok m
+
+-- A `Pkg` as a Voltaic constant, `export const BASH : Pkg = Pkg { … }`: one
+-- entry of a generated package index.
+export pkg_constant : &str -> &str -> &str -> &str -> String
+pkg_constant attr drv out modulo =
+  name = attr.to_uppercase ().replace "-" "_"
+  "export const #{name} : Pkg = Pkg {\n  attr = \"#{attr}\",\n  drv = \"#{drv}\",\n  out = \"#{out}\",\n  modulo = \"#{modulo}\",\n}\n"
