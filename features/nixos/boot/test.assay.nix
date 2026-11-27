@@ -1,4 +1,5 @@
-# Colocated suite for features/nixos/boot/test.nix, the lanzaboote reboot/rollback VM test.
+# Colocated suite for features/nixos/boot/test.nix, the lanzaboote reboot/rollback VM test
+# as comin deploys it on muninn (test-vdeploy.assay.nix covers vdeploy on drakkar).
 #
 # Evaluates the test's node and its Secure Boot generation (no VM is booted here;
 # `nix build .#checks.x86_64-linux.lanzaboote-vm` runs it), so these claims are about
@@ -23,6 +24,10 @@ in
     bootsThroughFirmware = assay.eq [machine.virtualisation.useBootLoader machine.virtualisation.useEFIBoot machine.virtualisation.directBoot.enable] [true true false];
     generationOneIsPythonInstaller = assay.eq [machine.boot.loader.systemd-boot.enable machine.boot.lanzaboote.enable] [true false];
     generationOneHasSbctl = assay.eq (nixos.hasPackage machine "sbctl") true;
+    # muninn's hardening on the machine under test: the STIG test-host profile and the
+    # daemon restricted to @wheel, so the non-root checks are the host's.
+    muninnStigTestHost = assay.eq machine.security.stig.profile "test-host";
+    restrictedDaemon = assay.eq (builtins.elem "@wheel" machine.nix.settings.allowed-users) true;
     # Exactly one extra dependency: generation 2's toplevel (the same node, option on).
     generationTwoInImage = assay.eq (builtins.length machine.system.extraDependencies) 1;
     generationTwoIsANixosSystem = assay.eq (pkgs.lib.hasInfix "nixos-system-machine" (toString secureBoot)) true;
