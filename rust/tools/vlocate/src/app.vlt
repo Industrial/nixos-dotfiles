@@ -9,8 +9,9 @@
 --      (`hint`, for nushell) or on stderr with exit 127 (`not-found`, for fish
 --      and zsh).
 --
--- Exit codes: 0 found; 1 found nowhere (bin, hint) or a usage error; 127 for
--- not-found, always, as a shell expects of its handler.
+-- Exit codes: 0 found; 1 found nowhere (bin, hint) or a usage error; 2 for bin
+-- when nothing was found and nix-locate failed (nixpkgs unknown, not empty); 127
+-- for not-found, always, as a shell expects of its handler.
 
 import std::sync::Arc
 import id_effect::{Effect, HNil, Never, succeed}
@@ -63,10 +64,17 @@ scanned w name systems =
   all = union_of (&systems)
   w.0.present all (name.clone ()) |> .flat_map (move \present -> with_nixpkgs w2 n2 (hits_of (&systems) (&present)))
 
+-- Step 4. A failed nix-locate is kept as the reason, not turned into no hits (GH-442).
 with_nixpkgs : WorldTool -> String -> Vec<crate::find::Hit> -> Effect<Found, Never, HNil>
 with_nixpkgs w name hits =
   n2 = name.clone ()
-  w.0.nixpkgs (name.clone ()) |> .map (move \attrs -> Found { name = n2, hits, nixpkgs = attrs })
+  w.0.nixpkgs (name.clone ()) |> .map (\attrs -> Ok attrs) |> .catch (\e -> succeed (Err e)) |> .map (move \r -> found_with n2 hits r)
+
+found_with : String -> Vec<crate::find::Hit> -> Result<Vec<String>, String> -> Found
+found_with name hits r =
+  case r of
+    Ok attrs -> Found { name, hits, nixpkgs = attrs, nixpkgs_error = None }
+    Err e -> Found { name, hits, nixpkgs = Vec::new (), nixpkgs_error = Some e }
 
 -- A listing for `bin`.
 export listing_of : &Found -> String
@@ -83,20 +91,31 @@ listing_of f =
 found_anything : &Found -> bool
 found_anything f = !(f.hits.is_empty ()) || !(f.nixpkgs.is_empty ())
 
+-- bin's exit code: found, nowhere, or nowhere that could be searched.
+bin_code : &Found -> u8
+bin_code f =
+  if found_anything f
+    0
+  else if f.nixpkgs_error.is_some ()
+    2
+  else
+    1
+
+-- bin's note on stderr when the nixpkgs half failed.
+bin_note : &Found -> String
+bin_note f =
+  case &f.nixpkgs_error of
+    Some e -> "vlocate: nixpkgs not searched: #{e}\n"
+    None -> String::new ()
+
 -- What a mode prints, and the exit code.
 export answer_of : Mode -> bool -> &Found -> (String, String, u8)
 answer_of mode json f =
   case mode of
     Mode::Bin -> if json
-      ("#{json_of f}\n", String::new (), if found_anything f
-        0
-      else
-        1)
+      ("#{json_of f}\n", bin_note f, bin_code f)
     else
-      (listing_of f, String::new (), if found_anything f
-        0
-      else
-        1)
+      (listing_of f, bin_note f, bin_code f)
     Mode::Hint -> case hint_of f of
       Some h -> (h, String::new (), 0)
       None -> (String::new (), String::new (), 1)
@@ -169,9 +188,29 @@ test "a system that cannot be read is skipped; the others still answer"
   assert_eq! \-> f.hits.len () \-> 1
   assert_eq! \-> f.hits[0].systems \-> .to_vec ([.to_string "mimir"])
 
+test "a failed nix-locate is reported, not read as no hits; the fleet still answers"
+  a = path 'a'
+  why = .to_string "nix-locate exited 2: error: unexpected argument '--top-level' found"
+  w = Scripted { systems = .to_vec ([(.to_string "this host", .to_string "/r/here")]), closures = .to_vec ([(.to_string "/r/here", .to_vec ([a.clone ()]))]), with_bin = .to_vec ([a.clone ()]), nixpkgs_error = Some (why.clone ()), ...Scripted::default () }
+  f = found_in w (.to_string "hello")
+  assert_eq! \-> f.hits.len () \-> 1
+  assert_eq! \-> f.nixpkgs_error \-> Some (why.clone ())
+  (js, note, code) = answer_of Mode::Bin true (&f)
+  assert! \-> js.contains "\"nixpkgs_error\":\"nix-locate exited 2" && note.contains "nixpkgs not searched" && code == 0
+  (hint, _, hcode) = answer_of Mode::Hint false (&f)
+  assert! \-> hint.contains "(this host)" && hint.contains "not searched" && hcode == 0
+  -- Nothing in the fleet: bin says so with exit 2 (unknown), not 1 (nowhere); hint stays quiet.
+  nothing = Found { hits = Vec::new (), ...f.clone () }
+  (_, _, ncode) = answer_of Mode::Bin false (&nothing)
+  assert_eq! \-> ncode \-> 2
+  (nohint, _, nhcode) = answer_of Mode::Hint false (&nothing)
+  assert! \-> nohint.is_empty () && nhcode == 1
+  (_, plain, pcode) = answer_of Mode::NotFound false (&nothing)
+  assert_eq! \-> (plain.as_str (), pcode) \-> ("hello: command not found\n", 127)
+
 test "each mode's output and exit code"
   hit = crate::find::Hit { path = path 'a', systems = .to_vec ([.to_string "this host"]) }
-  f = Found { name = .to_string "hello", hits = .to_vec ([hit]), nixpkgs = .to_vec ([.to_string "hello"]) }
+  f = Found { name = .to_string "hello", hits = .to_vec ([hit]), nixpkgs = .to_vec ([.to_string "hello"]), nixpkgs_error = None }
   none = Found { hits = Vec::new (), nixpkgs = Vec::new (), ...f.clone () }
   (out, _, code) = answer_of Mode::Bin false (&f)
   assert! \-> out.contains "hello-2.12\t" && out.contains "nixpkgs#hello\t(nixpkgs)" && code == 0

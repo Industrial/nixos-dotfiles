@@ -1,6 +1,6 @@
 [package]
 name = "vlocate"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Industrial <tom.wieland@gmail.com>"]
 description = "Where a command comes from: the fleet's own systems (from the store database), nixpkgs (nix-locate's prebuilt database), and a command-not-found hint for nushell, fish and zsh (GH-245)"
