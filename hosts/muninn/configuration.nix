@@ -18,6 +18,9 @@
   # profiles.gaming.enable = true;
 
   features.fleet.comin.enable = true;
+  # vdeploy (Voltaic) in observe mode next to comin (#437): it plans and logs the switch
+  # comin makes, and never switches; comin still deploys muninn. Rollback: delete this line.
+  features.nix.vdeploy.enable = true;
   features.fleet.nix-remote-builder-server.enable = true;
   features.fleet.remote-access.enable = true;
   features.monitoring.grafana.enable = true;
