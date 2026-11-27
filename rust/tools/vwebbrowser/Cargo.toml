@@ -27,6 +27,12 @@ id_effect_cli = "=0.13.0"
 id_effect_fsm = "=0.13.0"
 # The machine runs as a Statem process: ProcessNode, ProcessCtx, CallError.
 id_effect_process = "=0.13.0"
+# Settings (src/settings.vlt): env + XDG TOML layering. figment is named
+# directly for `Toml::string` (the 0.10 line id_effect_config uses); serde
+# derives the partial document.
+id_effect_config = "=0.13.0"
+figment = { version = "0.10.19", default-features = false, features = ["toml"] }
+serde = { version = "1", features = ["derive"] }
 # The GTK edge (src/gtk_edge.rs) only: one gtk-rs generation (glib/gio 0.22).
 # webkit6 0.6.1 names gtk::Accessible, which gtk4 0.11 only exports from v4_10
 # on; nixpkgs ships gtk4 4.24, so the 4.14 API is safe to assume.

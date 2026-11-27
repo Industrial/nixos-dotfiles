@@ -38,5 +38,6 @@ voltaic!(error);
 voltaic!(ui);
 voltaic!(app);
 voltaic!(nav);
+voltaic!(settings);
 
 pub mod gtk_edge;
