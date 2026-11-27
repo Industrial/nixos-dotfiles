@@ -23,6 +23,9 @@
   features.nix.vdeploy.enable = true;
   features.fleet.nix-remote-builder-server.enable = true;
   features.fleet.remote-access.enable = true;
+  # vfiles (Voltaic, #437, as drakkar GH-188): declared dotfiles placed by one linker, not
+  # one activation script per feature. Rollback: delete this line, and the scripts come back.
+  features.nixos.vfiles.enable = true;
   features.monitoring.grafana.enable = true;
   features.monitoring.homepage-dashboard.enable = true;
   features.monitoring.prometheus-exporter.enable = true;
