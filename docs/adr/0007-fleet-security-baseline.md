@@ -267,7 +267,43 @@ writing the UKIs), or have root run `/nix/var/nix/profiles/system/bin/switch-to-
 Watch `last.json`'s `note`, not its `result`.
 
 The order matters. Both deployers apply every merge on their own, and `lzbt` fails if the
-keys are missing. So **step 1 happens before the enable merges.**
+keys are missing. So **step 1 happens before the enable merges**, either by hand or, on a
+host with `createKeys`, by the configuration itself.
+
+### Keys created by the host: `features.hardening.secureBoot.createKeys` (GH-343)
+
+muninn sets it; drakkar does not (yet). With it on, steps 1 and 2 below are done by the
+configuration, with no new key material beyond the Secure Boot keys and no passphrase:
+
+- **Keys.** `sbctl-ensure-keys` runs in the install hook, before `lzbt` signs (a systemd
+  unit would be too late: `switch-to-configuration` installs the bootloader before it
+  activates), and again from `sbctl-keys.service`. It runs
+  `sbctl create-keys --database-path /var/lib/sbctl --export /var/lib/sbctl/keys` only when
+  `keys/db/db.key` is missing, keeps the bundle root-only (0700), and **never overwrites**:
+  a `keys/` without `db.key` is refused with an error, not replaced.
+- **Encrypted backup.** `sbctl-keys.service` then writes, when it is missing,
+  `/var/lib/sbctl-backup/sbctl-<host>.tar.age`: `tar` of `/var/lib/sbctl` piped to
+  `age -R` with every operator ssh-ed25519 key in `common/fleet.nix` as a recipient. It is
+  owned by the operator (`tom`, 0400), so it can be copied off the host without root. The
+  keys never change, so the backup is written once; removed by hand, it is rewritten from
+  the same keys at the next start of the unit.
+- **Off-host copies** (unprivileged, from drakkar, after the first switch):
+  `mkdir -p ~/backups/sbctl && scp tom@muninn:/var/lib/sbctl-backup/sbctl-muninn.tar.age ~/backups/sbctl/`,
+  and a second copy onto mimir's `/data` over drakkar's NFS mount (a file write only:
+  nothing on mimir is restarted or reconfigured).
+- **Recovery**, on the host, with any operator key (one command):
+  `age -d -i ~/.ssh/id_ed25519 sbctl-<host>.tar.age | sudo tar -C /var/lib -xf -`
+  This restores `/var/lib/sbctl` (keys, GUID) exactly; check with
+  `sudo test -s /var/lib/sbctl/keys/db/db.key`. To inspect without restoring:
+  `age -d -i ~/.ssh/id_ed25519 sbctl-<host>.tar.age | tar -tf -`.
+- **Not automated:** enrollment. lanzaboote's `autoEnrollKeys` stays off. It only acts
+  when the firmware is in Setup Mode (muninn, a Dell XPS 15 9500 on UEFI 2.70, reports
+  `Secure Boot: disabled`, not in Setup Mode), and it would force-enroll at the next boot
+  with nobody watching. Enrollment stays step 5, by hand, at the machine.
+
+`checks.x86_64-linux.lanzaboote-vm` covers it on muninn's configuration: keys created by the
+hook on the first switch, a rerun changes nothing, existing keys are not overwritten, a
+partial bundle is refused, and the backup decrypts with an operator key.
 
 1. **Keys, on the host, before the enable.** Run
    `sudo nix run nixpkgs#sbctl -- create-keys`. This writes `/var/lib/sbctl/keys/{PK,KEK,db}`
