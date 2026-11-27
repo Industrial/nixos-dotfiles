@@ -131,8 +131,11 @@ GitHub's and Anthropic's addresses change.
 
 ### 5. vsock: readiness and the operator's terminal
 
-The guest gets a vsock CID (`100 + n`). cloud-hypervisor exposes it on the host as a Unix socket
-in the VM's state directory (hybrid vsock). It carries two things and nothing else:
+Each guest has vsock. cloud-hypervisor exposes it on the host as a Unix socket in the VM's state
+directory (hybrid vsock), so no CID is global and every guest can use the same one. That is part
+of why every slot runs one and the same guest system: the tap, the address and the agent's host
+uid are supplied at run time by the slot's units, and the host evaluates one guest, not N. The
+vsock carries two things and nothing else:
 
 - systemd's readiness notification (microvm.nix's notify socket), so the VM unit is "started"
   only once the guest has booted. That is also how start-up time is measured.
