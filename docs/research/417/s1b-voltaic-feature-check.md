@@ -28,7 +28,7 @@ What follows records where the surface reaches and where it trips.
 | Cross-module reads: declared read/write DAG | **Supported (library)** | `modsys/src/eval.vlt`. Each `Module` lists `reads` and `writes`. Writers run before readers in a topological order, and a read or write outside the declaration is refused. A cycle is reported through modules **and** options: `evaluation cycle: a -[x]-> b -[y]-> a` |
 | Evaluation in an id_effect env with no IO capability | **Partial: R covers capabilities, not ambient IO** | `modsys/src/pure.vlt`. `evaluated : … -> Effect<A, EvalError, HNil>`. A pinned fetch is `Effect<_, _, HCons<Fetch, HNil>>`, and putting one inside the `HNil` evaluation is a rustc error (`expected Effect<_, _, HNil>, found Effect<_, _, HCons<Fetch, HNil>>`, probed). **But** `suspend (\-> std::fs::read_to_string …)` type-checks at `R = HNil` (probed), and vcache's `load_signer` does exactly this. `R` tracks what is *asked for*, not ambient authority. The fence is `host/clippy.toml`: `disallowed-methods` / `disallowed-types` over std's fs, process, net, env and clock, which caught the probe inside the `include!`d generated code. Voltaic's own `io` row does not see these calls (Industrial/voltaic#19) |
 | Typed package handles from a pinned index | **Supported via codegen** | `modsys/src/index.vlt` (`gen-index`). Run once per lock bump, it reads the `.drv` closure, computes each package's modulo hash and writes `host/src/pkgs.vlt` as `export const BASH : Pkg = Pkg { attr, drv, out, modulo }`. A package missing from the index is a compile error, and emitting a derivation reads no file |
-| Emitting ATerm `.drv` | **Supported, byte-identical to Nix** | `modsys/src/drv.vlt`: ATerm `unparse`, `hashDerivationModulo` (input `.drv`s replaced by their modulo hashes, outputs and their env entries blanked), `makeStorePath` (output paths) and `makeTextPath` (the `.drv` path). `host/src/oracle.vlt` asserts that the host's toplevel equals `oracle.nix`'s `derivation { … }` on the pinned nixpkgs, with path, out path and text all byte-for-byte: `/nix/store/4aadlf2x…-s1b-hello.drv`. It builds on nix-store-core's `Derivation`, `digest` and `nixbase32` |
+| Emitting ATerm `.drv` | **Supported, byte-identical to Nix** | `modsys/src/drv.vlt`: ATerm `unparse`, `hashDerivationModulo` (input `.drv`s replaced by their modulo hashes, outputs and their env entries blanked), `makeStorePath` (output paths) and `makeTextPath` (the `.drv` path). `host/src/oracle.vlt` asserts that the host's toplevel equals `oracle.nix`'s `derivation { … }` on the pinned nixpkgs (`oracle.assay.nix` checks the Nix side), with path, out path and text all byte-for-byte: `/nix/store/4aadlf2x…-s1b-hello.drv`. It builds on nix-store-core's `Derivation`, `digest` and `nixbase32` |
 
 What the host spike exercises end to end (`host/src/{modules,host,toplevel}.vlt`):
 
@@ -166,11 +166,11 @@ no `rust """` hatch. Concretely:
 
 ## Reproducing
 
-From the main checkout:
+Run from a checkout (worktrees: call `bin/with-devenv` from the main checkout and `cd` inside):
 
 ```
 bin/with-devenv bash -c 'cd rust/spikes/voltaic-modules && cargo test && cargo clippy --all-targets -- -D warnings'
-nix eval --json --file rust/spikes/voltaic-modules/oracle.nix --apply "f: f { rev = \"$(git rev-parse HEAD)\"; }"
+bin/with-devenv bash -c 'assay run rust/spikes/voltaic-modules/oracle.assay.nix'   # Nix side of the oracle
 bin/with-devenv bash -c 'cd rust/spikes/voltaic-modules && cargo run -q -p modsys --bin gen-index -- bash=<bash .drv>'
 ```
 
