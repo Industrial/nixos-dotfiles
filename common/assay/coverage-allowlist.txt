@@ -12,3 +12,6 @@ features/ai/hermes-agent/.hermes/skills/**/templates/**
 # idAutomation is a git submodule with its own repository and its own test suite; files
 # inside it are not this repo's code to cover.
 features/games/wow-classic/Interface/AddOns/idAutomation/**
+# Research helpers are throwaway measurement expressions that evaluate the whole flake (the
+# #417 option census); their output is the committed report, not configuration.
+docs/research/**
