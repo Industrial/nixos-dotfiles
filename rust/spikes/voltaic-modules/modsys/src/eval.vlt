@@ -1,0 +1,237 @@
+-- Open extensibility and a declared read/write DAG.
+--
+-- Any module may declare options and any module may define them: the option
+-- tree is not one struct that a central file owns. A `Key<T>` is a typed path,
+-- exported as a constant by the module that declares it; the registry stores
+-- each slot type-erased (`Box<dyn Any>`), and every access goes back through
+-- the key's `T`, so a definition of the wrong type is a rustc error, and the
+-- only runtime type check left is two modules declaring one path with two
+-- types.
+--
+-- Cross-module reads resolve through a DAG rather than a lazy fixpoint: a
+-- module states the paths it reads and writes, the writers of a path run
+-- before its readers, and a read or write outside the declaration is an
+-- error. A cycle is reported as its path through modules and options.
+
+import std::any::Any
+import std::collections::BTreeMap
+import std::fmt::Debug
+import std::marker::PhantomData
+import crate::option::{Def, MergeError, OptionDecl, Strategy, merge}
+
+-- A typed option path. `fn() -> t` keeps the key `Send + Sync` and `Copy`
+-- whatever `t` is.
+export data Key {
+  export path &'static str,
+  export marker PhantomData<Box<t>>,
+}
+
+export errors EvalError
+  from MergeError as Merge                   "#{0}"
+  Undeclared &'static str &'static str       "module `#{0}` defines `#{1}`, which no module declares"
+  Redeclared &'static str &'static str       "module `#{0}` declares `#{1}`, which is already declared"
+  WrongType &'static str                     "option `#{0}` is used at a type other than its declaration's"
+  UndeclaredRead &'static str &'static str   "module `#{0}` reads `#{1}` without listing it in `reads`"
+  UndeclaredWrite &'static str &'static str  "module `#{0}` writes `#{1}` without listing it in `writes`"
+  Cycle String                               "evaluation cycle: #{0}"
+  Emit String                                "emitting the derivation: #{0}"
+
+-- Declared slots and their definitions, both keyed by path.
+export data Registry {
+  decls BTreeMap<&'static str, Box<dyn Any>>,
+  defs BTreeMap<&'static str, Box<dyn Any>>,
+}
+
+export empty : Registry
+empty = Registry {
+  decls = BTreeMap::new (),
+  defs = BTreeMap::new (),
+}
+
+-- What a module's body may see: the registry, and the reads it declared.
+export data View {
+  origin &'static str,
+  reads Vec<&'static str>,
+  registry &'a Registry,
+}
+
+-- One typed write, closed over its `T`.
+type Write = Box<dyn FnOnce(&mut Registry) -> Result<(), EvalError>>
+
+-- What a module's body produces: its writes, applied after it returns.
+export data Out {
+  origin &'static str,
+  writes Vec<(&'static str, Write)>,
+}
+
+export data Module {
+  export name &'static str,
+  export reads Vec<&'static str>,
+  export writes Vec<&'static str>,
+  export declares Box<dyn Fn(&mut Registry, &'static str) -> Result<(), EvalError>>,
+  export body Box<dyn Fn(&View, &mut Out) -> Result<(), EvalError>>,
+}
+
+export declare : given <T: 'static> &mut Registry -> &'static str -> &Key<T> -> &'static str -> Option<T> -> Strategy<T> -> Result<(), EvalError>
+declare reg origin key doc default strategy =
+  if reg.decls.contains_key key.path
+    Err (Redeclared origin key.path)
+  else
+    decl = OptionDecl {
+      path = key.path,
+      doc,
+      default,
+      strategy,
+    }
+    reg.decls.insert key.path (Box::new decl)
+    empty_defs = Vec::new () : Vec<Def<T>>
+    reg.defs.insert key.path (Box::new empty_defs)
+    Ok ()
+
+-- A definition at a priority: recorded now, applied after the body returns.
+export define : given <T: 'static> &mut Out -> &Key<T> -> u32 -> T -> ()
+define out key priority value =
+  origin = out.origin
+  path = key.path
+  apply = Box::new (move \reg -> push reg origin path priority value) : Write
+  out.writes.push (path, apply)
+  ()
+
+push : given <T: 'static> &mut Registry -> &'static str -> &'static str -> u32 -> T -> Result<(), EvalError>
+push reg origin path priority value =
+  slot = (reg.defs.get_mut path
+    |> .ok_or (Undeclared origin path))?
+  typed = slot.downcast_mut () : Option<&mut Vec<Def<T>>>
+  defs = (typed
+    |> .ok_or (WrongType path))?
+  defs.push (Def {
+    origin,
+    priority,
+    value,
+  })
+  Ok ()
+
+-- The merged value of an option, if this view may read it.
+export get : given <T: Clone + PartialEq + Debug + 'static> &View -> &Key<T> -> Result<T, EvalError>
+get view key =
+  if !view.reads.contains (&key.path)
+    Err (UndeclaredRead view.origin key.path)
+  else
+    value view.registry key
+
+-- The merged value, unchecked against any module's reads: for the consumer
+-- of a finished evaluation.
+export value : given <T: Clone + PartialEq + Debug + 'static> &Registry -> &Key<T> -> Result<T, EvalError>
+value reg key =
+  decl_any = (reg.decls.get key.path
+    |> .ok_or (Undeclared "<reader>" key.path))?
+  decl = (decl_any.downcast_ref () : Option<&OptionDecl<T>>)
+    |> .ok_or (WrongType key.path)
+  defs_any = (reg.defs.get key.path
+    |> .ok_or (Undeclared "<reader>" key.path))?
+  defs = (defs_any.downcast_ref () : Option<&Vec<Def<T>>>)
+    |> .ok_or (WrongType key.path)
+  merged = (merge decl? defs?)?
+  Ok merged
+
+-- Every module's declarations, then every body in dependency order.
+export evaluate : &[Module] -> Result<Registry, EvalError>
+evaluate modules =
+  mut reg = empty
+  for m in modules
+    declares = &m.declares
+    (declares (&mut reg) m.name)?
+  order = (schedule modules)?
+  for i in order
+    (run (&mut reg) (&modules[i]))?
+  Ok reg
+
+run : &mut Registry -> &Module -> Result<(), EvalError>
+run reg m =
+  mut out = Out {
+    origin = m.name,
+    writes = Vec::new (),
+  }
+  view = View {
+    origin = m.name,
+    reads = m.reads.clone (),
+    registry = reg,
+  }
+  body = &m.body
+  (body (&view) (&mut out))?
+  for write in out.writes
+    (path, apply) = write
+    if !m.writes.contains (&path)
+      (Err (UndeclaredWrite m.name path))?
+    (apply reg)?
+  Ok ()
+
+-- Edges: module `i` depends on module `w` through option `path` when `w`
+-- writes what `i` reads. A module reading its own write is a cycle too: the
+-- DAG has no partial values.
+export data Edge {
+  export from usize,
+  export path &'static str,
+}
+  deriving (Debug, Clone)
+
+edges : &[Module] -> Vec<Vec<Edge>>
+edges modules =
+  modules
+    |> .iter
+    |> .map (\m -> deps_of modules m)
+    |> .collect
+
+deps_of : &[Module] -> &Module -> Vec<Edge>
+deps_of modules m =
+  mut out = Vec::new ()
+  for r in &m.reads
+    for pair in modules.iter ().enumerate ()
+      (w, writer) = pair
+      if writer.writes.contains r
+        out.push (Edge {
+          from = w,
+          path = r,
+        })
+  out
+
+-- A topological order, or the first cycle found, as a path.
+export schedule : &[Module] -> Result<Vec<usize>, EvalError>
+schedule modules =
+  graph = edges modules
+  mut state = vec![0u8; modules.len ()]
+  mut stack = Vec::new () : Vec<(usize, &'static str)>
+  mut order = Vec::new ()
+  for i in 0 .. modules.len ()
+    (visit modules (&graph) i "" (&mut state) (&mut stack) (&mut order))?
+  Ok order
+
+-- 0 unvisited, 1 on the stack, 2 done.
+visit : &[Module] -> &[Vec<Edge>] -> usize -> &'static str -> &mut Vec<u8> -> &mut Vec<(usize, &'static str)> -> &mut Vec<usize> -> Result<(), EvalError>
+visit modules graph i via state stack order
+  | state[i] == 2 = Ok ()
+  | state[i] == 1 = Err (Cycle (render modules stack i via))
+  | _ =
+    state[i] := 1
+    stack.push (i, via)
+    for e in &graph[i]
+      (visit modules graph e.from e.path state stack order)?
+    stack.pop ()
+    state[i] := 2
+    order.push i
+    Ok ()
+
+-- `a -[x]-> b` reads "a needs x, which b writes"; the path closes on the
+-- module it started from.
+render : &[Module] -> &[(usize, &'static str)] -> usize -> &'static str -> String
+render modules stack again via =
+  start = stack
+    |> .iter
+    |> .position (\s -> s.0 == again)
+    |> .unwrap_or 0
+  mut text = String::from modules[again].name
+  for step in &stack[start + 1 .. stack.len ()]
+    (m, p) = step
+    text.push_str (&" -[#{p}]-> #{modules[*m].name}")
+  text.push_str (&" -[#{via}]-> #{modules[again].name}")
+  text

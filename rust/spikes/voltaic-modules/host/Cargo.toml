@@ -1,0 +1,18 @@
+[package]
+name = "host"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "S1b spike: one host configuration as Voltaic modules over modsys"
+build = "build.rs"
+
+[dependencies]
+# One id_effect version per build, pinned exactly like every consumer.
+id_effect = { version = "=0.13.0", default-features = false }
+# The module system.
+modsys = { path = "../modsys" }
+
+[build-dependencies]
+voltaic-driver = "=0.3.0"
+voltaic-diag = "=0.3.0"

@@ -1,0 +1,83 @@
+-- "NixOS modules": each declares its own options and defines others'. No
+-- file lists every option; `networking` owns `networking.hostName`, `hello`
+-- owns `services.hello.*` and also defines `environment.systemPackages`,
+-- which `environment` declares. A host is a list of these plus its own.
+
+import modsys::drv::Pkg
+import modsys::eval::{EvalError, Key, Module, Out, Registry, View, declare, define, get}
+import modsys::option::{DEFAULT, NORMAL, any_true, concat}
+import modsys::option::Strategy::{Fold, Unique}
+import std::marker::PhantomData
+import crate::pkgs::BASH
+
+export const HOST_NAME : Key<String> = Key {
+  path = "networking.hostName",
+  marker = PhantomData,
+}
+
+export const SYSTEM_PACKAGES : Key<Vec<Pkg>> = Key {
+  path = "environment.systemPackages",
+  marker = PhantomData,
+}
+
+export const HELLO_ENABLE : Key<bool> = Key {
+  path = "services.hello.enable",
+  marker = PhantomData,
+}
+
+export const HELLO_GREETING : Key<String> = Key {
+  path = "services.hello.greeting",
+  marker = PhantomData,
+}
+
+-- networking: declares the host name, defines nothing.
+declare_networking : &mut Registry -> &'static str -> Result<(), EvalError>
+declare_networking reg origin = declare reg origin (&HOST_NAME) "The host's name." (Some (String::from "nixos")) Unique
+
+nothing : &View -> &mut Out -> Result<(), EvalError>
+nothing _ _ = Ok ()
+
+export networking : Module
+networking = Module {
+  name = "networking",
+  reads = Vec::new (),
+  writes = Vec::new (),
+  declares = Box::new declare_networking,
+  body = Box::new nothing,
+}
+
+-- environment: declares the system packages, a list that concatenates.
+declare_environment : &mut Registry -> &'static str -> Result<(), EvalError>
+declare_environment reg origin = declare reg origin (&SYSTEM_PACKAGES) "Packages in the system profile." (Some (Vec::new ())) (Fold (Box::new concat))
+
+export environment : Module
+environment = Module {
+  name = "environment",
+  reads = Vec::new (),
+  writes = Vec::new (),
+  declares = Box::new declare_environment,
+  body = Box::new nothing,
+}
+
+-- hello: its own options, plus a cross-module read (the host name, for the
+-- default greeting) and a cross-module write (bash into the packages).
+declare_hello : &mut Registry -> &'static str -> Result<(), EvalError>
+declare_hello reg origin =
+  (declare reg origin (&HELLO_ENABLE) "Whether to greet." (Some false) (Fold (Box::new any_true)))?
+  declare reg origin (&HELLO_GREETING) "What the greeter says." None Unique
+
+hello_body : &View -> &mut Out -> Result<(), EvalError>
+hello_body view out =
+  host = (get view (&HOST_NAME))?
+  define out (&HELLO_GREETING) DEFAULT "hello from #{host}"
+  define out (&SYSTEM_PACKAGES) NORMAL ([BASH].to_vec ())
+  Ok ()
+
+export hello : Module
+hello = Module {
+  name = "hello",
+  reads = [HOST_NAME.path].to_vec (),
+  writes = [HELLO_GREETING.path, SYSTEM_PACKAGES.path].to_vec (),
+  declares = Box::new declare_hello,
+  body = Box::new hello_body,
+}
