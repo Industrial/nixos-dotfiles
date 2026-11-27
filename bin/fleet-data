@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Regenerate common/fleet.json and features/catalog.json from the Voltaic inventory and
+# catalog (rust/tools/vfleet/src/inventory.vlt, catalog.vlt), after vfleet has checked
+# every invariant. Run it after editing either .vlt file and commit the JSON with it.
+#
+#   bin/fleet-data           write both files
+#   bin/fleet-data --check   fail if either file is out of date (what the drift test checks)
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+mode=write
+case "${1:-}" in
+  "") ;;
+  --check) mode=diff ;;
+  *)
+    echo "usage: bin/fleet-data [--check]" >&2
+    exit 2
+    ;;
+esac
+nix shell nixpkgs#cargo nixpkgs#rustc -c \
+  cargo run --quiet --locked --manifest-path "$ROOT/rust/tools/vfleet/Cargo.toml" -- "$mode" "$ROOT"

@@ -1,0 +1,91 @@
+-- The JSON NixOS reads: common/fleet.json and features/catalog.json. Keys come
+-- out sorted (serde_json's map is ordered), so the output is a pure function of
+-- the inventory and the drift check is a byte comparison.
+--
+-- Field names are the ones common/fleet.nix has always used (camelCase). An
+-- absent optional field is left out, not written as null, so `h ? tailscaleIp`
+-- and `h.online or true` read the JSON exactly as they read the old attrset;
+-- operatorKey and attestationRoot are always present (null = not enrolled).
+
+import serde_json::{Map, Value}
+import crate::model::{BuilderSpec, Cpu, Feature, Fleet, Host, HostName, feature_name, feature_path, host_name, role_name, tier_name, vendor_name}
+
+text : String -> Value
+text s = Value::String s
+
+strings : Vec<String> -> Value
+strings xs = Value::Array (xs |> .into_iter |> .map text |> .collect)
+
+nullable : Option<String> -> Value
+nullable o =
+  case o of
+    Some s -> Value::String s
+    None -> Value::Null
+
+names : &[HostName] -> Value
+names hs = strings (hs.iter () |> .map (\h -> host_name (*h)) |> .collect)
+
+builder_json : &BuilderSpec -> Value
+builder_json b =
+  mut m = Map::new ()
+  m.insert (.to_string "maxJobs") (Value::from b.max_jobs)
+  m.insert (.to_string "speedFactor") (Value::from b.speed_factor)
+  m.insert (.to_string "supportedFeatures") (strings (b.supported_features.iter () |> .map (\x -> feature_name (*x)) |> .collect))
+  Value::Object m
+
+cpu_json : &Cpu -> Value
+cpu_json c =
+  mut m = Map::new ()
+  m.insert (.to_string "vendor") (text (vendor_name c.vendor))
+  m.insert (.to_string "model") (text (c.model.clone ()))
+  m.insert (.to_string "sevSnp") (Value::Bool c.sev_snp)
+  m.insert (.to_string "tdx") (Value::Bool c.tdx)
+  Value::Object m
+
+export host_json : &Host -> Value
+host_json h =
+  mut m = Map::new ()
+  m.insert (.to_string "description") (text (h.description.clone ()))
+  m.insert (.to_string "roles") (strings (h.roles.iter () |> .map (\r -> role_name (*r)) |> .collect))
+  if !(h.online)
+    m.insert (.to_string "online") (Value::Bool false)
+  if h.tailscale_ip is Some ip
+    m.insert (.to_string "tailscaleIp") (text (ip.to_string ()))
+  if h.cache_key.as_ref () is Some k
+    m.insert (.to_string "cacheKey") (text (k.clone ()))
+  m.insert (.to_string "operatorKey") (nullable (h.operator_key.clone ()))
+  if h.builder.as_ref () is Some b
+    m.insert (.to_string "builder") (builder_json b)
+  if h.deploy_debounce.as_ref () is Some d
+    m.insert (.to_string "deployDebounce") (text (d.clone ()))
+  m.insert (.to_string "trustTier") (text (tier_name h.trust_tier))
+  m.insert (.to_string "cpu") (cpu_json (&h.cpu))
+  m.insert (.to_string "tpm2") (Value::Bool h.tpm2)
+  m.insert (.to_string "attestationRoot") (nullable (h.attestation_root.clone ()))
+  Value::Object m
+
+export fleet_value : &Fleet -> Value
+fleet_value f =
+  mut hosts = Map::new ()
+  for h in f.hosts.iter ()
+    hosts.insert (host_name h.name) (host_json h)
+  mut m = Map::new ()
+  m.insert (.to_string "hosts") (Value::Object hosts)
+  m.insert (.to_string "order") (names (&f.order))
+  m.insert (.to_string "builderOrder") (names (&f.builder_order))
+  m.insert (.to_string "nfsClientOrder") (names (&f.nfs_client_order))
+  m.insert (.to_string "cachePort") (Value::from f.ports.vcache)
+  Value::Object m
+
+pretty : Value -> String
+pretty v =
+  body = serde_json::to_string_pretty (&v) |> .unwrap_or_default
+  "#{body}\n"
+
+-- common/fleet.json.
+export fleet_json : &Fleet -> String
+fleet_json f = pretty (fleet_value f)
+
+-- features/catalog.json: the entries' paths below features/, in catalog order.
+export catalog_json : &[Feature] -> String
+catalog_json entries = pretty (strings (entries.iter () |> .map feature_path |> .collect))

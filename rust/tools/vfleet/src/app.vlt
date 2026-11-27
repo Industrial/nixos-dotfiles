@@ -1,0 +1,135 @@
+-- The program. Every command checks the inventory and the catalog first, and
+-- refuses to emit anything that breaks an invariant.
+--
+--   vfleet check               the invariants only
+--   vfleet emit fleet|catalog  the JSON on stdout
+--   vfleet write ROOT          ROOT/common/fleet.json and ROOT/features/catalog.json
+--   vfleet diff ROOT           fail when either file differs from what write would write
+--
+-- `main_code` runs the program under id_effect_cli's run_main, so the exit code
+-- follows the 0 / 1 / 101 / 130 taxonomy.
+
+import id_effect::{Effect, HNil, fail, succeed, suspend}
+import crate::catalog::catalog
+import crate::check::{catalog_violations, fleet_violations}
+import crate::emit::{catalog_json, fleet_json}
+import crate::inventory::fleet
+
+export const USAGE : &str = "usage: vfleet check | vfleet emit fleet|catalog | vfleet write ROOT | vfleet diff ROOT"
+
+export const FLEET_JSON : &str = "common/fleet.json"
+export const CATALOG_JSON : &str = "features/catalog.json"
+
+export errors FleetError
+  Usage String     "#{0}"
+  Invalid String   "invariants violated:\n#{0}"
+  Io String        "#{0}"
+  Drift String     "generated JSON is out of date (run bin/fleet-data): #{0}"
+
+export data Command = Check | EmitFleet | EmitCatalog | Write String | Diff String
+  deriving (Clone, Debug, PartialEq)
+
+export parse_args : &[String] -> Result<Command, String>
+parse_args args =
+  words = args.iter () |> .map (\s -> s.as_str ()) |> .collect : Vec<&str>
+  case words.as_slice () of
+    ["check"] -> Ok Command::Check
+    ["emit", "fleet"] -> Ok Command::EmitFleet
+    ["emit", "catalog"] -> Ok Command::EmitCatalog
+    ["write", root] -> Ok (Command::Write (root.to_string ()))
+    ["diff", root] -> Ok (Command::Diff (root.to_string ()))
+    _ -> Err (USAGE.to_string ())
+
+lifted : given <A: Send + 'static> Result<A, FleetError> -> Effect<A, FleetError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- Every violation of the real inventory and catalog.
+export violations : Vec<String>
+violations =
+  mut out = fleet_violations (&fleet ())
+  out.extend (catalog_violations (&catalog ()))
+  out
+
+checked : Result<(), FleetError>
+checked =
+  found = violations ()
+  if found.is_empty ()
+    Ok ()
+  else
+    Err (Invalid (found.join "\n"))
+
+-- The two generated files, relative to the repository root, with their contents.
+export generated : Vec<(String, String)>
+generated = .to_vec ([(FLEET_JSON.to_string (), fleet_json (&fleet ())), (CATALOG_JSON.to_string (), catalog_json (&catalog ()))])
+
+write_all : &str -> Result<(), FleetError>
+write_all root =
+  for g in generated ()
+    path = "#{root}/#{g.0}"
+    (std::fs::write (&path) g.1 |> .map_err (\e -> Io "#{path}: #{e}"))?
+  Ok ()
+
+-- The generated files whose checked-in copy under `root` differs (or is missing).
+export drifted : &str -> Vec<String>
+drifted root =
+  generated () |> .into_iter |> .filter (\g -> std::fs::read_to_string ("#{root}/#{g.0}") |> .map (\t -> t != g.1) |> .unwrap_or true) |> .map (\g -> g.0) |> .collect
+
+diff_all : &str -> Result<(), FleetError>
+diff_all root =
+  stale = drifted root
+  if stale.is_empty ()
+    Ok ()
+  else
+    Err (Drift (stale.join ", "))
+
+run_command : Command -> Result<(), FleetError>
+run_command c =
+  checked ()?
+  case c of
+    Command::Check ->
+      println! \-> "vfleet: inventory and catalog satisfy every invariant"
+      Ok ()
+    Command::EmitFleet ->
+      print! \-> "#{fleet_json (&fleet ())}"
+      Ok ()
+    Command::EmitCatalog ->
+      print! \-> "#{catalog_json (&catalog ())}"
+      Ok ()
+    Command::Write root -> write_all (&root)
+    Command::Diff root -> diff_all (&root)
+
+-- The program for parsed arguments (or the usage error).
+export program : Result<Command, String> -> Effect<(), FleetError, HNil>
+program parsed =
+  case parsed of
+    Err why -> fail (Usage why)
+    Ok c -> suspend (move \-> lifted (run_command c))
+
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  id_effect_cli::run_main (program (parse_args (&args))) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+repo_root : String
+repo_root =
+  base = env!("CARGO_MANIFEST_DIR")
+  "#{base}/../../.."
+
+test "the real inventory and catalog satisfy every invariant"
+  empty = Vec::new () : Vec<String>
+  assert_eq! \-> violations () \-> empty
+
+test "the checked-in JSON is what the inventory generates (drift gate)"
+  empty = Vec::new () : Vec<String>
+  assert_eq! \-> drifted (&repo_root ()) \-> empty
+
+test "commands parse"
+  words = \xs -> (xs : &[&str]).iter () |> .map (\s -> s.to_string ()) |> .collect : Vec<String>
+  assert_eq! \-> parse_args (&words (&["check"])) \-> Ok Command::Check
+  assert_eq! \-> parse_args (&words (&["emit", "catalog"])) \-> Ok Command::EmitCatalog
+  assert_eq! \-> parse_args (&words (&["diff", "/r"])) \-> Ok (Command::Diff (.to_string "/r"))
+  assert! \-> parse_args (&words (&["emit"])) |> .is_err

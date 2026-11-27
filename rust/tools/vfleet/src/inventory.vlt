@@ -1,0 +1,154 @@
+-- The fleet inventory: the one place that knows which hosts exist and what
+-- each does. THIS FILE IS THE SOURCE OF TRUTH (GH-417 S2). common/fleet.json is
+-- generated from it (`bin/fleet-data`), and common/fleet.nix reads that JSON and
+-- derives the helpers features use (withRole, builders, binaryCaches, ...).
+-- Editing common/fleet.json by hand fails vfleet's drift test.
+--
+-- Fields per host (see src/model.vlt for the types):
+--   roles        tags features select on (`withRole`). Vdeploy: vdeploy deploys
+--                the host instead of comin (features/nix/vdeploy, GH-160).
+--   builder      present when the host accepts remote nix builds; consumed by
+--                features/fleet/nix-remote-builder-client.nix. A host has one
+--                exactly when it has the Builder role.
+--   operator_key the host's ~/.ssh/id_ed25519.pub, installed fleet-wide by
+--                features/fleet/operator-ssh.nix. None = not yet enrolled.
+--   tailscale_ip tailnet IPv4, for consumers that need an address rather than a
+--                MagicDNS name (NFS export lists, the vcache listener).
+--   cache_key    public half of the host's vcache signing key (features/nix/vcache).
+--                The secret half is generated on the host at the service's first
+--                start and never leaves it. None = the host serves no cache (yet).
+--   online       false for a host that is out of reach for the long term. It keeps
+--                its roles and its own config, but clients stop using it as a
+--                remote builder or cache: Nix's build hook can pick a dead builder
+--                and wait out the TCP timeout for a derivation (GH-252).
+--
+-- Compartment trust facts (GH-421, epic GH-419):
+--   trust_tier       LocalHwAttested: a TPM2 that roots the host's own
+--                    attestation. LocalUnattested: no TPM2 (or none verified).
+--   cpu              vendor, model, and whether it can run confidential VMs
+--                    (sev_snp, tdx). Consumer parts cannot: every host is false/false.
+--   tpm2             a TPM 2.0 is present (/dev/tpm0, tpm_version_major = 2).
+--   attestation_root the pinned root of the host's DICE chain, the way operator_key
+--                    pins its ssh key. Decided 2026-11-27: pure DICE chains rooted in
+--                    each host's TPM, no fleet CA. None until enrolled.
+-- The facts were read non-root over ssh on 2026-11-27 (/proc/cpuinfo flags,
+-- /dev/tpm0, /sys/class/tpm/tpm0/tpm_version_major, kvm_amd's sev_snp parameter).
+-- A host that was unreachable says so next to its facts.
+--
+-- Host names double as MagicDNS short names on the tailnet.
+
+import std::net::Ipv4Addr
+import crate::model::{BuilderSpec, Cpu, CpuVendor, Fleet, Host, HostName, Ports, Role, SystemFeature, TrustTier}
+
+drakkar : Host
+drakkar =
+  Host {
+    name = HostName::Drakkar
+    , description = .to_string "desktop and gaming station"
+    -- Vdeploy: vdeploy deploys this host, health-checked with rollback, and comin
+    -- is retired (features/nix/vdeploy, GH-160).
+    , roles = .to_vec ([Role::Desktop, Role::Builder, Role::NfsClient, Role::Vdeploy])
+    , online = true
+    , tailscale_ip = Some (Ipv4Addr::new 100 69 213 35)
+    -- Public half of /var/lib/private/vcache/secret-key, logged by vcache-ensure-key
+    -- (`journalctl -u vcache`). Rotating that key means updating this line.
+    , cache_key = Some (.to_string "drakkar-vcache-1:WtADMHunhHX0O8Et3619eHQwtbl4EkFEfwrujjaYMv8=")
+    , operator_key = Some (.to_string "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAtviEPSAz5PlJ8K8mFzSQz/Y6WqzqrBA5PzXkhjZ2/y tom@drakkar")
+    , builder = Some (BuilderSpec { max_jobs = 8, speed_factor = 2, supported_features = .to_vec ([SystemFeature::BigParallel, SystemFeature::Kvm, SystemFeature::NixosTest]) })
+    , deploy_debounce = None
+    , trust_tier = TrustTier::LocalHwAttested
+    -- Zen 4 desktop part: svm, but no SEV/SEV-SNP (kvm_amd sev_snp = N).
+    , cpu = Cpu { vendor = CpuVendor::Amd, model = .to_string "AMD Ryzen 9 7950X", sev_snp = false, tdx = false }
+    , tpm2 = true
+    , attestation_root = None
+    }
+
+huginn : Host
+huginn =
+  Host {
+    name = HostName::Huginn
+    , description = .to_string "tablet (Intel N200)"
+    , roles = .to_vec ([Role::Tablet, Role::Builder, Role::NfsClient])
+    -- Out of reach since 2026-11 (no WiFi, router full): no longer a builder for
+    -- clients (GH-252).
+    , online = false
+    , tailscale_ip = Some (Ipv4Addr::new 100 70 136 13)
+    , cache_key = None
+    , operator_key = Some (.to_string "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINvaH/4XK0nQr6vo1ZZYpk0SIv0LvtJm6yxWMv7U2/Gb tom@huginn")
+    , builder = Some (BuilderSpec { max_jobs = 4, speed_factor = 1, supported_features = .to_vec ([SystemFeature::Kvm, SystemFeature::NixosTest]) })
+    , deploy_debounce = None
+    -- UNVERIFIED: huginn was unreachable on 2026-11-27 (ssh timed out). The CPU is
+    -- from hosts/huginn (N200, Alder Lake-N: vmx, no TDX). Its TPM is not checked,
+    -- so it claims none and stays unattested until probed; the N200's PTT is a
+    -- likely TPM2.
+    , trust_tier = TrustTier::LocalUnattested
+    , cpu = Cpu { vendor = CpuVendor::Intel, model = .to_string "Intel N200", sev_snp = false, tdx = false }
+    , tpm2 = false
+    , attestation_root = None
+    }
+
+mimir : Host
+mimir =
+  Host {
+    name = HostName::Mimir
+    , description = .to_string "always-on file server"
+    -- Vdeploy: vdeploy deploys this host instead of comin (GH-160), after drakkar's
+    -- 5 clean deploys on 2026-11-22.
+    , roles = .to_vec ([Role::Server, Role::Monitoring, Role::NfsServer, Role::RemoteDesktopRelay, Role::Vdeploy])
+    , online = true
+    , tailscale_ip = Some (Ipv4Addr::new 100 103 79 41)
+    , cache_key = None
+    , operator_key = Some (.to_string "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHaaBOy2a1WnlGy5B6WwEmVlf7s5VUgVIbsjdGZrsmK+ tom@mimir")
+    , builder = None
+    -- vdeploy waits for main to sit still this long before it starts a plan
+    -- (GH-221). vdeploy never cancels a plan, so a plan started on a commit that is
+    -- superseded a minute later is a whole plan of lag. Measured 2026-11-21/22 over
+    -- 48 h: 20 of 73 gaps between merges on main were under 2 min (agents merging
+    -- back to back), and comin had each of mimir's generations ready a median 4 min
+    -- after its merge, because mimir substitutes from drakkar's cache. 2 min
+    -- collapses those bursts. A longer window (10 min would cover 38 of the 73
+    -- gaps) would cost more waiting than a plan takes.
+    , deploy_debounce = Some (.to_string "2m")
+    , trust_tier = TrustTier::LocalHwAttested
+    -- Zen 3 mobile part: svm, no SEV/SEV-SNP (kvm_amd sev_snp = N).
+    , cpu = Cpu { vendor = CpuVendor::Amd, model = .to_string "AMD Ryzen 7 5825U", sev_snp = false, tdx = false }
+    , tpm2 = true
+    , attestation_root = None
+    }
+
+muninn : Host
+muninn =
+  Host {
+    name = HostName::Muninn
+    , description = .to_string "work laptop; monitoring standby when mimir is down"
+    -- Never NfsClient: a work machine holds no personal files, so it neither
+    -- mounts mimir's /data nor appears in its export list.
+    , roles = .to_vec ([Role::Laptop, Role::Work, Role::Builder, Role::Monitoring])
+    -- Out of reach since 2026-11 (no WiFi, router full): no longer a builder for
+    -- clients (GH-252).
+    , online = false
+    , tailscale_ip = None
+    , cache_key = None
+    , operator_key = Some (.to_string "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAC/xRRyQ1Om1ChkxfeqfK8HjvAgzg1d+bfgU9ALxgYx tom@muninn")
+    , builder = Some (BuilderSpec { max_jobs = 4, speed_factor = 1, supported_features = .to_vec ([SystemFeature::Kvm, SystemFeature::NixosTest]) })
+    , deploy_debounce = None
+    , trust_tier = TrustTier::LocalHwAttested
+    -- Comet Lake-H: vmx, no TDX.
+    , cpu = Cpu { vendor = CpuVendor::Intel, model = .to_string "Intel Core i7-10750H", sev_snp = false, tdx = false }
+    , tpm2 = true
+    , attestation_root = None
+    }
+
+-- The fleet. Order is part of the contract: prometheus target order and
+-- remote-builder preference follow these lists, so they are explicit rather than
+-- alphabetical.
+export fleet : Fleet
+fleet =
+  Fleet {
+    hosts = .to_vec ([drakkar (), huginn (), mimir (), muninn ()])
+    , order = .to_vec ([HostName::Mimir, HostName::Drakkar, HostName::Huginn, HostName::Muninn])
+    , builder_order = .to_vec ([HostName::Drakkar, HostName::Muninn, HostName::Huginn])
+    , nfs_client_order = .to_vec ([HostName::Drakkar, HostName::Huginn])
+    -- vcache's TCP port, on every serving host's tailnet address.
+    , ports = Ports { vcache = 5100 }
+    }

@@ -1,0 +1,218 @@
+-- The fleet's types: what a host is, what roles and builder features exist, the
+-- compartment trust facts (GH-421), and what a feature-catalog entry is.
+--
+-- Every closed set is a sum type, so a role, a builder feature, a trust tier, a
+-- CPU vendor, a host name or a catalog category that is not listed here is a
+-- compile error in src/inventory.vlt or src/catalog.vlt, not an eval-time typo.
+-- Each has one exhaustive `*_name` function: the string NixOS sees in the
+-- generated JSON. Adding a variant without a name does not compile.
+
+import std::net::Ipv4Addr
+
+-- The hosts of the fleet. A name in `order`, `builder_order` or
+-- `nfs_client_order` is one of these, so those lists cannot name a host that
+-- does not exist.
+export data HostName = Drakkar | Huginn | Mimir | Muninn
+  deriving (Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)
+
+-- Every host name, in declaration order. `check` verifies it holds each
+-- variant once, and that every one has a host record.
+export all_hosts : Vec<HostName>
+all_hosts = .to_vec ([HostName::Drakkar, HostName::Huginn, HostName::Mimir, HostName::Muninn])
+
+export host_name : HostName -> String
+host_name h =
+  case h of
+    HostName::Drakkar -> .to_string "drakkar"
+    HostName::Huginn -> .to_string "huginn"
+    HostName::Mimir -> .to_string "mimir"
+    HostName::Muninn -> .to_string "muninn"
+
+-- The tags features select on (common/fleet.nix's `withRole`).
+export data Role
+  = Desktop
+  | Laptop
+  | Tablet
+  | Server
+  | Work
+  | Builder
+  | Monitoring
+  | NfsClient
+  | NfsServer
+  | RemoteDesktopRelay
+  | Vdeploy
+  deriving (Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)
+
+export role_name : Role -> String
+role_name r =
+  case r of
+    Role::Desktop -> .to_string "desktop"
+    Role::Laptop -> .to_string "laptop"
+    Role::Tablet -> .to_string "tablet"
+    Role::Server -> .to_string "server"
+    Role::Work -> .to_string "work"
+    Role::Builder -> .to_string "builder"
+    Role::Monitoring -> .to_string "monitoring"
+    Role::NfsClient -> .to_string "nfs-client"
+    Role::NfsServer -> .to_string "nfs-server"
+    Role::RemoteDesktopRelay -> .to_string "remote-desktop-relay"
+    Role::Vdeploy -> .to_string "vdeploy"
+
+-- Nix system features a remote builder advertises.
+export data SystemFeature = BigParallel | Kvm | NixosTest
+  deriving (Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)
+
+export feature_name : SystemFeature -> String
+feature_name f =
+  case f of
+    SystemFeature::BigParallel -> .to_string "big-parallel"
+    SystemFeature::Kvm -> .to_string "kvm"
+    SystemFeature::NixosTest -> .to_string "nixos-test"
+
+-- A host that accepts remote nix builds (features/fleet/nix-remote-builder-client.nix).
+export data BuilderSpec
+  { export max_jobs u32
+  , export speed_factor u32
+  , export supported_features Vec<SystemFeature>
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- What the hardware can attest (GH-421). Hardware-attested means a TPM2 that
+-- roots the host's own DICE chain; there is no fleet CA.
+export data TrustTier = LocalHwAttested | LocalUnattested
+  deriving (Clone, Copy, Debug, PartialEq, Eq)
+
+export tier_name : TrustTier -> String
+tier_name t =
+  case t of
+    TrustTier::LocalHwAttested -> .to_string "local-hw-attested"
+    TrustTier::LocalUnattested -> .to_string "local-unattested"
+
+export data CpuVendor = Amd | Intel
+  deriving (Clone, Copy, Debug, PartialEq, Eq)
+
+export vendor_name : CpuVendor -> String
+vendor_name v =
+  case v of
+    CpuVendor::Amd -> .to_string "amd"
+    CpuVendor::Intel -> .to_string "intel"
+
+-- sev_snp / tdx: the CPU can run confidential VMs (AMD SEV-SNP, Intel TDX).
+export data Cpu
+  { export vendor CpuVendor
+  , export model String
+  , export sev_snp bool
+  , export tdx bool
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- One host. The optional fields are left out of the JSON when absent, exactly
+-- as common/fleet.nix's readers expect (`h ? tailscaleIp`, `cacheKey or null`,
+-- `online or true`); operator_key and attestation_root are emitted as null.
+export data Host
+  { export name HostName
+  , export description String
+  , export roles Vec<Role>
+  , export online bool
+  , export tailscale_ip Option<Ipv4Addr>
+  , export cache_key Option<String>
+  , export operator_key Option<String>
+  , export builder Option<BuilderSpec>
+  , export deploy_debounce Option<String>
+  , export trust_tier TrustTier
+  , export cpu Cpu
+  , export tpm2 bool
+  , export attestation_root Option<String>
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- The fleet's own TCP ports, one field per service so a service cannot be
+-- forgotten or listed twice; `check` keeps the numbers distinct.
+export data Ports
+  { export vcache u16
+  }
+  deriving (Clone, Debug, PartialEq)
+
+export port_list : &Ports -> Vec<(String, u16)>
+port_list p = .to_vec ([(.to_string "vcache", p.vcache)])
+
+-- The inventory. The three orders are part of the contract: prometheus target
+-- order and remote-builder preference follow them.
+export data Fleet
+  { export hosts Vec<Host>
+  , export order Vec<HostName>
+  , export builder_order Vec<HostName>
+  , export nfs_client_order Vec<HostName>
+  , export ports Ports
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- A features/ category: the first path component of a catalog entry.
+export data Category
+  = Ai
+  | Cli
+  | Communication
+  | Creative
+  | Desktop
+  | Finance
+  | Fleet
+  | Games
+  | Media
+  | Monitoring
+  | Network
+  | Nix
+  | Nixos
+  | Performance
+  | Programming
+  | Security
+  | Storage
+  | WindowManager
+  deriving (Clone, Copy, Debug, PartialEq, Eq)
+
+export category_name : Category -> String
+category_name c =
+  case c of
+    Category::Ai -> .to_string "ai"
+    Category::Cli -> .to_string "cli"
+    Category::Communication -> .to_string "communication"
+    Category::Creative -> .to_string "creative"
+    Category::Desktop -> .to_string "desktop"
+    Category::Finance -> .to_string "finance"
+    Category::Fleet -> .to_string "fleet"
+    Category::Games -> .to_string "games"
+    Category::Media -> .to_string "media"
+    Category::Monitoring -> .to_string "monitoring"
+    Category::Network -> .to_string "network"
+    Category::Nix -> .to_string "nix"
+    Category::Nixos -> .to_string "nixos"
+    Category::Performance -> .to_string "performance"
+    Category::Programming -> .to_string "programming"
+    Category::Security -> .to_string "security"
+    Category::Storage -> .to_string "storage"
+    Category::WindowManager -> .to_string "window-manager"
+
+-- A catalog entry: features/<category>/<rest>, a directory with a default.nix
+-- or a loose `.nix` module. An empty `rest` is the category directory itself
+-- (features/nixos/default.nix).
+export data Feature
+  { export category Category
+  , export rest String
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- The entry's path below features/, as the JSON carries it.
+export feature_path : &Feature -> String
+feature_path f =
+  top = category_name f.category
+  if f.rest.is_empty ()
+    top
+  else
+    "#{top}/#{f.rest}"
+
+-- The option name lib/features.nix derives: the path minus `.nix` /
+-- `/default.nix`, with `/` as `.`.
+export option_name : &Feature -> String
+option_name f =
+  path = feature_path f
+  bare = path.strip_suffix "/default.nix" |> .or_else (\-> path.strip_suffix ".nix") |> .unwrap_or (&path)
+  bare.replace "/" "."

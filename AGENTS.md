@@ -17,15 +17,19 @@ and entering the shell no longer runs them. Previously, shell entry ran
 ## Hosts, profiles, features
 
 Features are switched on by option, not imported by path. Every host gets every
-entry of `features/catalog.nix` (each wrapped by `lib/features.nix`, which declares
+entry of the feature catalog (each wrapped by `lib/features.nix`, which declares
 `features.<path>.enable`, default off) and every `profiles/*.nix` (each declaring
 `profiles.<name>.enable`). `hosts/<name>/configuration.nix` enables profiles and
 features; a profile's choice is overridden per host with `lib.mkForce false`.
 
-- New feature: add its path to `features/catalog.nix`, then set
-  `features.<category>.<name>.enable = true;` in a profile or host.
-- Host facts (roles, builders, operator keys, tailnet IPs) live in
-  `common/fleet.nix`. Features read it; they never name hosts.
+- New feature: add it to `rust/tools/vfleet/src/catalog.vlt`, run `bin/fleet-data`,
+  then set `features.<category>.<name>.enable = true;` in a profile or host.
+- Host facts (roles, builders, operator keys, tailnet IPs, trust facts) live in
+  `rust/tools/vfleet/src/inventory.vlt` (typed Voltaic, the source of truth).
+  `bin/fleet-data` checks the invariants and writes `common/fleet.json` and
+  `features/catalog.json`; `common/fleet.nix` and `features/catalog.nix` read them.
+  Never edit the JSON by hand: vfleet's drift test fails. Features read
+  `common/fleet.nix`; they never name hosts.
 - `features.<…>` / `profiles.<…>` selections are cheap to test with
   `evalSelection` from `lib/features.nix`; see `profiles/*.assay.nix`.
 
