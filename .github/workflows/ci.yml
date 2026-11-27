@@ -126,7 +126,7 @@ jobs:
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
       # VM tests are the only gate that proves the runtime half of the baseline, the controls
-      # no static analysis can speak to. 68 booted machines per pull request is not a
+      # no static analysis can speak to. 83 booted machines per pull request is not a
       # reasonable default, so pull requests get reports plus the CAT I gate.
       - name: STIG compliance
         uses: ./.github/actions/stig

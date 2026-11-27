@@ -74,8 +74,10 @@ classified `base`. A disruptive control cannot drift onto a fielded host.
 **mimir and muninn carry controls.** muninn's `test-host` profile leaves no control
 `Not Implemented`: what it does not configure it excludes, and the reasons are in
 `features/security/stig/profiles/test-host.nix`. Two of its exclusions are CAT I
-(`V-268146`, `V-268168`); ADR-0008 records that ruling. None of the 15 controls it adds to
-`base-safe` has a VM test yet. Two more, `V-268081` and `V-268170`, are excluded because
+(`V-268146`, `V-268168`); ADR-0008 records that ruling. Each of the 15 controls it adds to
+`base-safe` has a VM test that boots the profile
+(`features/security/stig/tests/vm/test-host.nix`).
+Two more, `V-268081` and `V-268170`, are excluded because
 their modules render a PAM line that does not enforce the requirement; they return once the
 modules are reworked and have a VM test. Until `V-268170` returns, the pwquality.conf
 settings (`V-268126`..`V-268129`, `V-268134`, `V-268145`, `V-268169`) are written on muninn
@@ -135,7 +137,7 @@ mechanism standing between a release bump and undetected drift.
 | `moon run test` | every commit (prek) | control modules declare what their control requires |
 | `bin/assay-coverage-check` | every commit | a `.nix` file with no colocated suite |
 | `bin/ci/stig` | PR and main | report builds; **CAT I regression fails the build** |
-| `moon run stig-vm-test` | main (`STIG_VM=1`) | 68 booted machines, one per control |
+| `moon run stig-vm-test` | main (`STIG_VM=1`) | 83 booted machines, one per control: `base-safe`'s 68 and the 15 `test-host` adds |
 
 The VM tests are the only gate that proves the runtime half. They have already caught things
 no amount of static analysis would:
@@ -146,6 +148,12 @@ no amount of static analysis would:
   `systemd-journal`), so the published `chown` fails outright.
 - `V-268078`'s check requires `firewall-panic`, a binary nixpkgs **removed** in favour of
   `nixos-firewall-tool`.
+- `V-268132`'s check passes and enforces nothing: `PASS_MIN_DAYS 1` is in `login.defs`, but
+  shadow 4.20 no longer implements a minimum password age, so a new account's shadow entry
+  has no minimum. The test pins that, so it fails the day shadow honours the key again.
+- `V-268086` declares a dconf lock on `idle-delay` without the leading slash dconf requires,
+  so the key is set and not locked. The check does not ask for the lock, and the test prints
+  the state without asserting it; the module is not corrected yet.
 
 ## ⚠ The CI gate does not gate deployment
 
