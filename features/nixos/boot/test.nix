@@ -101,7 +101,9 @@ in
         services.timesyncd.enable = lib.mkForce true;
         # muninn's restriction (features/nixos/users), so alice must reach the daemon as wheel.
         nix.settings.allowed-users = ["@wheel"];
-        # sbctl for the checks, age for decrypting the backup with the test operator key.
+        # The test operator's private key, in the image (useBootLoader: no host store).
+      environment.etc."vmtest-operator-key".source = snakeOil.snakeOilEd25519PrivateKey;
+      # sbctl for the checks, age for decrypting the backup with the test operator key.
         environment.systemPackages = [pkgs.sbctl pkgs.age];
         users.users.alice = {
           isNormalUser = true;
@@ -127,7 +129,7 @@ in
       plain = "${plain}"
       manual = "${builtins.elemAt deps 0}"
       secure_boot = "${builtins.elemAt deps 1}"
-      operator_key = "${snakeOil.snakeOilEd25519PrivateKey}"
+      operator_key = "/etc/vmtest-operator-key"
       backup = "/var/lib/sbctl-backup/sbctl-machine.tar.age"
       profiles = "/nix/var/nix/profiles"
       comin = f"{profiles}/system-profiles/comin"
