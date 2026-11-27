@@ -1,0 +1,301 @@
+-- A tab's navigation lifecycle, as a typed state machine.
+--
+--   Blank -Started-> Loading -Committed-> Committed -Finished-> Loaded
+--                       |  \_Redirected (new uri)      |
+--                       |_LoadFailed / Stop_> Failed <_|_LoadFailed
+--                       |_TlsError_> TlsFailed
+--   any non-Blank -WebProcessTerminated-> Crashed
+--   Loaded | Failed | TlsFailed | Crashed -Reload-> Loading (same uri)
+--
+-- The core is pure: `transition` maps a state and an event to the next state,
+-- or to a typed `NavError::Illegal`; nothing here panics on a bad event.
+--
+-- The Effect face is id_effect_fsm's gen_statem behaviour: a tab's machine is
+-- a `StatemProcess<NavMachine>` on a `ProcessNode`, and `step` hands it one
+-- event as a call, answered with the transition's outcome. An illegal event
+-- leaves the machine where it was and fails the step with `Illegal`.
+--
+-- Why Statem and not `#[derive(Fsm)]`: the derive (and TransitionTable,
+-- StateMachine, Interpreter) key edges on `Copy + Hash` unit states and reject
+-- data-carrying variants at compile time. These states carry the uri, the
+-- progress and the failure reason, which is exactly what Statem is for.
+
+import std::time::Duration
+import id_effect::{Effect, HNil, Never, fail, succeed}
+import id_effect_fsm::{Action, StatemEvent, StatemHandle, StatemInit, StatemProcess, Transition}
+import id_effect_process::{CallError, ProcessCtx, ProcessNode}
+
+-- Where a tab is. `progress` is a percentage, 0..=100, and is carried across
+-- the commit so the bar does not jump back.
+export data NavState
+  = Blank
+  | Loading { uri String, progress u8 }
+  | Committed { uri String, progress u8 }
+  | Loaded { uri String }
+  | Failed { uri String, reason String }
+  | TlsFailed { uri String }
+  | Crashed { uri String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- What happens to a tab: WebKit's load events (mapped from UiEvent by the
+-- GTK edge) and the user's Reload / Stop.
+export data NavEvent
+  = Started String
+  | Progress u8
+  | Redirected String
+  | Committed
+  | Finished
+  | LoadFailed String
+  | TlsError
+  | WebProcessTerminated
+  | Reload
+  | Stop
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- A step that did not happen. `Illegal`: the event has no edge from the state
+-- (the machine is unchanged). `Down`: the tab's machine could not answer (it
+-- exited, its mailbox was closed or full, or the call timed out).
+export data NavError
+  = Illegal { from NavState, event NavEvent }
+  | Down String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display NavError
+  fmt : &self -> &mut std::fmt::Formatter<'_> -> std::fmt::Result
+  fmt self f = case self of
+    NavError::Illegal { from, event } -> write! \-> f \-> "no navigation transition from #{from:?} on #{event:?}"
+    NavError::Down why -> write! \-> f \-> "the tab's navigation machine is unavailable: #{why}"
+
+instance std::error::Error NavError
+
+-- The reason a load the user stopped before it committed is failed with.
+export const STOPPED : &str = "stopped"
+
+clamp : u8 -> u8
+clamp p = p.min 100
+
+illegal : &NavState -> &NavEvent -> Result<NavState, NavError>
+illegal state event = Err (NavError::Illegal { from = state.clone (), event = event.clone () })
+
+-- One step of the lifecycle: the next state, or `Illegal`.
+export transition : &NavState -> &NavEvent -> Result<NavState, NavError>
+transition state event =
+  pair = (state, event)
+  case pair of
+    (_, NavEvent::Started to) -> Ok (NavState::Loading { uri = to.clone (), progress = 0 })
+    (NavState::Loading { uri, .. }, NavEvent::Progress p) -> Ok (NavState::Loading { uri = uri.clone (), progress = clamp (*p) })
+    (NavState::Committed { uri, .. }, NavEvent::Progress p) -> Ok (NavState::Committed { uri = uri.clone (), progress = clamp (*p) })
+    (NavState::Loading { progress, .. }, NavEvent::Redirected to) -> Ok (NavState::Loading { uri = to.clone (), progress = *progress })
+    (NavState::Loading { uri, progress }, NavEvent::Committed) -> Ok (NavState::Committed { uri = uri.clone (), progress = *progress })
+    (NavState::Loading { uri, .. }, NavEvent::Finished) -> Ok (NavState::Loaded { uri = uri.clone () })
+    (NavState::Committed { uri, .. }, NavEvent::Finished) -> Ok (NavState::Loaded { uri = uri.clone () })
+    (NavState::Loading { uri, .. }, NavEvent::LoadFailed why) -> Ok (NavState::Failed { uri = uri.clone (), reason = why.clone () })
+    (NavState::Committed { uri, .. }, NavEvent::LoadFailed why) -> Ok (NavState::Failed { uri = uri.clone (), reason = why.clone () })
+    (NavState::Loading { uri, .. }, NavEvent::TlsError) -> Ok (NavState::TlsFailed { uri = uri.clone () })
+    (NavState::Loading { uri, .. }, NavEvent::WebProcessTerminated) -> Ok (NavState::Crashed { uri = uri.clone () })
+    (NavState::Committed { uri, .. }, NavEvent::WebProcessTerminated) -> Ok (NavState::Crashed { uri = uri.clone () })
+    (NavState::Loaded { uri }, NavEvent::WebProcessTerminated) -> Ok (NavState::Crashed { uri = uri.clone () })
+    (NavState::Failed { uri, .. }, NavEvent::WebProcessTerminated) -> Ok (NavState::Crashed { uri = uri.clone () })
+    (NavState::TlsFailed { uri }, NavEvent::WebProcessTerminated) -> Ok (NavState::Crashed { uri = uri.clone () })
+    (NavState::Crashed { uri }, NavEvent::WebProcessTerminated) -> Ok (NavState::Crashed { uri = uri.clone () })
+    (NavState::Loaded { uri }, NavEvent::Reload) -> Ok (NavState::Loading { uri = uri.clone (), progress = 0 })
+    (NavState::Failed { uri, .. }, NavEvent::Reload) -> Ok (NavState::Loading { uri = uri.clone (), progress = 0 })
+    (NavState::TlsFailed { uri }, NavEvent::Reload) -> Ok (NavState::Loading { uri = uri.clone (), progress = 0 })
+    (NavState::Crashed { uri }, NavEvent::Reload) -> Ok (NavState::Loading { uri = uri.clone (), progress = 0 })
+    (NavState::Committed { uri, .. }, NavEvent::Stop) -> Ok (NavState::Loaded { uri = uri.clone () })
+    (NavState::Loading { uri, .. }, NavEvent::Stop) -> Ok (NavState::Failed { uri = uri.clone (), reason = .to_string STOPPED })
+    _ -> illegal state event
+
+-- UI helpers.
+
+-- Whether the tab is mid-load (the address bar shows Stop, not Reload).
+export is_loading : &NavState -> bool
+is_loading state = matches!(state, NavState::Loading { .. } | NavState::Committed { .. })
+
+-- The load bar's fill, 0.0..=1.0, while loading; `None` when there is no bar.
+export progress_fraction : &NavState -> Option<f64>
+progress_fraction state = case state of
+  NavState::Loading { progress, .. } -> Some (f64::from (*progress) / 100.0)
+  NavState::Committed { progress, .. } -> Some (f64::from (*progress) / 100.0)
+  _ -> None
+
+-- The uri the address bar shows; empty for a blank tab.
+export display_uri : &NavState -> &str
+display_uri state = case state of
+  NavState::Blank -> ""
+  NavState::Loading { uri, .. } -> uri.as_str ()
+  NavState::Committed { uri, .. } -> uri.as_str ()
+  NavState::Loaded { uri } -> uri.as_str ()
+  NavState::Failed { uri, .. } -> uri.as_str ()
+  NavState::TlsFailed { uri } -> uri.as_str ()
+  NavState::Crashed { uri } -> uri.as_str ()
+
+-- The Effect face: a tab's machine as an id_effect_fsm Statem process.
+
+-- The machine's callback module (never instantiated). The state is all there
+-- is, so the machine data is `()`; callbacks need no capability (`HNil`) and
+-- cannot fail (`Never`): an illegal event is an answer, not a crash.
+export data NavMachine = NavMachine
+
+instance id_effect_fsm::Statem NavMachine
+  type Args = NavState
+  type Env = HNil
+  type State = NavState
+  type Data = ()
+  type Event = NavEvent
+  type Reply = Result<NavState, NavError>
+  type Error = Never
+
+  init : NavState -> ProcessCtx -> Effect<StatemInit<Self>, Never, HNil>
+  init start _ctx = succeed ((start, (), Vec::new ()))
+
+  handle_event : &StatemEvent<Self> -> &NavState -> () -> ProcessCtx -> Effect<Transition<Self>, Never, HNil>
+  handle_event event state _data _ctx = succeed (decide event state)
+
+-- Apply the event; answer a call with the outcome. A legal event moves the
+-- machine, an illegal one keeps it.
+decide : &StatemEvent<NavMachine> -> &NavState -> Transition<NavMachine>
+decide event state =
+  outcome = transition state (event.content ())
+  replies = case event.reply_to () of
+    Some to -> Vec::from ([Action::Reply (to.clone ()) (outcome.clone ())])
+    None -> Vec::new ()
+  case outcome of
+    Ok next -> Transition::Next next (()) replies
+    Err _ -> Transition::Keep (()) replies
+
+-- A running tab machine.
+export type NavHandle = StatemHandle<NavMachine>
+
+-- How long a step waits for the machine's answer before failing `Down`.
+export const STEP_TIMEOUT : Duration = Duration::from_secs 5
+
+-- A tab's machine, unlinked, starting in `initial`.
+export start : &ProcessNode -> NavState -> NavHandle
+start node initial = StatemProcess::start node initial HNil
+
+-- A tab's machine linked to the calling process (a Tabs service owning it).
+export start_linked : &ProcessCtx -> NavState -> NavHandle
+start_linked ctx initial = StatemProcess::start_linked ctx initial HNil
+
+down : CallError -> NavError
+down e = NavError::Down ("#{e}")
+
+lifted : Result<NavState, NavError> -> Effect<NavState, NavError, HNil>
+lifted outcome = case outcome of
+  Ok next -> succeed next
+  Err e -> fail e
+
+-- One event into the tab's machine: its new state, or the typed reason the
+-- step did not happen.
+export step : &NavHandle -> NavEvent -> Effect<NavState, NavError, HNil>
+step handle event = ((handle.call event STEP_TIMEOUT).map_err down).flat_map lifted
+
+-- The tab's current state, as the machine answers it.
+export current : &NavHandle -> Effect<NavState, NavError, HNil>
+current handle = (handle.state STEP_TIMEOUT).map_err down
+
+-- Tests: the full table (every state x every event), the helpers, and the
+-- Effect face driven on a TestExecutor node.
+
+#[cfg(test)]
+import std::sync::Arc
+#[cfg(test)]
+import id_effect::{Exit, TestExecutor, assert_exit_success, expect_exit_failure, run_test_on}
+#[cfg(test)]
+import id_effect_process::NodeName
+
+#[cfg(test)]
+s : &str -> String
+s text = .to_string text
+
+-- One sample of each state (indices 0..7) and of each event (0..10).
+#[cfg(test)]
+states : Vec<NavState>
+states = Vec::from ([NavState::Blank, NavState::Loading { uri = s "a", progress = 40 }, NavState::Committed { uri = s "a", progress = 60 }, NavState::Loaded { uri = s "a" }, NavState::Failed { uri = s "a", reason = s "x" }, NavState::TlsFailed { uri = s "a" }, NavState::Crashed { uri = s "a" }])
+
+#[cfg(test)]
+events : Vec<NavEvent>
+events = Vec::from ([NavEvent::Started (s "b"), NavEvent::Progress 70, NavEvent::Redirected (s "b"), NavEvent::Committed, NavEvent::Finished, NavEvent::LoadFailed (s "dns"), NavEvent::TlsError, NavEvent::WebProcessTerminated, NavEvent::Reload, NavEvent::Stop])
+
+-- The legal cells, (state index, event index, next state); every other cell
+-- of the 7 x 10 table is Illegal.
+#[cfg(test)]
+legal : Vec<(usize, usize, NavState)>
+legal =
+  loading_b = NavState::Loading { uri = s "b", progress = 0 }
+  crashed = NavState::Crashed { uri = s "a" }
+  reloading = NavState::Loading { uri = s "a", progress = 0 }
+  failed_dns = NavState::Failed { uri = s "a", reason = s "dns" }
+  loaded = NavState::Loaded { uri = s "a" }
+  Vec::from ([(0, 0, loading_b.clone ()), (1, 0, loading_b.clone ()), (2, 0, loading_b.clone ()), (3, 0, loading_b.clone ()), (4, 0, loading_b.clone ()), (5, 0, loading_b.clone ()), (6, 0, loading_b), (1, 1, NavState::Loading { uri = s "a", progress = 70 }), (2, 1, NavState::Committed { uri = s "a", progress = 70 }), (1, 2, NavState::Loading { uri = s "b", progress = 40 }), (1, 3, NavState::Committed { uri = s "a", progress = 40 }), (1, 4, loaded.clone ()), (2, 4, loaded.clone ()), (1, 5, failed_dns.clone ()), (2, 5, failed_dns), (1, 6, NavState::TlsFailed { uri = s "a" }), (1, 7, crashed.clone ()), (2, 7, crashed.clone ()), (3, 7, crashed.clone ()), (4, 7, crashed.clone ()), (5, 7, crashed.clone ()), (6, 7, crashed), (3, 8, reloading.clone ()), (4, 8, reloading.clone ()), (5, 8, reloading.clone ()), (6, 8, reloading), (2, 9, loaded), (1, 9, NavState::Failed { uri = s "a", reason = s "stopped" })])
+
+#[cfg(test)]
+cell : &[(usize, usize, NavState)] -> usize -> usize -> Option<NavState>
+cell table i j = table |> .iter |> .find (\c -> c.0 == i && c.1 == j) |> .map (\c -> c.2.clone ())
+
+-- A node on a deterministic executor: time is virtual, nothing sleeps.
+#[cfg(test)]
+node_on : &TestExecutor -> ProcessNode
+node_on exec = ProcessNode::on_executor (NodeName::new "nav@test") (Arc::new (exec.clone ()))
+
+test "the full table: every state x every event, legal cells reach their state, the rest are Illegal"
+  ss = states ()
+  es = events ()
+  table = legal ()
+  assert_eq! \-> ss.len () * es.len () \-> 70
+  assert_eq! \-> table.len () \-> 28
+  for row in ss.iter ().enumerate ()
+    (i, state) = row
+    for col in es.iter ().enumerate ()
+      (j, event) = col
+      got = transition state event
+      want = case cell (&table) i j of
+        Some next -> Ok next
+        None -> Err (NavError::Illegal { from = state.clone (), event = event.clone () })
+      assert_eq! \-> got \-> want \-> "state #{i} x event #{j}"
+
+test "a crashed tab reloads its uri from zero"
+  crashed = NavState::Crashed { uri = s "https://example.org" }
+  assert_eq! \-> transition (&crashed) (&NavEvent::Reload) \-> Ok (NavState::Loading { uri = s "https://example.org", progress = 0 })
+
+test "progress clamps to 100 while loading and after the commit"
+  loading = NavState::Loading { uri = s "a", progress = 10 }
+  committed = NavState::Committed { uri = s "a", progress = 10 }
+  assert_eq! \-> transition (&loading) (&NavEvent::Progress 250) \-> Ok (NavState::Loading { uri = s "a", progress = 100 })
+  assert_eq! \-> transition (&committed) (&NavEvent::Progress 101) \-> Ok (NavState::Committed { uri = s "a", progress = 100 })
+  assert_eq! \-> transition (&loading) (&NavEvent::Progress 100) \-> Ok (NavState::Loading { uri = s "a", progress = 100 })
+
+test "the UI helpers: loading flag, bar fraction, address-bar uri"
+  loading = NavState::Loading { uri = s "a", progress = 50 }
+  committed = NavState::Committed { uri = s "c", progress = 100 }
+  loaded = NavState::Loaded { uri = s "b" }
+  assert! \-> is_loading (&loading)
+  assert! \-> is_loading (&committed)
+  assert! \-> !is_loading (&loaded)
+  assert! \-> !is_loading (&NavState::Blank)
+  assert_eq! \-> progress_fraction (&loading) \-> Some 0.5
+  assert_eq! \-> progress_fraction (&committed) \-> Some 1.0
+  assert_eq! \-> progress_fraction (&loaded) \-> None
+  assert_eq! \-> display_uri (&loaded) \-> "b"
+  assert_eq! \-> display_uri (&NavState::Blank) \-> ""
+  assert_eq! \-> display_uri (&(NavState::Failed { uri = s "f", reason = s "x" })) \-> "f"
+
+test "the Effect face: a tab machine steps through a load, an illegal event fails typed and keeps the state"
+  exec = TestExecutor::new ()
+  tab = start (&(node_on (&exec))) NavState::Blank
+  started = run_test_on (&exec) (step (&tab) (NavEvent::Started (s "https://example.org")))
+  assert_exit_success (&started) (&(NavState::Loading { uri = s "https://example.org", progress = 0 }))
+  bad = run_test_on (&exec) (step (&tab) NavEvent::Reload)
+  assert_eq! \-> expect_exit_failure bad \-> NavError::Illegal { from = NavState::Loading { uri = s "https://example.org", progress = 0 }, event = NavEvent::Reload }
+  still = run_test_on (&exec) (current (&tab))
+  assert_exit_success (&still) (&(NavState::Loading { uri = s "https://example.org", progress = 0 }))
+
+test "the Effect face: one program crashes a loaded tab and reloads it"
+  exec = TestExecutor::new ()
+  tab = start (&(node_on (&exec))) (NavState::Loaded { uri = s "https://example.org" })
+  t1 = tab.clone ()
+  t2 = tab.clone ()
+  program = (step (&tab) NavEvent::WebProcessTerminated).flat_map (move \_ -> step (&t1) NavEvent::Reload) |> .flat_map (move \_ -> step (&t2) (NavEvent::Progress 30))
+  exit = run_test_on (&exec) program : Exit<NavState, NavError>
+  assert_exit_success (&exit) (&(NavState::Loading { uri = s "https://example.org", progress = 30 }))
