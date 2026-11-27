@@ -151,6 +151,7 @@
   # network
   ./network/chromium
   ./network/firefox
+  ./network/vwebbrowser
   ./network/searx
 
   # nix
