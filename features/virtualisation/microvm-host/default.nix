@@ -100,9 +100,19 @@
               type = lib.types.str;
               description = "Socket path relative to stateDir; must equal the guest share's `socket`.";
             };
+            guestUid = lib.mkOption {
+              type = lib.types.nullOr lib.types.int;
+              default = null;
+              description = "When set, the guest sees the VM user's files as this uid and gid (virtiofsd's --translate-uid/gid), so one guest system can serve VMs with different host users.";
+            };
           };
         });
         default = [];
+      };
+      environment = lib.mkOption {
+        type = lib.types.attrsOf lib.types.str;
+        default = {};
+        description = "Environment of the VMM unit; the runner's `extraArgsScript` may read it.";
       };
       preStart = lib.mkOption {
         type = lib.types.listOf lib.types.str;
@@ -237,14 +247,20 @@ in {
               // {
                 # Unprivileged, so no namespace sandbox of its own; systemd's is the sandbox,
                 # and the share is the only writable path in it.
-                ExecStart = lib.escapeShellArgs [
-                  "${pkgs.virtiofsd}/bin/virtiofsd"
-                  "--fd=3"
-                  "--shared-dir=${s.source}"
-                  "--sandbox=none"
-                  "--cache=auto"
-                  "--thread-pool-size=4"
-                ];
+                ExecStart =
+                  lib.escapeShellArgs [
+                    "${pkgs.virtiofsd}/bin/virtiofsd"
+                    "--fd=3"
+                    "--shared-dir=${s.source}"
+                    "--sandbox=none"
+                    "--cache=auto"
+                    "--thread-pool-size=4"
+                  ]
+                  + lib.optionalString (s.guestUid != null) (" "
+                    + lib.escapeShellArgs [
+                      "--translate-uid=map:${toString s.guestUid}:${toString vm.uid}:1"
+                      "--translate-gid=map:${toString s.guestUid}:${toString vm.uid}:1"
+                    ]);
                 User = vm.user;
                 Group = vm.user;
                 UMask = "0027";
@@ -270,6 +286,7 @@ in {
           after = deps ++ ["network.target"] ++ map (s: "${unitOf name}-fs-${s.tag}.service") vm.shares;
           # A switch never restarts a running session; the next start picks up the new runner.
           restartIfChanged = false;
+          inherit (vm) environment;
           serviceConfig =
             hardened
             // {

@@ -17,7 +17,7 @@ let
       }
     ];
   };
-  guest = cfg.features.ai.agent-vm.guests.agent-1.config;
+  guest = cfg.features.ai.agent-vm.guest.config;
   vm = cfg.features.virtualisation.microvm-host.vms.agent-1;
   vmm = cfg.systemd.services.microvm-agent-1.serviceConfig;
   fs = cfg.systemd.services.microvm-agent-1-fs-work.serviceConfig;
@@ -31,7 +31,8 @@ in
     closureOnlyStore = assay.eq [guest.microvm.storeOnDisk guest.microvm.storeDiskType] [true "erofs"];
     noHostStoreShare = assay.eq (builtins.elem "/nix/store" shareSources) false;
     # The one share is the slot's work directory: nothing from any home directory.
-    onlyTheWorkShare = assay.eq shareSources ["/var/lib/microvm-host/agent-1/work"];
+    onlyOneShare = assay.eq (builtins.length shareSources) 1;
+    slotSharesItsWork = assay.eq (map (s: s.source) vm.shares) ["/var/lib/microvm-host/agent-1/work"];
     noHomeShare = assay.eq (builtins.any (lib.hasPrefix "/home") shareSources) false;
     # No operator key: the only authorized keys are the session's, on the share.
     noOperatorKey = assay.eq [guest.users.users.agent.openssh.authorizedKeys.keys guest.services.openssh.authorizedKeysFiles] [[] ["/work/.session/authorized_keys"]];
@@ -39,7 +40,9 @@ in
     sshOverVsockOnly = assay.eq [guest.microvm.vsock.ssh.enable guest.services.openssh.openFirewall guest.networking.firewall.allowedTCPPorts] [true false []];
     # No route, no resolver: the proxy is the way out.
     noResolver = assay.eq guest.networking.nameservers [];
-    proxyIsTheWayOut = assay.eq guest.networking.proxy.default "http://10.233.1.1:3128";
+    proxyIsTheWayOut = assay.eq [(lib.hasInfix "/work/.session/net.env" guest.environment.extraInit) (lib.hasInfix "agent-vm-net-1.env" (builtins.concatStringsSep " " vmm.ExecStartPre))] [true true];
+    slotTapAtRunTime = assay.eq [cfg.systemd.services.microvm-agent-1.environment.AGENT_TAP guest.microvm.interfaces] ["agvm1" []];
+    guestUidMapped = assay.eq (lib.hasInfix "--translate-uid=map:1000:8101:1" fs.ExecStart) true;
     cloudHypervisor = assay.eq guest.microvm.hypervisor "cloud-hypervisor";
     ownDaemonNotTheHosts = assay.eq (lib.unique guest.nix.settings.trusted-users) ["root"];
 

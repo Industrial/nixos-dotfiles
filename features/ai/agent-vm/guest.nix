@@ -1,4 +1,4 @@
-# The agent guest (ADR-0009): a minimal NixOS on microvm.nix and cloud-hypervisor, one per slot.
+# The agent guest (ADR-0009): a minimal NixOS on microvm.nix and cloud-hypervisor.
 #
 #   store      an erofs image of this closure only (microvm.storeOnDisk), read-only, with an
 #              overlay on the per-session volume for the guest's own builds
@@ -10,7 +10,15 @@
 #              public key the launcher put in /work/.session/authorized_keys
 #   builds     the guest's own nix-daemon on the overlay store; substitutes through the proxy
 #
-# `agentVm` is passed in by ./default.nix: the slot's number, uid and limits.
+# One guest system serves every slot: a NixOS system evaluated per slot costs the host's own
+# evaluation a whole system each (muninn's VM-test checks went over CI's memory budget with
+# three). What differs per slot comes in at run time, from the host: the tap (`--net`, from
+# the VMM unit's AGENT_TAP), and the address and proxy (/work/.session/net.env, written by the
+# VMM unit before boot). The CID is the same in every guest: cloud-hypervisor's vsock is
+# hybrid, a Unix socket per VM, so no CID is global. The agent's uid is the same too; the
+# slot's virtiofsd maps it to the slot's own host uid.
+#
+# `agentVm` is passed in by ./default.nix: limits, packages and the host's package set.
 {
   lib,
   pkgs,
@@ -18,23 +26,20 @@
   ...
 }: let
   s = agentVm;
-  proxy = "http://${s.hostIp}:${toString s.proxyPort}";
   rwStore = "/nix/.rw-store";
-  proxyEnv = {
-    http_proxy = proxy;
-    https_proxy = proxy;
-    HTTP_PROXY = proxy;
-    HTTPS_PROXY = proxy;
-    no_proxy = "127.0.0.1,localhost";
-    NO_PROXY = "127.0.0.1,localhost";
-  };
+  netEnv = "/work/.session/net.env";
+  # Every guest is alone on its own tap, so one MAC serves them all.
+  mac = "02:00:0a:e9:00:02";
+  netArgs = pkgs.writeShellScript "agent-vm-net-args" ''
+    echo "--net tap=$AGENT_TAP,mac=${mac},num_queues=${toString (2 * s.vcpu)}"
+  '';
 in {
-  networking.hostName = s.name;
+  networking.hostName = "agent";
   system.stateVersion = "25.05";
   # The host's package set, so guest paths are the host's and no second nixpkgs is evaluated.
   # microvm.nix's `optimize` adds an overlay, which an external package set cannot take; the
   # parts of it that matter here are set below.
-  nixpkgs.pkgs = agentVm.hostPkgs;
+  nixpkgs.pkgs = s.hostPkgs;
   microvm.optimize.enable = false;
   boot.kernelParams = ["8250.nr_uarts=1"];
   boot.initrd.systemd.tpm2.enable = false;
@@ -47,7 +52,7 @@ in {
     mem = s.memory;
     balloon = true;
     deflateOnOOM = true;
-    vsock.cid = s.cid;
+    vsock.cid = 3;
     vsock.ssh.enable = true;
     # Relative to the VMM's working directory (the slot's state directory).
     socket = "api.sock";
@@ -55,13 +60,9 @@ in {
     storeDiskType = "erofs";
     writableStoreOverlay = rwStore;
     registerWithMachined = false;
-    interfaces = [
-      {
-        type = "tap";
-        id = s.tap;
-        inherit (s) mac;
-      }
-    ];
+    # The tap is the slot's; the VMM unit names it (microvm-host's `environment`).
+    interfaces = [];
+    extraArgsScript = "${netArgs}";
     volumes = [
       {
         # Deleted by the host before every session, so each starts empty.
@@ -75,7 +76,8 @@ in {
       {
         proto = "virtiofs";
         tag = "work";
-        source = s.workDir;
+        # Not used by the guest (it mounts by tag); the host's virtiofsd serves the slot's.
+        source = "/var/lib/microvm-host/agent/work";
         mountPoint = "/work";
         socket = "work.sock";
       }
@@ -84,32 +86,48 @@ in {
 
   # No route and no resolver: the proxy is the way out, and it resolves names itself.
   networking.useDHCP = false;
-  networking.useNetworkd = true;
+  networking.useNetworkd = false;
+  networking.usePredictableInterfaceNames = false;
   networking.nameservers = lib.mkForce [];
   services.resolved.enable = false;
-  systemd.network.networks."10-tap" = {
-    matchConfig.MACAddress = s.mac;
-    address = ["${s.guestIp}/24"];
-    networkConfig.LinkLocalAddressing = "no";
-    linkConfig.RequiredForOnline = "routable";
-  };
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = lib.mkForce [];
-  networking.proxy.default = proxy;
-  networking.proxy.noProxy = "127.0.0.1,localhost";
+
+  # The slot's address, from the host, before anything wants the network.
+  systemd.services.agent-net = {
+    description = "agent: the slot's address on eth0";
+    wantedBy = ["network-online.target" "multi-user.target"];
+    before = ["network-online.target" "agent-session.service" "nix-daemon.service"];
+    after = ["work.mount" "sys-subsystem-net-devices-eth0.device"];
+    wants = ["sys-subsystem-net-devices-eth0.device"];
+    unitConfig.RequiresMountsFor = "/work";
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      EnvironmentFile = netEnv;
+      ExecStart = [
+        "${pkgs.iproute2}/bin/ip link set eth0 up"
+        "${pkgs.iproute2}/bin/ip addr add \${AGENT_GUEST_IP}/24 dev eth0"
+      ];
+    };
+  };
+  # Every shell (login, and ssh's non-interactive commands) gets the slot's proxy.
+  environment.extraInit = ''
+    if [ -r ${netEnv} ]; then set -a; . ${netEnv}; set +a; fi
+  '';
 
   users.mutableUsers = false;
   # Nobody logs in but the agent, by the session key: no root password, no wheel.
   users.allowNoPasswordLogin = true;
   users.users.agent = {
     isNormalUser = true;
-    inherit (s) uid;
+    uid = s.guestUid;
     home = "/work/home";
     createHome = false;
     group = "agent";
     shell = pkgs.bashInteractive;
   };
-  users.groups.agent.gid = s.uid;
+  users.groups.agent.gid = s.guestUid;
   users.users.root.hashedPassword = "!";
 
   # ssh over vsock only: the generator's sshd-vsock socket; the TCP listener is closed by the
@@ -129,8 +147,8 @@ in {
       KbdInteractiveAuthentication = false;
       PermitRootLogin = "no";
       AllowUsers = ["agent"];
-      # The key file is on the share, owned by the slot's uid (= agent's), group-writable
-      # by the host's operators group, which the guest does not know.
+      # The key file is on the share and written by the host; the guest's ownership checks
+      # do not describe who can change it.
       StrictModes = false;
       AcceptEnv = ["TERM"];
     };
@@ -148,10 +166,14 @@ in {
       ];
       sandbox = true;
     };
-    # Not in guest RAM: build directories on the session volume.
     gc.automatic = false;
   };
-  systemd.services.nix-daemon.environment = proxyEnv // {TMPDIR = "${rwStore}/tmp";};
+  systemd.services.nix-daemon = {
+    after = ["agent-net.service"];
+    # Not in guest RAM: build directories on the session volume.
+    environment.TMPDIR = "${rwStore}/tmp";
+    serviceConfig.EnvironmentFile = "-${netEnv}";
+  };
   systemd.tmpfiles.rules = ["d ${rwStore}/tmp 1777 root root - -"];
 
   environment.systemPackages = s.packages;
@@ -166,13 +188,13 @@ in {
   systemd.services.agent-session = {
     description = "agent session: clone the base ref into /work/repo";
     wantedBy = ["multi-user.target"];
-    after = ["network-online.target" "work.mount"];
+    after = ["network-online.target" "work.mount" "agent-net.service"];
     wants = ["network-online.target"];
     unitConfig = {
       ConditionPathExists = ["/work/.session/session.env" "!/work/repo/.git"];
       RequiresMountsFor = "/work";
     };
-    environment = proxyEnv // {HOME = "/work/home";};
+    environment.HOME = "/work/home";
     path = [pkgs.git];
     serviceConfig = {
       Type = "oneshot";
@@ -180,7 +202,7 @@ in {
       User = "agent";
       Group = "agent";
       UMask = "0027";
-      EnvironmentFile = "/work/.session/session.env";
+      EnvironmentFile = [netEnv "/work/.session/session.env"];
       ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /work/home";
       ExecStart = "${pkgs.git}/bin/git clone --filter=blob:none --branch \${AGENT_BASE} \${AGENT_REPO} /work/repo";
       ExecStartPost = [

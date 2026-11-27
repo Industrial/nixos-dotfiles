@@ -4,7 +4,7 @@
 # virtiofsd), each with its own egress proxy. A session is `vagent run --slot N --branch B`:
 # see rust/tools/vagent. Per slot n:
 #
-#   user        agent-vm-n, uid 8100+n (= the guest's `agent`, so files on /work keep one owner)
+#   user        agent-vm-n, uid 8100+n; its virtiofsd shows it to the guest as `agent` (1000)
 #   state       /var/lib/microvm-host/agent-n: sockets (vsock notify.vsock, api.sock, work.sock),
 #               session.img (the guest's overlay store, recreated each session), session/ (the
 #               launcher's inputs: authorized_keys, session.env), work/ (the guest's /work)
@@ -13,9 +13,11 @@
 #   proxy       agent-vm-proxy-n: tinyproxy on 10.233.<n>.1:3128, a default-deny allowlist of
 #               host names; its unit may not reach private, tailnet, link-local or loopback
 #               addresses, and it resolves through public resolvers, never MagicDNS or the LAN
-#   vsock       CID 100+n: readiness (Type=notify) and ssh to the guest
+#   vsock       hybrid (a Unix socket per VM): readiness (Type=notify) and ssh to the guest
 #
-# Each start empties work/ and deletes session.img (as the slot's user), then copies session/
+# Every slot runs the same guest system (./guest.nix); the slot is the host side. Each start
+# empties work/ and deletes session.img (as the slot's user), writes the slot's address and
+# proxy (net.env) and copies session/
 # into work/.session. Nothing else from the host reaches the guest.
 #
 # Probe (no root): `systemctl status microvm-agent-1`; as the operator, `vagent run --slot 1
@@ -30,7 +32,6 @@
   ...
 }: let
   cfg = config.features.ai.agent-vm;
-  host = config.features.virtualisation.microvm-host;
   vagentPkg = pkgs.callPackage ../../../rust/tools/vagent/default.nix {};
   # The host's absolute tools first; the operator's own options after.
   vagent = pkgs.writeShellScriptBin "vagent" ''
@@ -54,27 +55,45 @@
   nameOf = n: "agent-${toString n}";
   stateOf = n: "/var/lib/microvm-host/${nameOf n}";
 
+  # What differs per slot. None of it is in the guest system (see ./guest.nix).
   params = n: {
     name = nameOf n;
     uid = cfg.uidBase + n;
-    cid = 100 + n;
     tap = "agvm${toString n}";
-    mac = "02:00:0a:e9:${lib.fixedWidthString 2 "0" (lib.toHexString n)}:02";
     hostIp = "10.233.${toString n}.1";
     guestIp = "10.233.${toString n}.2";
-    inherit (cfg) proxyPort memory vcpu volumeSize;
     workDir = "${stateOf n}/work";
-    packages = cfg.guestPackages;
-    hostPkgs = pkgs;
   };
 
-  guestOf = n:
-    import "${pkgs.path}/nixos/lib/eval-config.nix" {
-      inherit (pkgs.stdenv.hostPlatform) system;
-      specialArgs.agentVm = params n;
-      modules = [inputs.microvm.nixosModules.microvm ./guest.nix] ++ cfg.guestModules;
+  # The agent's uid inside every guest; each slot's virtiofsd maps it to the slot's own.
+  guestUid = 1000;
+
+  # One guest system for every slot.
+  guest = import "${pkgs.path}/nixos/lib/eval-config.nix" {
+    inherit (pkgs.stdenv.hostPlatform) system;
+    specialArgs.agentVm = {
+      inherit (cfg) memory vcpu volumeSize;
+      inherit guestUid;
+      packages = cfg.guestPackages;
+      hostPkgs = pkgs;
     };
-  guests = lib.listToAttrs (map (n: lib.nameValuePair (nameOf n) (guestOf n)) slotNumbers);
+    modules = [inputs.microvm.nixosModules.microvm ./guest.nix] ++ cfg.guestModules;
+  };
+
+  # The slot's address and proxy, read by the guest at boot (/work/.session/net.env).
+  netEnvOf = n: let
+    p = params n;
+    proxy = "http://${p.hostIp}:${toString cfg.proxyPort}";
+  in
+    pkgs.writeText "agent-vm-net-${toString n}.env" ''
+      AGENT_GUEST_IP=${p.guestIp}
+      http_proxy=${proxy}
+      https_proxy=${proxy}
+      HTTP_PROXY=${proxy}
+      HTTPS_PROXY=${proxy}
+      no_proxy=127.0.0.1,localhost
+      NO_PROXY=127.0.0.1,localhost
+    '';
 
   # Private, tailnet, link-local, loopback, multicast: never a proxy destination.
   denied = [
@@ -188,11 +207,11 @@ in {
       default = [];
       description = "Extra NixOS modules for every guest.";
     };
-    guests = lib.mkOption {
+    guest = lib.mkOption {
       type = lib.types.raw;
       readOnly = true;
-      default = guests;
-      description = "The evaluated guest systems, by slot name (for tests and measurements).";
+      default = guest;
+      description = "The evaluated guest system every slot runs (for tests and measurements).";
     };
   };
 
@@ -207,27 +226,32 @@ in {
         st = stateOf n;
       in
         lib.nameValuePair p.name {
-          runner = guests.${p.name}.config.microvm.declaredRunner;
+          runner = guest.config.microvm.declaredRunner;
           user = "agent-vm-${toString n}";
           inherit (p) uid;
           tap = {
             name = p.tap;
             address = "${p.hostIp}/24";
           };
+          # Read by the guest's runner (`--net tap=$AGENT_TAP`, ./guest.nix).
+          environment.AGENT_TAP = p.tap;
           shares = [
             {
               tag = "work";
               source = p.workDir;
               socket = "work.sock";
+              inherit guestUid;
             }
           ];
-          # A fresh session: empty /work and a new overlay volume; the launcher's inputs
-          # copied in (absent when the slot is started without vagent: it then boots with no
-          # session). `find -delete` never follows the links a guest may have left.
+          # A fresh session: empty /work and a new overlay volume; the slot's address and
+          # proxy, and the launcher's inputs, copied in (those are absent when the slot is
+          # started without vagent: it then boots with no session). `find -delete` never
+          # follows the links a guest may have left.
           preStart = [
             "${pkgs.findutils}/bin/find ${p.workDir} -mindepth 1 -delete"
             "${pkgs.coreutils}/bin/rm -f ${st}/session.img"
             "${pkgs.coreutils}/bin/mkdir -p ${p.workDir}/.session ${p.workDir}/home"
+            "${pkgs.coreutils}/bin/cp ${netEnvOf n} ${p.workDir}/.session/net.env"
             "-${pkgs.coreutils}/bin/cp --no-dereference ${st}/session/authorized_keys ${st}/session/session.env ${p.workDir}/.session/"
           ];
           memoryMax = "${toString (cfg.memory + 1024)}M";
