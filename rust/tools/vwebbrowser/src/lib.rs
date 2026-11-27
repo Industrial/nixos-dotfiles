@@ -40,5 +40,6 @@ voltaic!(app);
 voltaic!(nav);
 voltaic!(settings);
 voltaic!(log);
+voltaic!(tabtree);
 
 pub mod gtk_edge;
