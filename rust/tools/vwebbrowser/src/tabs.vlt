@@ -1,0 +1,533 @@
+-- The Tabs service: every tab the window has, as one value, and the consumer
+-- that keeps it in step with the window.
+--
+--   State   the tab tree (tabtree), per-tab info (title, uri, the tab's
+--           navigation machine and its last state), and the selection.
+--           One SubscriptionRef holds it: the `Tabs` capability.
+--   handle  one UiEvent: a pure step on the State, then the UiCmds that show
+--           it. Every change to the tree or a tab's info is followed by a
+--           RenderTree of the new snapshot.
+--   consume the UiEvents queue as a Stream, one event per pull, under
+--           id_effect's `supervised`: a defect in a handler restarts the
+--           consumer, and the State, which lives in the capability and not
+--           in the restarted fiber, carries over.
+--
+-- Navigation: each tab runs a NavMachine (nav.vlt) on the ProcessNode
+-- capability. WebKit's load events step it; an Illegal step is logged at
+-- debug and dropped.
+--
+-- Failures are split by what the consumer does with them (TabsError): an
+-- event about a closed tab is dropped, a machine that does not answer is
+-- logged, and a window that refuses a command ends the program.
+
+import std::collections::BTreeMap
+import std::sync::Arc
+import std::sync::atomic::{AtomicU64, Ordering}
+import std::time::Duration
+import id_effect::{Effect, HNil, Layer, Stream, SubscriptionRef, SupervisorPolicy, caps, effect, fail, hlist, succeed, supervised}
+import id_effect_process::{ExitReason, ProcessNode}
+import crate::error::UiError
+import crate::log::Log
+import crate::nav::{NavError, NavEvent, NavHandle, NavState}
+import crate::omnibox::{OmniboxError, Target}
+import crate::settings::{HwAccel, Settings}
+import crate::tabtree::TabTree
+import crate::ui::{TabId, TabRow, TreeSnapshot, Ui, UiCmd, UiEvent, UiEvents, ViewConfig}
+
+-- One tab: what the sidebar shows of it, and its navigation machine with the
+-- state the machine last answered.
+#[derive(Clone)]
+export data TabInfo { export title String, export uri String, export nav NavHandle, export state NavState }
+
+-- Every tab.
+#[derive(Clone)]
+export data State { export tree TabTree, export tabs BTreeMap<TabId, TabInfo>, export selected Option<TabId> }
+
+-- No tabs yet.
+export initial : State
+initial = State { tree = crate::tabtree::empty (), tabs = BTreeMap::new (), selected = None }
+
+-- The capability: the one cell the State lives in.
+#[derive(Clone)]
+export data Tabs { export cell SubscriptionRef<State> }
+
+-- A fresh, empty Tabs.
+export fresh : Tabs
+fresh = Tabs { cell = SubscriptionRef::new (initial ()) }
+
+export type TabsCell = caps!(Tabs)
+
+export type NodeEnv = caps!(ProcessNode)
+
+-- What the service runs in: the window, its events, the settings, the log,
+-- the node tab machines run on, and the tabs.
+export type TabsEnv = caps!(Ui, UiEvents, Settings, Log, ProcessNode, Tabs)
+
+-- `tabs` as a layer (a test keeps a clone to read the State back).
+export layer : given <E: Send + 'static> Tabs -> Layer<TabsCell, E>
+layer tabs = Layer::succeed (hlist![tabs])
+
+-- The node tab machines run on, as a layer.
+export node_layer : given <E: Send + 'static> ProcessNode -> Layer<NodeEnv, E>
+node_layer node = Layer::succeed (hlist![node])
+
+-- What the consumer does with a failed event.
+--
+--   Stale    the event names a tab that is not open (closed meanwhile):
+--            dropped, at debug
+--   NavDown  the tab's machine did not answer: logged, the tab keeps the
+--            state it last had
+--   Window   the window refused a command: the program ends (exit 1)
+export data TabsError
+  = Stale TabId
+  | NavDown TabId String
+  | Window UiError
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display TabsError
+  fmt : &self -> &mut std::fmt::Formatter<'_> -> std::fmt::Result
+  fmt self f = case self of
+    TabsError::Stale tab -> write! \-> f \-> "no open tab with id #{tab.id}"
+    TabsError::NavDown tab why -> write! \-> f \-> "tab #{tab.id}: #{why}"
+    TabsError::Window e -> write! \-> f \-> "#{e}"
+
+instance std::error::Error TabsError
+
+instance From UiError TabsError
+  from : UiError -> Self
+  from e = TabsError::Window e
+
+-- Whether the consumer goes on after an event.
+export data Flow
+  = Continue
+  | Stop
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+-- The pure core.
+
+-- How web views are set up, from the settings.
+export view_config : &Settings -> ViewConfig
+view_config s = ViewConfig { hardware_acceleration = s.hardware_acceleration == HwAccel::Always, developer_extras = s.developer_extras }
+
+-- The sidebar's view of `st`.
+export snapshot : &State -> TreeSnapshot
+snapshot st =
+  rows = crate::tabtree::depth_first (&st.tree) |> .into_iter |> .filter_map (\id -> row_of st id) |> .collect : Vec<TabRow>
+  TreeSnapshot { rows, selected = st.selected }
+
+row_of : &State -> TabId -> Option<TabRow>
+row_of st id =
+  info = (st.tabs.get (&id))?
+  depth = crate::tabtree::depth_of (&st.tree) id |> .unwrap_or 0
+  has_children = !(crate::tabtree::children_of (&st.tree) id).is_empty ()
+  crashed = matches!(info.state, NavState::Crashed { .. })
+  Some (TabRow { id, depth, title = info.title.clone (), uri = info.uri.clone (), loading = crate::nav::is_loading (&info.state), progress = crate::nav::progress_fraction (&info.state), crashed, has_children })
+
+-- A new tab's place: under `parent` while it is open, else at the top level
+-- (a page whose opener closed meanwhile still gets its tab).
+placed : &TabTree -> Option<TabId> -> (TabTree, TabId)
+placed tree parent = case parent of
+  Some p -> placed_under tree p
+  None -> crate::tabtree::open_root tree
+
+placed_under : &TabTree -> TabId -> (TabTree, TabId)
+placed_under tree parent = case crate::tabtree::open_child tree parent of
+  Ok pair -> pair
+  Err _ -> crate::tabtree::open_root tree
+
+-- The selection once a tab is opened: the new tab when asked (or when
+-- nothing was selected), else unchanged.
+chosen : Option<TabId> -> TabId -> bool -> Option<TabId>
+chosen current id select =
+  if select || current.is_none ()
+    Some id
+  else
+    current
+
+-- `st` with a new tab for `uri`, and the tab's id.
+export opened : &State -> Option<TabId> -> String -> NavHandle -> bool -> (State, TabId)
+opened st parent uri nav select =
+  (tree, id) = placed (&st.tree) parent
+  mut tabs = st.tabs.clone ()
+  tabs.insert id (TabInfo { title = String::new (), uri, nav, state = NavState::Blank })
+  (State { tree, tabs, selected = chosen st.selected id select }, id)
+
+-- The selection once `closed` is closed: `after` if it was the selected one.
+kept : Option<TabId> -> TabId -> Option<TabId> -> Option<TabId>
+kept current closed after =
+  if current == Some closed
+    after
+  else
+    current
+
+-- `st` without `id` (its children promoted), the new selection, and the
+-- closed tab's info (its machine is stopped by the caller).
+export closed : &State -> TabId -> Result<(State, Option<TabId>, TabInfo), TabsError>
+closed st id =
+  after = crate::tabtree::select_after_close (&st.tree) id
+  tree = (crate::tabtree::close (&st.tree) id |> .map_err (\_ -> TabsError::Stale id))?
+  mut tabs = st.tabs.clone ()
+  info = (tabs.remove (&id) |> .ok_or (TabsError::Stale id))?
+  selected = kept st.selected id after
+  Ok ((State { tree, tabs, selected }, selected, info))
+
+-- `st` with `id` selected.
+export selected_to : &State -> TabId -> Result<State, TabsError>
+selected_to st id =
+  if !st.tabs.contains_key (&id)
+    Err (TabsError::Stale id)
+  else
+    Ok (State { tree = st.tree.clone (), tabs = st.tabs.clone (), selected = Some id })
+
+-- The tab after (or before) the selected one, depth-first, wrapping.
+export neighbour : &State -> bool -> Option<TabId>
+neighbour st forward = case st.selected of
+  None -> None
+  Some at -> stepped_from (&st.tree) at forward
+
+stepped_from : &TabTree -> TabId -> bool -> Option<TabId>
+stepped_from tree at forward =
+  if forward
+    crate::tabtree::next tree at
+  else
+    crate::tabtree::prev tree at
+
+info_of : &State -> TabId -> Result<TabInfo, TabsError>
+info_of st id = st.tabs.get (&id) |> .cloned |> .ok_or (TabsError::Stale id)
+
+-- `st` with `id`'s info replaced.
+with_info : &State -> TabId -> TabInfo -> State
+with_info st id info =
+  mut tabs = st.tabs.clone ()
+  tabs.insert id info
+  State { tree = st.tree.clone (), tabs, selected = st.selected }
+
+-- The Effect face.
+
+-- The State, now.
+export now : Effect<State, TabsError, TabsEnv>
+now =
+  effect!
+    let tabs = ~Tabs;
+    ~tabs.cell.get::<TabsError, HNil>()
+
+store : State -> Effect<(), TabsError, TabsEnv>
+store st =
+  effect!
+    let tabs = ~Tabs;
+    ~tabs.cell.set::<TabsError, HNil>(st)
+
+-- One command to the window.
+cmd : UiCmd -> Effect<(), TabsError, TabsEnv>
+cmd c =
+  effect!
+    let ui = ~Ui;
+    ~ui.0.send(c)
+
+render : State -> Effect<(), TabsError, TabsEnv>
+render st = cmd (UiCmd::RenderTree (snapshot (&st)))
+
+-- Store `st` and show it.
+commit : State -> Effect<(), TabsError, TabsEnv>
+commit st =
+  effect!
+    ~store(st.clone());
+    ~render(st)
+
+sent : UiCmd -> Effect<Flow, TabsError, TabsEnv>
+sent c = (cmd c).map (\_ -> Flow::Continue)
+
+debug_on : String -> Effect<Flow, TabsError, TabsEnv>
+debug_on message =
+  effect!
+    ~crate::log::debug::<TabsError>(message);
+    Flow::Continue
+
+warn_on : String -> Effect<Flow, TabsError, TabsEnv>
+warn_on message =
+  effect!
+    ~crate::log::warn::<TabsError>(message);
+    Flow::Continue
+
+-- A new tab for `uri` (under `parent`, or at the top level), its machine
+-- started Blank on the node. The caller tells the window.
+export open : Option<TabId> -> String -> bool -> Effect<TabId, TabsError, TabsEnv>
+open parent uri select =
+  effect!
+    let node = ~ProcessNode;
+    let st = ~now();
+    let machine = crate::nav::start(&node, NavState::Blank);
+    let (next, id) = opened(&st, parent, uri, machine, select);
+    ~store(next);
+    id
+
+-- A top-level tab for `url`, selected.
+open_top : String -> Effect<Flow, TabsError, TabsEnv>
+open_top url =
+  effect!
+    let id = ~open(None, url.clone(), true);
+    ~cmd(UiCmd::OpenTab { id, url });
+    ~cmd(UiCmd::Select(id));
+    let st = ~now();
+    ~render(st);
+    Flow::Continue
+
+-- Ctrl+T: the homepage in a new top-level tab, the address bar focused.
+new_tab : Effect<Flow, TabsError, TabsEnv>
+new_tab =
+  effect!
+    let settings = ~Settings;
+    let flow = ~open_top(settings.homepage.clone());
+    ~cmd(UiCmd::FocusAddress);
+    flow
+
+-- A page opened a window: its tab goes under the opener and stays in the
+-- background (the opener keeps the selection).
+adopt_child : TabId -> u64 -> String -> Effect<Flow, TabsError, TabsEnv>
+adopt_child parent nonce uri =
+  effect!
+    let id = ~open(Some(parent), uri, false);
+    ~cmd(UiCmd::AdoptChild { nonce, id });
+    let st = ~now();
+    ~render(st);
+    Flow::Continue
+
+-- Close `id`: its children take its place, the selection moves per
+-- tabtree::select_after_close, its machine stops. The last tab closed ends
+-- the consumer, as a closed window does.
+close_tab : TabId -> Effect<Flow, TabsError, TabsEnv>
+close_tab id =
+  effect!
+    let node = ~ProcessNode;
+    let st = ~now();
+    let (next, selected, info) = closed(&st, id)?;
+    node.exit(info.nav.pid(), ExitReason::Shutdown);
+    ~store(next.clone());
+    ~cmd(UiCmd::CloseTab(id));
+    ~after_close(next, selected)
+
+after_close : State -> Option<TabId> -> Effect<Flow, TabsError, TabsEnv>
+after_close st selected = case selected of
+  None -> succeed Flow::Stop
+  Some s -> shown_after_close st s
+
+shown_after_close : State -> TabId -> Effect<Flow, TabsError, TabsEnv>
+shown_after_close st selected =
+  effect!
+    ~cmd(UiCmd::Select(selected));
+    ~render(st);
+    Flow::Continue
+
+-- Show `id`.
+select_tab : TabId -> Effect<Flow, TabsError, TabsEnv>
+select_tab id =
+  effect!
+    let st = ~now();
+    let next = selected_to(&st, id)?;
+    ~store(next.clone());
+    ~cmd(UiCmd::Select(id));
+    ~render(next);
+    Flow::Continue
+
+-- Ctrl+Tab / Ctrl+Shift+Tab.
+cycle : bool -> Effect<Flow, TabsError, TabsEnv>
+cycle forward =
+  effect!
+    let st = ~now();
+    ~select_maybe(neighbour(&st, forward))
+
+select_maybe : Option<TabId> -> Effect<Flow, TabsError, TabsEnv>
+select_maybe target = case target of
+  Some id -> select_tab id
+  None -> succeed Flow::Continue
+
+retitle : TabId -> String -> Effect<Flow, TabsError, TabsEnv>
+retitle id title =
+  effect!
+    let st = ~now();
+    let info = info_of(&st, id)?;
+    ~commit(with_info(&st, id, TabInfo { title, ..info }));
+    Flow::Continue
+
+-- The page's uri changed: the row and the address bar follow it.
+reuri : TabId -> String -> Effect<Flow, TabsError, TabsEnv>
+reuri id uri =
+  effect!
+    let st = ~now();
+    let info = info_of(&st, id)?;
+    ~commit(with_info(&st, id, TabInfo { uri: uri.clone(), ..info }));
+    ~cmd(UiCmd::SetAddress(id, uri));
+    Flow::Continue
+
+-- One event into the tab's machine, as a Result: an Illegal step is an
+-- answer here, not a failure.
+stepped : NavHandle -> NavEvent -> Effect<Result<NavState, NavError>, TabsError, HNil>
+stepped nav event = (crate::nav::step (&nav) event).map (\s -> Ok s) |> .catch (\e -> succeed (Err e))
+
+-- A load event for `id`: step its machine, keep the new state, show it.
+nav_event : TabId -> NavEvent -> Effect<Flow, TabsError, TabsEnv>
+nav_event id event =
+  effect!
+    let st = ~now();
+    let info = info_of(&st, id)?;
+    let outcome = ~stepped(info.nav.clone(), event);
+    ~applied(id, outcome)
+
+applied : TabId -> Result<NavState, NavError> -> Effect<Flow, TabsError, TabsEnv>
+applied id outcome = case outcome of
+  Ok state -> restated id state
+  Err (NavError::Down why) -> fail (TabsError::NavDown id why)
+  Err illegal -> debug_on ("tab #{id.id}: #{illegal}; dropped")
+
+restated : TabId -> NavState -> Effect<Flow, TabsError, TabsEnv>
+restated id state =
+  effect!
+    let st = ~now();
+    let info = info_of(&st, id)?;
+    let progress = crate::nav::progress_fraction(&state);
+    ~cmd(UiCmd::SetProgress(id, progress));
+    ~commit(with_info(&st, id, TabInfo { state, ..info }));
+    Flow::Continue
+
+-- Reload and Stop step the machine (so Reload clears a crash) and always
+-- reach the web view.
+nav_and : TabId -> NavEvent -> UiCmd -> Effect<Flow, TabsError, TabsEnv>
+nav_and id event c =
+  effect!
+    let flow = ~nav_event(id, event);
+    ~cmd(c);
+    flow
+
+-- A command for an open tab.
+to_tab : TabId -> UiCmd -> Effect<Flow, TabsError, TabsEnv>
+to_tab id c =
+  effect!
+    let st = ~now();
+    let _ = info_of(&st, id)?;
+    ~sent(c)
+
+-- The address bar: a URL to load, or the tab's own uri back.
+address : TabId -> String -> Effect<Flow, TabsError, TabsEnv>
+address id input =
+  effect!
+    let settings = ~Settings;
+    let st = ~now();
+    let info = info_of(&st, id)?;
+    let target = crate::omnibox::classify(&input, &settings.search_template);
+    ~entered(id, info.uri, target)
+
+entered : TabId -> String -> Result<Target, OmniboxError> -> Effect<Flow, TabsError, TabsEnv>
+entered id current target = case target of
+  Ok (Target::Load url) -> sent (UiCmd::Navigate id url)
+  Err why -> refused id current ("tab #{id.id}: not loading the address bar input: #{why}")
+
+refused : TabId -> String -> String -> Effect<Flow, TabsError, TabsEnv>
+refused id current message =
+  effect!
+    ~crate::log::warn::<TabsError>(message);
+    ~cmd(UiCmd::SetAddress(id, current));
+    Flow::Continue
+
+-- One event from the window.
+export handle : UiEvent -> Effect<Flow, TabsError, TabsEnv>
+handle event = case event of
+  UiEvent::WindowClosed -> succeed Flow::Stop
+  UiEvent::TitleChanged id title -> retitle id title
+  UiEvent::UriChanged id uri -> reuri id uri
+  UiEvent::LoadStarted id uri -> nav_event id (NavEvent::Started uri)
+  UiEvent::LoadRedirected id uri -> nav_event id (NavEvent::Redirected uri)
+  UiEvent::LoadCommitted id -> nav_event id NavEvent::Committed
+  UiEvent::LoadFinished id -> nav_event id NavEvent::Finished
+  UiEvent::Progress id p -> nav_event id (NavEvent::Progress p)
+  UiEvent::LoadFailed id why -> nav_event id (NavEvent::LoadFailed why)
+  UiEvent::TlsError id -> nav_event id NavEvent::TlsError
+  UiEvent::WebProcessTerminated id -> nav_event id NavEvent::WebProcessTerminated
+  UiEvent::ChildRequested { parent, nonce, uri } -> adopt_child parent nonce uri
+  UiEvent::PageClosed id -> close_tab id
+  UiEvent::NewTabRequested -> new_tab ()
+  UiEvent::CloseRequested id -> close_tab id
+  UiEvent::SelectRequested id -> select_tab id
+  UiEvent::NextTabRequested -> cycle true
+  UiEvent::PrevTabRequested -> cycle false
+  UiEvent::AddressEntered id input -> address id input
+  UiEvent::ReloadRequested id -> nav_and id NavEvent::Reload (UiCmd::Reload id)
+  UiEvent::StopRequested id -> nav_and id NavEvent::Stop (UiCmd::Stop id)
+  UiEvent::BackRequested id -> to_tab id (UiCmd::GoBack id)
+  UiEvent::ForwardRequested id -> to_tab id (UiCmd::GoForward id)
+  UiEvent::FocusAddressRequested -> sent UiCmd::FocusAddress
+
+-- An event that failed: dropped (stale tab, silent machine) or, when the
+-- window refused a command, the end of the program.
+recovered : TabsError -> Effect<Flow, TabsError, TabsEnv>
+recovered e = case e of
+  TabsError::Window why -> fail (TabsError::Window why)
+  TabsError::Stale tab -> debug_on ("dropping an event for tab #{tab.id}, which is not open")
+  TabsError::NavDown tab why -> warn_on ("tab #{tab.id}: #{why}")
+
+handled : UiEvent -> Effect<Flow, TabsError, TabsEnv>
+handled event = (handle event).catch recovered
+
+-- Startup: the view settings, then the first tab (the command-line address
+-- through the omnibox, else the homepage), selected.
+export start : Option<String> -> Effect<(), TabsError, TabsEnv>
+start argv =
+  effect!
+    let settings = ~Settings;
+    ~cmd(UiCmd::Configure(view_config(&settings)));
+    let url = ~first_url(argv, settings.homepage.clone(), settings.search_template.clone());
+    ~open_top(url);
+    ()
+
+first_url : Option<String> -> String -> String -> Effect<String, TabsError, TabsEnv>
+first_url argv homepage template = case argv of
+  None -> succeed homepage
+  Some input -> classified homepage (crate::omnibox::classify (&input) (&template))
+
+classified : String -> Result<Target, OmniboxError> -> Effect<String, TabsError, TabsEnv>
+classified homepage target = case target of
+  Ok (Target::Load url) -> succeed url
+  Err why -> homepage_after homepage ("not loading the command-line address: #{why}; opening the homepage")
+
+homepage_after : String -> String -> Effect<String, TabsError, TabsEnv>
+homepage_after homepage message =
+  effect!
+    ~crate::log::warn::<TabsError>(message);
+    homepage
+
+-- The window's events, one per pull, until the window closes or the last
+-- tab does. One per pull (not Stream::from_queue, which takes up to a chunk
+-- of 64): a restart after a defect then loses only the event that broke,
+-- never the ones queued behind it.
+consume_once : Effect<(), TabsError, TabsEnv>
+consume_once =
+  effect!
+    let events = ~UiEvents;
+    let queue = events.0.clone();
+    ~Stream::from_pull(move |_n: usize| queue.take::<TabsEnv>().map(|e| Some(vec![e])).catch(|_| succeed(None))).map_effect(handled).take_while(|f| *f == Flow::Continue).run_drain()
+
+-- The consumer, supervised: a defect restarts it (logged at error), the State
+-- carries over; a typed failure (the window refused a command) ends it; an
+-- interrupt is never restarted.
+export consume : Effect<(), TabsError, TabsEnv>
+consume =
+  attempts = Arc::new (AtomicU64::new 0)
+  (supervised (SupervisorPolicy::Restart { delay = Duration::ZERO }) (move \-> attempt (Arc::clone (&attempts)))).flat_map settled
+
+attempt : Arc<AtomicU64> -> Effect<Result<(), TabsError>, TabsError, TabsEnv>
+attempt attempts =
+  n = attempts.fetch_add 1 Ordering::SeqCst
+  body = (consume_once ()).map (\_ -> Ok (())) |> .catch (\e -> succeed (Err e))
+  if n == 0
+    body
+  else
+    (error_on ("the event consumer died; restart #{n}")).flat_map (move \_ -> body)
+
+error_on : String -> Effect<(), TabsError, TabsEnv>
+error_on message =
+  effect!
+    ~crate::log::error::<TabsError>(message)
+
+settled : Result<(), TabsError> -> Effect<(), TabsError, TabsEnv>
+settled outcome = case outcome of
+  Ok _ -> succeed (())
+  Err e -> fail e

@@ -27,6 +27,7 @@ use gtk::gio::ApplicationHoldGuard;
 use gtk::glib;
 use gtk4 as gtk;
 use id_effect::{Effect, Exit, sync};
+use id_effect_process::{NodeName, ProcessNode};
 use id_effect_tokio::TokioRuntime;
 use webkit6::prelude::*;
 use webkit6::{NetworkSession, WebView};
@@ -80,7 +81,8 @@ struct Registry {
     window: Option<gtk::ApplicationWindow>,
     session: Option<NetworkSession>,
     tabs: HashMap<TabId, WebView>,
-    /// Commands that arrived before the window existed, replayed on activate.
+    /// Commands that arrived before the window existed, replayed on activate
+    /// (the view settings, the first tab, its selection, the first tree).
     pending: Vec<UiCmd>,
     /// Keeps the application running after its window closes, until the
     /// root has finished and sent `Quit`.
@@ -98,21 +100,51 @@ fn with_registry(f: impl FnOnce(&mut Registry)) {
     });
 }
 
-/// One command, on the GTK thread.
+/// One command, on the GTK thread. Commands that arrive before the window
+/// exists (the root starts before `activate`) wait in `pending`.
 fn apply(cmd: UiCmd) {
     with_registry(|reg| match cmd {
         UiCmd::Quit => {
             reg.hold = None;
             reg.app.quit();
         }
-        UiCmd::OpenUrl(tab, url) => {
-            if reg.window.is_none() {
-                reg.pending.push(UiCmd::OpenUrl(tab, url));
-            } else {
-                open_url(reg, tab, &url);
+        cmd if reg.window.is_none() => reg.pending.push(cmd),
+        UiCmd::OpenTab { id, url } => open_url(reg, id, &url),
+        UiCmd::Navigate(tab, url) => {
+            if let Some(view) = reg.tabs.get(&tab) {
+                view.load_uri(&url);
             }
         }
+        UiCmd::Select(tab) => show(reg, tab),
+        UiCmd::CloseTab(tab) => {
+            if let Some(view) = reg.tabs.remove(&tab)
+                && let Some(window) = &reg.window
+                && window.child().as_ref() == Some(view.upcast_ref())
+            {
+                window.set_child(None::<&gtk::Widget>);
+            }
+        }
+        // gtk-shell leaf: the related view stashed for ChildRequested.
+        UiCmd::AdoptChild { .. } => {}
+        // gtk-shell leaf: the web view's own navigation.
+        UiCmd::Reload(_) | UiCmd::Stop(_) | UiCmd::GoBack(_) | UiCmd::GoForward(_) => {}
+        // gtk-shell leaf: the sidebar, the address bar and the load bar.
+        UiCmd::RenderTree(_)
+        | UiCmd::SetAddress(..)
+        | UiCmd::SetProgress(..)
+        | UiCmd::FocusAddress => {}
+        // gtk-shell leaf: WebKit settings per view.
+        UiCmd::Configure(_) => {}
     });
+}
+
+/// One window, one visible WebView: the selected tab's.
+fn show(reg: &mut Registry, tab: TabId) {
+    if let (Some(window), Some(view)) = (&reg.window, reg.tabs.get(&tab))
+        && window.child().as_ref() != Some(view.upcast_ref())
+    {
+        window.set_child(Some(view));
+    }
 }
 
 fn open_url(reg: &mut Registry, tab: TabId, url: &str) {
@@ -124,12 +156,9 @@ fn open_url(reg: &mut Registry, tab: TabId, url: &str) {
             view
         }
     };
-    if let Some(window) = &reg.window {
-        // One window, one WebView for now: the newest tab is the child.
-        if window.child().as_ref() != Some(view.upcast_ref()) {
-            window.set_child(Some(&view));
-        }
-    }
+    // One window, one WebView for now: the newest tab is shown until the
+    // program selects another.
+    show(reg, tab);
     view.load_uri(url);
 }
 
@@ -197,7 +226,7 @@ fn activate(app: &gtk::Application) {
 
 /// The program: the root on tokio, GTK on this (the main) thread, and the
 /// root's exit as the process's (id_effect_cli's contract: 0 / 1 / 101 / 130).
-pub fn run(url: String) -> ExitCode {
+pub fn run(address: Option<String>) -> ExitCode {
     let runtime = match TokioRuntime::new_multi_thread() {
         Ok(rt) => rt,
         Err(e) => {
@@ -232,7 +261,9 @@ pub fn run(url: String) -> ExitCode {
     // A daemon root fiber on the tokio executor (so it runs inside tokio's
     // context), with its handle kept: if GTK stops on its own, the root is
     // interrupted and its finalizers run.
-    let root = app::program(url).provide_layer(ui::layer(live, events));
+    // Tab machines run as processes on the same tokio executor.
+    let node = ProcessNode::on_runtime(NodeName::new("vwebbrowser"), runtime.runtime().clone());
+    let root = app::program(address).provide_layer(app::live_layer(live, events, node));
     let fiber = runtime.fork(root);
 
     // GApplication must not see the URL: it would treat it as a file to open.

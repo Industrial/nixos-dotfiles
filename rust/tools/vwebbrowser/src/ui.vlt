@@ -16,17 +16,84 @@ import crate::error::{AppError, UiError}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 export newtype TabId = TabId { export id u64 }
 
--- What the program asks of the window.
-export data UiCmd
-  = OpenUrl TabId String
-  | Quit
+-- How every web view is set up, from the Settings (sent once, at start).
+export data ViewConfig { export hardware_acceleration bool, export developer_extras bool }
   deriving (Debug, Clone, PartialEq, Eq)
 
--- What the window tells the program.
+-- One sidebar row. `depth` is the number of ancestors (0 for a top-level
+-- tab); `progress` is the load bar's fill, 0.0..=1.0, while loading.
+export data TabRow { export id TabId, export depth usize, export title String, export uri String, export loading bool, export progress Option<f64>, export crashed bool, export has_children bool }
+  deriving (Debug, Clone, PartialEq)
+
+-- The whole tab tree as the sidebar shows it: rows in depth-first order
+-- (a tab, then its children, then its next sibling), and the selected tab.
+export data TreeSnapshot { export rows Vec<TabRow>, export selected Option<TabId> }
+  deriving (Debug, Clone, PartialEq)
+
+-- What the program asks of the window.
+--
+--   OpenTab        a new web view for `id`, loading `url`
+--   AdoptChild     the view the edge made for a ChildRequested (stashed
+--                  under `nonce`) is the tab `id` from now on
+--   CloseTab       drop the tab's view
+--   Navigate, Reload, Stop, GoBack, GoForward: the tab's web view
+--   Select         show this tab's view
+--   RenderTree     redraw the sidebar from the snapshot
+--   SetAddress     the address bar text for the tab (shown while selected)
+--   SetProgress    the tab's load bar (None: no bar)
+--   FocusAddress   focus the address bar and select its text
+--   Configure      the settings every web view is built with
+--   Quit           close the window and end the GTK main loop
+export data UiCmd
+  = OpenTab { id TabId, url String }
+  | AdoptChild { nonce u64, id TabId }
+  | CloseTab TabId
+  | Navigate TabId String
+  | Reload TabId
+  | Stop TabId
+  | GoBack TabId
+  | GoForward TabId
+  | Select TabId
+  | RenderTree TreeSnapshot
+  | SetAddress TabId String
+  | SetProgress TabId (Option<f64>)
+  | FocusAddress
+  | Configure ViewConfig
+  | Quit
+  deriving (Debug, Clone, PartialEq)
+
+-- What the window tells the program: WebKit's signals for a tab, then the
+-- user's intents (shortcuts, the sidebar, the address bar).
+--
+-- ChildRequested: WebKit's `create` signal must return a web view at once,
+-- so the edge makes the related view, stashes it under an edge-local
+-- `nonce` and reports it here; the program answers AdoptChild with the same
+-- nonce and the new tab's id (a child of `parent`).
 export data UiEvent
   = WindowClosed
   | TitleChanged TabId String
   | UriChanged TabId String
+  | LoadStarted TabId String
+  | LoadRedirected TabId String
+  | LoadCommitted TabId
+  | LoadFinished TabId
+  | Progress TabId u8
+  | LoadFailed TabId String
+  | TlsError TabId
+  | WebProcessTerminated TabId
+  | ChildRequested { parent TabId, nonce u64, uri String }
+  | PageClosed TabId
+  | NewTabRequested
+  | CloseRequested TabId
+  | SelectRequested TabId
+  | NextTabRequested
+  | PrevTabRequested
+  | AddressEntered TabId String
+  | ReloadRequested TabId
+  | StopRequested TabId
+  | BackRequested TabId
+  | ForwardRequested TabId
+  | FocusAddressRequested
   deriving (Debug, Clone, PartialEq, Eq)
 
 -- The window as a port: one method, because handing a command over is all
