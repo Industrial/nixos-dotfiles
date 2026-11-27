@@ -1,27 +1,42 @@
-# NixOS VM test for the Secure Boot path of features/nixos/boot (GH-184, ADR-0007). It
-# walks the drakkar migration end to end through the real boot path: OVMF firmware, then
-# systemd-boot, then the kernel, with no direct kernel boot (virtualisation.useBootLoader).
-# It uses drakkar's profile layout: comin deploys through system-profiles/comin, and the
-# `system` profile holds a STALE generation with a higher number (drakkar's system-493).
+# NixOS VM test for the Secure Boot path of features/nixos/boot (GH-184, ADR-0007), as
+# COMIN deploys it on MUNINN. It walks the migration end to end through the real boot path:
+# OVMF firmware, then systemd-boot, then the kernel, with no direct kernel boot
+# (virtualisation.useBootLoader). drakkar is deployed by vdeploy instead; that order, and
+# the boot step failing for missing keys, is ./test-vdeploy.nix (lanzaboote-vdeploy-vm).
+#
+# comin on main runs `operation = "switch"` (features/fleet/comin.nix): set
+# system-profiles/comin, then a LIVE `switch-to-configuration switch`, which activates and
+# installs the bootloader in one step. switch-to-configuration installs the bootloader
+# first, so a failing lzbt fails comin's switch before the new generation is activated.
+#
+# muninn's profile layout, read on the host 2026-11-27 (no root): a stale `system` profile
+# (system -> system-10-link, from the install, 2026-11-01) and comin's generations
+# system-profiles/comin-10 .. comin-14. The generation NUMBERS collide across the two
+# profiles (system-10 and comin-10); lzbt's UKI names and the default hook must cope.
 #
 #   generation 1    systemd-boot with the Python installer, which is what every host runs today
-#   stale system    system-900-link -> generation 1, the highest version on the machine
-#   keys            `sbctl create-keys` into pkiBundle, as the runbook does
-#   comin-1         features.hardening.secureBoot.enable, deployed comin's way
-#                   (system-profiles/comin, then a LIVE `switch-to-configuration switch`).
-#                   lzbt installs signed UKIs for every profile, and the boot default is
-#                   comin-1, not the stale system-900. The runbook removes the Python
-#                   installer's leftover entries. REBOOT: the firmware boots comin-1
-#                   through lanzaboote.
-#   system-901      a deploy-rs/nixos-rebuild-style generation (the `system` profile)
-#                   becomes the default the same way
-#   comin-2         the rollback: Secure Boot off again, comin's way, live switch OUT. The
+#   muninn layout   system-10-link (stale), comin-10 .. comin-14, all the plain machine
+#   KEYS MISSING    comin's way with no /var/lib/sbctl. Asserted: `switch` fails in its
+#                   bootloader step, BEFORE activating (switch-to-configuration-ng installs
+#                   the bootloader first), so the host stays on prev, the ESP is untouched,
+#                   and only comin's profile already names X (comin-15)
+#   keys            `sbctl create-keys` into pkiBundle, as the runbook does (root, Tom)
+#   comin-15        features.hardening.secureBoot.enable, deployed comin's way (the same
+#                   path again, so comin-15 stays the generation). lzbt
+#                   installs signed UKIs for every profile, and the boot default is
+#                   comin-15. The runbook removes the Python installer's leftover entries.
+#                   REBOOT: the firmware boots comin-15 through lanzaboote.
+#   system-11       a by-hand nixos-rebuild into the stale `system` profile, whose number
+#                   collides with comin-11: it becomes the default by its toplevel
+#   comin-16        the rollback: Secure Boot off again, comin's way, live switch OUT. The
 #                   Python installer takes the ESP back, the runbook's cleanup removes
-#                   lanzaboote's UKIs, and after a REBOOT comin-2 boots through systemd-boot.
+#                   lanzaboote's UKIs, and after a REBOOT comin-16 boots through systemd-boot.
 #
-# After each live switch, a non-root user still runs commands (brief rule 17). Secure Boot
-# stays off in the VM firmware (stock OVMF). That is how drakkar runs between the first
-# deploy and key enrollment, and enrollment needs someone at the machine.
+# The node carries muninn's real hardening: the STIG test-host profile (ADR-0008) and the
+# Nix daemon restricted to @wheel. After each live switch and boot, a non-root wheel user
+# still runs commands and reaches the daemon. Secure Boot stays off in the VM firmware
+# (stock OVMF): that is how the host runs between the first deploy and key enrollment, and
+# enrollment needs someone at the machine.
 #
 #   nix build .#checks.x86_64-linux.lanzaboote-vm
 # Locally, only through the serialized wrapper (.tmp/vnla/vmtest.sh). CI does not build VM
@@ -52,7 +67,7 @@ pkgs.testers.runNixOSTest {
       ];
     };
   in {
-    imports = [./default.nix];
+    imports = [./default.nix ../../security/stig/profiles/test-host.nix];
 
     options.vmtest.secureBootGeneration = lib.mkEnableOption "the Secure Boot generation of this test";
 
@@ -64,9 +79,16 @@ pkgs.testers.runNixOSTest {
         cores = 2;
       };
       boot.loader.timeout = 0;
+      # qemu-vm turns timesyncd off; the STIG profile's V-268151 turns it on. The control wins.
+      services.timesyncd.enable = lib.mkForce true;
+      # muninn's restriction (features/nixos/users), so alice must reach the daemon as wheel.
+      nix.settings.allowed-users = ["@wheel"];
       # The plain generation needs sbctl to create the keys before the option is on.
       environment.systemPackages = [pkgs.sbctl];
-      users.users.alice.isNormalUser = true;
+      users.users.alice = {
+        isNormalUser = true;
+        extraGroups = ["wheel"];
+      };
       environment.etc."vmtest-installer".text =
         if config.features.hardening.secureBoot.enable
         then "lanzaboote\n"
@@ -117,15 +139,23 @@ pkgs.testers.runNixOSTest {
         machine.succeed(f"grep -l '^version Generation {generation} ' /boot/loader/entries/nixos-*.conf")
 
     def deploy(profile, system, action):
-        # What comin (system-profiles/comin) and deploy-rs (system) both do: set the
-        # profile, then run the new system's switch-to-configuration.
+        # What comin (system-profiles/comin, `switch`) and a by-hand nixos-rebuild (system)
+        # both do: set the profile, then run the new system's switch-to-configuration.
         machine.succeed(f"mkdir -p {profiles}/system-profiles")
         machine.succeed(f"nix-env -p {profile} --set {system}")
         print(machine.succeed(f"{system}/bin/switch-to-configuration {action} 2>&1"))
 
     def non_root_works():
         t.assertEqual(machine.succeed("su - alice -c 'id -un'").strip(), "alice")
-        machine.succeed("su - alice -c 'nix-store --version'")
+        machine.succeed("timeout 60 su - alice -c 'nix-store --store daemon -q --hash /run/current-system'")
+
+    def uki_for(generation, system):
+        # The UKI of <generation> that boots <system>; with colliding numbers there may be
+        # several nixos-generation-<generation>-*.efi.
+        names = machine.succeed(f"ls /boot/EFI/Linux/ | grep -E '^nixos-generation-{generation}-.*[.]efi$'").split()
+        hits = [n for n in names if machine.execute(f"grep -qaF 'init={system}/init' /boot/EFI/Linux/{n}")[0] == 0]
+        t.assertGreaterEqual(len(hits), 1, f"generation {generation}: {names}, none boots {system}")
+        return sorted(hits)[-1]
 
     machine.start(allow_reboot=True)
     machine.wait_for_unit("multi-user.target")
@@ -137,25 +167,50 @@ pkgs.testers.runNixOSTest {
         machine.fail("ls /boot/EFI/Linux/nixos-*.efi")
         t.assertIn(".conf", current_entry())
 
-    with subtest("drakkar's layout: a stale, higher-numbered system profile"):
-        machine.succeed(f"ln -s {plain} {profiles}/system-900-link")
-        machine.succeed(f"ln -sfn system-900-link {profiles}/system")
+    with subtest("muninn's layout: a stale system-10, comin-10 .. comin-14, colliding numbers"):
+        machine.succeed(f"ln -s {plain} {profiles}/system-10-link")
+        machine.succeed(f"ln -sfn system-10-link {profiles}/system")
+        machine.succeed(f"mkdir -p {profiles}/system-profiles")
+        for n in range(10, 15):
+            machine.succeed(f"ln -s {plain} {profiles}/system-profiles/comin-{n}-link")
+        machine.succeed(f"ln -sfn comin-14-link {comin}")
+        machine.fail("test -e /var/lib/sbctl")
+
+    with subtest("KEYS MISSING, comin's way: the switch fails before activating, the host stays on prev"):
+        esp_before = esp()
+        conf_before = machine.succeed("cat /boot/loader/loader.conf")
+        # comin sets its profile first, then runs `switch`; switch-to-configuration installs
+        # the bootloader BEFORE it activates, and exits 1 when that fails.
+        machine.succeed(f"nix-env -p {comin} --set {secure_boot}")
+        status, out = machine.execute(f"{secure_boot}/bin/switch-to-configuration switch 2>&1")
+        print(out)
+        t.assertNotEqual(status, 0, "comin's switch fails when the keys are missing")
+        t.assertIn("Failed to read public key", out)
+        t.assertIn("Failed to install bootloader", out)
+        # Not activated: the host runs prev. comin's profile already names X (comin-15).
+        machine.succeed(f"test $(readlink -f /run/current-system) = {plain}")
+        machine.succeed("grep -qx systemd-boot /etc/vmtest-installer")
+        t.assertEqual(machine.succeed(f"readlink {comin}").strip(), "comin-15-link")
+        # The ESP is untouched, so a reboot boots prev through systemd-boot.
+        t.assertEqual(esp(), esp_before)
+        t.assertEqual(machine.succeed("cat /boot/loader/loader.conf"), conf_before)
+        non_root_works()
 
     with subtest("keys: sbctl create-keys into pkiBundle"):
         machine.succeed("sbctl create-keys")
         machine.succeed("test -s /var/lib/sbctl/keys/db/db.pem")
         machine.succeed("test -s /var/lib/sbctl/keys/db/db.key")
 
-    with subtest("comin-1: live switch into lanzaboote, every profile installed, comin-1 the default"):
+    with subtest("comin-15: live switch into lanzaboote, every profile installed, comin-15 the default"):
         deploy(comin, secure_boot, "switch")
         esp()
+        t.assertEqual(machine.succeed(f"readlink {comin}").strip(), "comin-15-link")
         machine.succeed(f"test $(readlink -f /run/current-system) = {secure_boot}")
-        # Every profile's generations: comin-1, system-1 and the stale system-900.
-        machine.succeed("ls /boot/EFI/Linux/nixos-generation-900-*.efi")
-        t.assertEqual(len(machine.succeed("ls /boot/EFI/Linux/nixos-generation-1-*.efi").split()), 2)
+        # Every profile's generations: system-1, the stale system-10, comin-10 .. comin-15.
+        for n in [1, 10, 11, 12, 13, 14]:
+            uki_for(n, plain)
         default = loader_default()
-        t.assertRegex(default, r"^nixos-generation-1-.*\.efi$")
-        machine.succeed(f"grep -qaF 'init={secure_boot}/init' /boot/EFI/Linux/{default}")
+        t.assertEqual(default, uki_for(15, secure_boot))
         print(machine.succeed("sbctl verify 2>&1"))
         machine.succeed(f"sbctl verify 2>&1 | grep -F '{default}' | grep -v 'not signed' | grep -q 'signed'")
         non_root_works()
@@ -167,21 +222,24 @@ pkgs.testers.runNixOSTest {
     machine.reboot()
     machine.wait_for_unit("multi-user.target")
 
-    with subtest("the firmware boots comin-1 through lanzaboote, not the stale system-900"):
+    with subtest("the firmware boots comin-15 through lanzaboote"):
         t.assertEqual(booted(), secure_boot)
         machine.succeed("grep -qx lanzaboote /etc/vmtest-installer")
         t.assertEqual(current_entry(), default)
         non_root_works()
 
-    with subtest("system-901 (deploy-rs/nixos-rebuild style) becomes the default the same way"):
+    with subtest("system-11, colliding with comin-11, becomes the default by its toplevel"):
         deploy(f"{profiles}/system", secure_boot, "boot")
-        t.assertRegex(loader_default(), r"^nixos-generation-901-.*\.efi$")
+        t.assertEqual(machine.succeed(f"readlink {profiles}/system").strip(), "system-11-link")
+        t.assertEqual(loader_default(), uki_for(11, secure_boot))
+        uki_for(11, plain)
 
-    with subtest("comin-2: rollback, live switch out of lanzaboote, the Python installer takes the ESP back"):
+    with subtest("comin-16: rollback, live switch out of lanzaboote, the Python installer takes the ESP back"):
         deploy(comin, plain, "switch")
         esp()
+        t.assertEqual(machine.succeed(f"readlink {comin}").strip(), "comin-16-link")
         machine.succeed(f"test $(readlink -f /run/current-system) = {plain}")
-        python_entry(2)
+        python_entry(16)
         non_root_works()
 
     with subtest("runbook: remove lanzaboote's UKIs, which the Python installer does not collect"):
@@ -192,12 +250,14 @@ pkgs.testers.runNixOSTest {
     machine.reboot()
     machine.wait_for_unit("multi-user.target")
 
-    with subtest("comin-2 boots through systemd-boot again"):
+    with subtest("comin-16 boots through systemd-boot again"):
         t.assertEqual(booted(), plain)
         machine.succeed("grep -qx systemd-boot /etc/vmtest-installer")
         entry = current_entry()
         t.assertIn(".conf", entry)
-        machine.succeed(f"grep -q '^version Generation 2 ' /boot/loader/entries/{entry}")
+        # By its toplevel, not its number: the Python installer picks the default entry by
+        # toplevel, and the plain machine is also system-1, system-10 and comin-10 .. 14.
+        machine.succeed(f"grep -qF 'init={plain}/init' /boot/loader/entries/{entry}")
         non_root_works()
   '';
 }
