@@ -1,0 +1,17 @@
+-- What every vagent module shares: the error type and the Result-to-Effect lift.
+
+import id_effect::{Effect, HNil, fail, succeed}
+
+-- Why vagent stopped. `Usage` is the operator's; `Start` is a slot that did
+-- not come up; `Session` is the attach or the export that failed.
+export errors AgentError
+  Usage String     "#{0}"
+  Start String     "#{0}"
+  Session String   "#{0}"
+
+-- An effect for a computed result: the planned failure stays typed.
+export lifted : given <A: Send + 'static> Result<A, AgentError> -> Effect<A, AgentError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e

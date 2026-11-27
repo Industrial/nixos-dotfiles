@@ -29,5 +29,7 @@ in
     # nix-output-monitor, vmon's (GH-181, the same suite), and nix-tree, vwhy's (GH-182).
     # nh is retired by vswitch (GH-241) and is not a rollback (vswitch's lands on
     # nixos-rebuild); it stays parked so a host can still opt in.
-    onlyCreativeParked = assay.eq (lib.filter (n: !builtins.elem n enabledSomewhere) names) ["cli.nh" "cli.nix-output-monitor" "cli.nix-tree" "cli.nvd" "creative.gimp" "creative.obs-studio" "creative.openpencil"];
+    # virtualisation.microvm-host is switched on by ai.agent-vm, which imports it (#353); a
+    # selection-only evaluation does not see that.
+    onlyCreativeParked = assay.eq (lib.filter (n: !builtins.elem n enabledSomewhere) names) ["cli.nh" "cli.nix-output-monitor" "cli.nix-tree" "cli.nvd" "creative.gimp" "creative.obs-studio" "creative.openpencil" "virtualisation.microvm-host"];
   }

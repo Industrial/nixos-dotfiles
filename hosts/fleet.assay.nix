@@ -20,14 +20,17 @@ let
   #   22/tcp    sshd — services.openssh.openFirewall defaults to true
   #   5353/udp  mDNS
   # Note what is NOT here: mimir's NFS (111, 2049, 20048) is opened on tailscale0 only.
-  publicTCP = onAll [22];
+  #   3128/tcp  muninn only: each agent slot's egress proxy, on that slot's own tap and
+  #             nowhere else (features/ai/agent-vm, #353)
+  publicTCP = onAll [22] // {muninn = [22 3128];};
   publicUDP = onAll [5353];
-  # mimir's NFS; drakkar's vcache (features/nix/vcache, fleet.cachePort).
+  # mimir's NFS; drakkar's vcache (features/nix/vcache, fleet.cachePort); muninn's agent slots.
   tailnetTCP =
     onAll {}
     // {
       mimir.tailscale0 = [111 2049 20048];
       drakkar.tailscale0 = [(import ../common/fleet.nix).cachePort];
+      muninn = lib.genAttrs ["agvm1" "agvm2" "agvm3"] (_: [3128]);
     };
 in
   assay.suite "fleet" {

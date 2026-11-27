@@ -157,6 +157,16 @@
       inputs.pre-commit.inputs.flake-compat.follows = "flake-compat";
     };
 
+    # microVMs for agent sessions (ADR-0009, #353): its guest module and generated
+    # cloud-hypervisor runner are used as they are (features/ai/agent-vm); its host module is
+    # not (features/virtualisation/microvm-host runs each VM under its own user). Adopted
+    # upstream, not rewritten. Its only other input, spectrum, is source for its own
+    # spectrum-os examples and builds nothing the fleet uses.
+    microvm = {
+      url = "github:microvm-nix/microvm.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Pull-based convergence; not packaged in nixpkgs. See ADR-0002.
     comin = {
       url = "github:nlewo/comin";
@@ -431,6 +441,9 @@
       # features/cli/vlocate (GH-245): the fleet's systems and the command-not-found hint in
       # nushell, fish and zsh, as a normal user.
       // {vlocate-vm = import ./features/cli/vlocate/test.nix {inherit pkgs;};}
+      # features/ai/agent-vm (ADR-0009, #353): a microVM nested in a STIG test-host VM, probed
+      # from inside the guest, the feature switched in and out live.
+      // {agent-vm = import ./features/ai/agent-vm/test.nix {inherit pkgs inputs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;

@@ -20,6 +20,7 @@
 # out until they are listed here.
 [
   # ai
+  ./ai/agent-vm
   ./ai/claude-code
   ./ai/paseo
 
@@ -225,6 +226,9 @@
   ./storage/nfs-client
   ./storage/nfs-server
   ./storage/qdirstat
+
+  # virtualisation
+  ./virtualisation/microvm-host
 
   # window-manager
   ./window-manager/alacritty

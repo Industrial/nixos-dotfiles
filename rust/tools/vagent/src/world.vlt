@@ -1,0 +1,167 @@
+-- The one capability vagent needs from the outside, `World`, with the live
+-- host and a scripted one for tests:
+--
+--   run          a command with this terminal's stdio (systemctl, ssh, git, cp)
+--   write        a file, replaced atomically, readable by the slot's user
+--   read         a file's text (the session key's public half)
+--   private_dir  a directory only this user can read (the session's key)
+--   remove_dir   that directory, gone however the session ended
+--   now_ms       a monotonic clock, for the start-up time
+--   say          one line to stderr
+--
+-- Every live step is one blocking call inside `suspend`: vagent is one
+-- operator's command, with no fiber beside it to starve.
+
+import std::fs
+import std::os::unix::fs::PermissionsExt
+import std::process::Command
+import std::sync::{Arc, Mutex}
+import std::time::Instant
+import id_effect::{Effect, HNil, Never, fail, succeed, suspend}
+import crate::common::AgentError
+import crate::common::AgentError::Session
+import crate::common::lifted
+
+export class World
+  run : &self -> Vec<String> -> Effect<(), AgentError, HNil>
+  write : &self -> String -> String -> Effect<(), AgentError, HNil>
+  read : &self -> String -> Effect<String, AgentError, HNil>
+  private_dir : &self -> String -> Effect<(), AgentError, HNil>
+  remove_dir : &self -> String -> Effect<(), Never, HNil>
+  now_ms : &self -> Effect<u128, Never, HNil>
+  say : &self -> String -> Effect<(), Never, HNil>
+
+export newtype WorldTool = WorldTool (export Arc<dyn World + Send + Sync>)
+
+instance Clone WorldTool
+  clone : &self -> Self
+  clone self = WorldTool (Arc::clone (&self.0))
+
+-- The live host.
+export data Live { export started Instant }
+  deriving (Debug, Clone)
+
+export live : Live
+live = Live { started = Instant::now () }
+
+-- Run a command with our stdio; its failure as a message.
+ran : &[String] -> Result<(), String>
+ran cmd =
+  case cmd.split_first () of
+    None -> Err (.to_string "an empty command")
+    Some (program, args) ->
+      status = (Command::new program |> .args args |> .status () |> .map_err (\e -> "running #{program}: #{e}"))?
+      if status.success ()
+        Ok ()
+      else
+        Err "#{cmd.join " "} failed (#{status})"
+
+-- Write `path` through a temporary file and a rename, mode 0644: the slot's
+-- user (not in the operators' group) reads it; the slot's 2770 directory keeps
+-- everyone else out.
+written : &str -> &str -> Result<(), String>
+written path text =
+  tmp = "#{path}.vagent-tmp"
+  (fs::write (&tmp) text |> .map_err (\e -> "writing #{tmp}: #{e}"))?
+  (fs::set_permissions (&tmp) (fs::Permissions::from_mode 0o644) |> .map_err (\e -> "chmod #{tmp}: #{e}"))?
+  fs::rename (&tmp) path |> .map_err (\e -> "renaming #{tmp} to #{path}: #{e}")
+
+made_private : &str -> Result<(), String>
+made_private dir =
+  (fs::create_dir_all dir |> .map_err (\e -> "creating #{dir}: #{e}"))?
+  fs::set_permissions dir (fs::Permissions::from_mode 0o700) |> .map_err (\e -> "chmod #{dir}: #{e}")
+
+removed : String -> Effect<(), Never, HNil>
+removed dir =
+  fs::remove_dir_all (&dir) |> .ok
+  succeed (())
+
+said : String -> Effect<(), Never, HNil>
+said line =
+  eprintln! \-> "vagent: #{line}"
+  succeed (())
+
+instance World Live
+  run : &self -> Vec<String> -> Effect<(), AgentError, HNil>
+  run self cmd =
+    suspend (move \-> lifted (ran (&cmd) |> .map_err (\e -> Session (e))))
+  write : &self -> String -> String -> Effect<(), AgentError, HNil>
+  write self path text =
+    suspend (move \-> lifted (written (&path) (&text) |> .map_err (\e -> Session (e))))
+  read : &self -> String -> Effect<String, AgentError, HNil>
+  read self path =
+    suspend (move \-> lifted (fs::read_to_string (&path) |> .map_err (\e -> Session ("reading #{path}: #{e}"))))
+  private_dir : &self -> String -> Effect<(), AgentError, HNil>
+  private_dir self dir =
+    suspend (move \-> lifted (made_private (&dir) |> .map_err (\e -> Session (e))))
+  remove_dir : &self -> String -> Effect<(), Never, HNil>
+  remove_dir self dir =
+    suspend (move \-> removed dir)
+  now_ms : &self -> Effect<u128, Never, HNil>
+  now_ms self =
+    t = self.started
+    suspend (move \-> succeed (t.elapsed () |> .as_millis))
+  say : &self -> String -> Effect<(), Never, HNil>
+  say self line =
+    suspend (move \-> said line)
+
+-- A scripted host, for tests: a run of a command containing a word in
+-- `failing` fails, and every call is logged.
+export data Scripted
+  { export failing Vec<String>
+  , export log Arc<Mutex<Vec<String>>>
+  }
+  deriving (Clone, Default)
+
+noted : &Arc<Mutex<Vec<String>>> -> String -> ()
+noted log line =
+  if log.lock () is Ok held
+    mut v = held
+    v.push line
+  ()
+
+export log_of : &Scripted -> Vec<String>
+log_of w = w.log.lock () |> .map (\v -> v.clone ()) |> .unwrap_or_default
+
+instance World Scripted
+  run : &self -> Vec<String> -> Effect<(), AgentError, HNil>
+  run self cmd =
+    line = cmd.join " "
+    noted (&self.log) ("run #{line}")
+    if self.failing.iter () |> .any (\w -> line.contains (w.as_str ()))
+      fail (Session (.to_string "scripted failure"))
+    else
+      succeed (())
+  write : &self -> String -> String -> Effect<(), AgentError, HNil>
+  write self path text =
+    noted (&self.log) ("write #{path} #{text.len ()}")
+    succeed (())
+  read : &self -> String -> Effect<String, AgentError, HNil>
+  read self path =
+    noted (&self.log) ("read #{path}")
+    succeed (.to_string "ssh-ed25519 AAAA vagent")
+  private_dir : &self -> String -> Effect<(), AgentError, HNil>
+  private_dir self dir =
+    noted (&self.log) ("mkdir #{dir}")
+    succeed (())
+  remove_dir : &self -> String -> Effect<(), Never, HNil>
+  remove_dir self dir =
+    noted (&self.log) ("rmdir #{dir}")
+    succeed (())
+  now_ms : &self -> Effect<u128, Never, HNil>
+  now_ms self = succeed 0
+  say : &self -> String -> Effect<(), Never, HNil>
+  say self line =
+    noted (&self.log) ("say #{line}")
+    succeed (())
+
+test "a file is written whole, 0644, through a rename"
+  dir = std::env::temp_dir () |> .join ("vagent-write-#{std::process::id ()}")
+  fs::create_dir_all (&dir) |> .expect "scratch"
+  p = dir.join "f" |> .to_string_lossy |> .to_string
+  written (&p) "one" |> .expect "first"
+  written (&p) "two" |> .expect "second"
+  assert_eq! \-> fs::read_to_string (&p) |> .expect "read" \-> "two"
+  mode = fs::metadata (&p) |> .expect "meta" |> .permissions |> .mode
+  assert_eq! \-> mode % 512 \-> 420
+  fs::remove_dir_all (&dir) |> .ok
