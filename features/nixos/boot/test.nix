@@ -102,8 +102,8 @@ in
         # muninn's restriction (features/nixos/users), so alice must reach the daemon as wheel.
         nix.settings.allowed-users = ["@wheel"];
         # The test operator's private key, in the image (useBootLoader: no host store).
-      environment.etc."vmtest-operator-key".source = snakeOil.snakeOilEd25519PrivateKey;
-      # sbctl for the checks, age for decrypting the backup with the test operator key.
+        environment.etc."vmtest-operator-key".source = snakeOil.snakeOilEd25519PrivateKey;
+        # sbctl for the checks, age for decrypting the backup with the test operator key.
         environment.systemPackages = [pkgs.sbctl pkgs.age];
         users.users.alice = {
           isNormalUser = true;
@@ -274,8 +274,12 @@ in
           decrypt_as_operator()
           # A keys/ without db.key is refused, not overwritten.
           machine.succeed("mv /var/lib/sbctl /var/lib/sbctl.real && install -d -m 0700 /var/lib/sbctl/keys")
-          status, out = machine.execute("systemctl restart sbctl-keys.service 2>&1; journalctl -u sbctl-keys -n 5 -o cat")
+          status, _ = machine.execute("systemctl restart sbctl-keys.service")
+          t.assertNotEqual(status, 0, "sbctl-keys.service fails on a partial bundle")
+          ensure = "$(systemctl cat sbctl-keys.service | sed -n 's|^ExecStart=\\(.*/sbctl-ensure-keys\\)$|\\1|p')"
+          status, out = machine.execute(f"{ensure} 2>&1")
           print(out)
+          t.assertNotEqual(status, 0)
           t.assertIn("refusing to create keys over it", out)
           machine.fail("test -e /var/lib/sbctl/keys/db")
           machine.succeed("rm -r /var/lib/sbctl && mv /var/lib/sbctl.real /var/lib/sbctl")
