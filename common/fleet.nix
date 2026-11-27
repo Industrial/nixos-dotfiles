@@ -28,11 +28,36 @@
 #                  derivation (GH-252). Absent = true. Bringing a host back is
 #                  deleting its `online = false;` line.
 #
+# Compartment trust facts (GH-421, epic GH-419). What the hardware can attest, read by the
+# compartment policy; every host carries all four.
+#   trustTier       — "local-hw-attested": a fleet machine with a TPM2 that roots its
+#                     own attestation. "local-unattested": no TPM2 (or none verified).
+#   cpu             — { vendor ("amd" | "intel"); model; sevSnp; tdx; }. sevSnp/tdx say
+#                     whether the CPU can run confidential VMs (AMD SEV-SNP, Intel TDX);
+#                     consumer parts cannot, so every host today is false/false.
+#   tpm2            — a TPM 2.0 is present (/dev/tpm0, tpm_version_major = 2).
+#   attestationRoot — the pinned root of the host's DICE chain, the way operatorKey pins
+#                     its ssh key. Decided 2026-11-27: pure DICE chains rooted in each
+#                     host's TPM, no fleet CA. null until enrolled.
+# Facts were read non-root over ssh on 2026-11-27 (/proc/cpuinfo flags, /dev/tpm0,
+# /sys/class/tpm/tpm0/tpm_version_major, kvm_amd's sev_snp parameter). A host that was
+# unreachable says so next to its facts.
+#
 # Host names double as MagicDNS short names on the tailnet.
 let
   hosts = {
     drakkar = {
       description = "desktop and gaming station";
+      trustTier = "local-hw-attested";
+      # Zen 4 desktop part: svm, but no SEV/SEV-SNP (kvm_amd sev_snp = N).
+      cpu = {
+        vendor = "amd";
+        model = "AMD Ryzen 9 7950X";
+        sevSnp = false;
+        tdx = false;
+      };
+      tpm2 = true;
+      attestationRoot = null;
       # vdeploy: vdeploy deploys this host, health-checked with rollback, and comin is
       # retired (features/nix/vdeploy, GH-160).
       roles = ["desktop" "builder" "nfs-client" "vdeploy"];
@@ -51,6 +76,18 @@ let
       # Out of reach since 2026-11 (no WiFi, router full): no longer a builder for clients (GH-252).
       online = false;
       description = "tablet (Intel N200)";
+      # UNVERIFIED: huginn was unreachable on 2026-11-27 (ssh timed out). The CPU is from
+      # hosts/huginn (N200, Alder Lake-N: vmx, no TDX). Its TPM is not checked, so it
+      # claims none and stays unattested until probed; the N200's PTT is a likely TPM2.
+      trustTier = "local-unattested";
+      cpu = {
+        vendor = "intel";
+        model = "Intel N200";
+        sevSnp = false;
+        tdx = false;
+      };
+      tpm2 = false;
+      attestationRoot = null;
       roles = ["tablet" "builder" "nfs-client"];
       tailscaleIp = "100.70.136.13";
       operatorKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINvaH/4XK0nQr6vo1ZZYpk0SIv0LvtJm6yxWMv7U2/Gb tom@huginn";
@@ -62,6 +99,16 @@ let
     };
     mimir = {
       description = "always-on file server";
+      trustTier = "local-hw-attested";
+      # Zen 3 mobile part: svm, no SEV/SEV-SNP (kvm_amd sev_snp = N).
+      cpu = {
+        vendor = "amd";
+        model = "AMD Ryzen 7 5825U";
+        sevSnp = false;
+        tdx = false;
+      };
+      tpm2 = true;
+      attestationRoot = null;
       # vdeploy: vdeploy deploys this host instead of comin (GH-160), after drakkar's 5
       # clean deploys on 2026-11-22.
       roles = ["server" "monitoring" "nfs-server" "remote-desktop-relay" "vdeploy"];
@@ -81,6 +128,16 @@ let
       # Out of reach since 2026-11 (no WiFi, router full): no longer a builder for clients (GH-252).
       online = false;
       description = "work laptop; monitoring standby when mimir is down";
+      trustTier = "local-hw-attested";
+      # Comet Lake-H: vmx, no TDX.
+      cpu = {
+        vendor = "intel";
+        model = "Intel Core i7-10750H";
+        sevSnp = false;
+        tdx = false;
+      };
+      tpm2 = true;
+      attestationRoot = null;
       # Never "nfs-client": a work machine holds no personal files, so it neither
       # mounts mimir's /data nor appears in its export list.
       roles = ["laptop" "work" "builder" "monitoring"];
