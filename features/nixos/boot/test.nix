@@ -27,7 +27,7 @@
 #                   comin-15. The runbook removes the Python installer's leftover entries.
 #                   REBOOT: the firmware boots comin-15 through lanzaboote.
 #   system-11       a by-hand nixos-rebuild into the stale `system` profile, whose number
-#                   collides with comin-11: it becomes the default by its toplevel
+#                   collides with comin-11: both get a UKI, the default still boots X
 #   comin-16        the rollback: Secure Boot off again, comin's way, live switch OUT. The
 #                   Python installer takes the ESP back, the runbook's cleanup removes
 #                   lanzaboote's UKIs, and after a REBOOT comin-16 boots through systemd-boot.
@@ -228,11 +228,16 @@ pkgs.testers.runNixOSTest {
         t.assertEqual(current_entry(), default)
         non_root_works()
 
-    with subtest("system-11, colliding with comin-11, becomes the default by its toplevel"):
+    with subtest("system-11, colliding with comin-11: both get a UKI, the default still boots X"):
         deploy(f"{profiles}/system", secure_boot, "boot")
         t.assertEqual(machine.succeed(f"readlink {profiles}/system").strip(), "system-11-link")
-        t.assertEqual(loader_default(), uki_for(11, secure_boot))
+        # system-11 and comin-11 share a number; each gets its own UKI.
+        uki_for(11, secure_boot)
         uki_for(11, plain)
+        # system-11 is the same toplevel as comin-15, so the hook keeps the highest UKI that
+        # boots it: the default still boots secure_boot.
+        default = loader_default()
+        machine.succeed(f"grep -qaF 'init={secure_boot}/init' /boot/EFI/Linux/{default}")
 
     with subtest("comin-16: rollback, live switch out of lanzaboote, the Python installer takes the ESP back"):
         deploy(comin, plain, "switch")
