@@ -64,13 +64,12 @@ in
     nixTreeRollsBack = assay.eq [(builtins.elem "cli.vwhy" rolledBack) (builtins.elem "cli.nix-tree" rolledBack)] [true true];
 
     # vswitch took over from nh and nixos-rebuild (GH-241): bin/update/system switches
-    # through it (bin/dev.d/test.sh checks the script). nh stays installed off the default
-    # path, so the rollback has a working tool the moment it is needed.
-    vswitchIsTheDefaultNhKept = assay.eq [(has "cli.vswitch") (has "cli.nh")] [true true];
+    # through it (bin/dev.d/test.sh checks the script), and nh is retired: not installed.
+    vswitchReplacesNh = assay.eq [(has "cli.vswitch") (has "cli.nh")] [true false];
 
-    # The rollback is one option: a host that turns vswitch off still has nh, and
-    # bin/update/system falls back to nixos-rebuild, with nothing else to change.
-    rollbackKeepsNh = let
+    # The rollback is one option: a host that turns vswitch off lands on nixos-rebuild
+    # (bin/update/system falls back to it); nh does not come back.
+    rollbackLandsOnNixosRebuild = let
       off = features.enabledFeatures (features.evalSelection {
         modules = [
           ({lib, ...}: {
@@ -80,7 +79,7 @@ in
         ];
       });
     in
-      assay.eq [(builtins.elem "cli.vswitch" off) (builtins.elem "cli.nh" off)] [false true];
+      assay.eq [(builtins.elem "cli.vswitch" off) (builtins.elem "cli.nh" off)] [false false];
 
     # vlocate complements nix-index (GH-245): both are on, and one option turns vlocate off
     # with nix-index left as it was.
