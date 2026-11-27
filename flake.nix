@@ -371,8 +371,11 @@
       # vbuild's two-node test and fan-out benchmark (rust/tools/vbuild/vm-test.nix).
       // {vbuild-vm = import ./rust/tools/vbuild/vm-test.nix {inherit pkgs;};}
       # features/nixos/boot's Secure Boot path (GH-184): systemd-boot -> lanzaboote -> reboot
-      # -> rollback to systemd-boot -> reboot, through OVMF and the ESP.
+      # -> rollback to systemd-boot -> reboot, through OVMF and the ESP. lanzaboote-vm deploys
+      # comin's way on muninn's profile layout; lanzaboote-vdeploy-vm runs the real vdeploy
+      # apply on drakkar's, including the boot step failing for missing keys.
       // {lanzaboote-vm = import ./features/nixos/boot/test.nix {inherit pkgs inputs;};}
+      // {lanzaboote-vdeploy-vm = import ./features/nixos/boot/test-vdeploy.nix {inherit pkgs inputs;};}
       # features/nix/vdaemon-proxy in a VM (#157).
       // {vdaemon-proxy-vm = import ./features/nix/vdaemon-proxy/test.nix {inherit pkgs;};}
       # ... and switched into and out of a running system.
